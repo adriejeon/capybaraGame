@@ -1,0 +1,59 @@
+name: capybara_game
+description: "카피바라 캐릭터 카드 짝 맞추기 게임"
+publish_to: "none"
+
+version: 1.0.0+1
+
+environment:
+  sdk: ">=3.0.0 <4.0.0"
+  flutter: ">=3.10.0"
+
+# Dependencies specify other packages that your package needs in order to work.
+# To automatically upgrade your package dependencies to the latest versions
+# consider running `flutter pub upgrade --major-versions`. Alternatively,
+# dependencies can be manually updated by changing the version numbers below to
+# the latest version available on pub.dev. To see which dependencies have newer
+# versions available, run `flutter pub outdated`.
+dependencies:
+  flutter:
+    sdk: flutter
+
+  # 게임 엔진
+  flame: ^1.15.0
+
+  # 상태 관리
+  provider: ^6.1.1
+
+  # 데이터 저장
+  shared_preferences: ^2.2.2
+
+  # 광고 (일시적으로 비활성화)
+  # google_mobile_ads: ^3.1.0
+
+  # UI
+  flutter_svg: ^2.0.9
+  cupertino_icons: ^1.0.8
+
+  # 유틸리티
+  path_provider: ^2.1.1
+  device_info_plus: ^9.1.1
+  package_info_plus: ^4.2.0
+
+dev_dependencies:
+  flutter_test:
+    sdk: flutter
+  flutter_lints: ^5.0.0
+  very_good_analysis: ^5.1.0
+
+# For information on the generic Dart part of this file, see the
+# following page: https://dart.dev/tools/pub/pubspec
+
+# The following section is specific to Flutter packages.
+flutter:
+  uses-material-design: true
+
+  assets:
+    - assets/
+    - assets/capybara/
+    - assets/images/
+    - assets/audio/
