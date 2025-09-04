@@ -235,50 +235,89 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white, // 하얀색 배경
         title: Text(
-          isWin ? '🎉 축하합니다!' : '⏰ 시간 종료',
+          isWin ? '축하합니다!' : '시간 종료',
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              isWin ? '모든 카드를 맞추셨습니다!' : '다시 도전해보세요!',
-              style: const TextStyle(fontSize: 18),
-            ),
-            const SizedBox(height: 20),
-            Container(
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF8F9FA), // 연한 회색
-                borderRadius: BorderRadius.circular(10),
-                border: Border.all(color: const Color(0xFFE6F3FF)),
+        content: SizedBox(
+          width:
+              MediaQuery.of(context).size.width * 0.8, // 다이얼로그 너비를 화면의 80%로 설정
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start, // 전체 컨텐츠 좌측 정렬
+            children: [
+              Text(
+                isWin ? '모든 카드를 맞추셨습니다!' : '다시 도전해보세요!',
+                style: const TextStyle(fontSize: 18),
               ),
-              child: Column(
-                children: [
-                  Text('점수: $_score점', style: const TextStyle(fontSize: 16)),
-                  Text('이동 횟수: $_moves번', style: const TextStyle(fontSize: 16)),
-                  if (isWin)
-                    Text('남은 시간: ${GameHelpers.formatTime(_remainingTime)}',
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity, // 다이얼로그에 꽉 차게
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA), // 연한 회색
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE6F3FF)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start, // 좌측 정렬
+                  children: [
+                    Text('점수: $_score점', style: const TextStyle(fontSize: 16)),
+                    const SizedBox(height: 8),
+                    Text('이동 횟수: $_moves번',
                         style: const TextStyle(fontSize: 16)),
-                ],
+                    if (isWin) ...[
+                      const SizedBox(height: 8),
+                      Text('남은 시간: ${GameHelpers.formatTime(_remainingTime)}',
+                          style: const TextStyle(fontSize: 16)),
+                    ],
+                  ],
+                ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
         actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              Navigator.of(context).pop(); // 홈으로 돌아가기
-            },
-            child: const Text('홈으로'),
-          ),
-          ElevatedButton(
-            onPressed: () {
-              Navigator.of(context).pop();
-              _restartGame();
-            },
-            child: const Text('다시 하기'),
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // 홈으로 돌아가기
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2), // 파란색 텍스트
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 16), // 버튼 높이 증가
+                  ),
+                  child: const Text(
+                    '홈으로',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold), // 텍스트 크기 증가
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _restartGame();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2), // 진한 파란색 배경
+                    foregroundColor: Colors.white, // 흰색 텍스트
+                    padding:
+                        const EdgeInsets.symmetric(vertical: 16), // 버튼 높이 증가
+                  ),
+                  child: const Text(
+                    '다시 하기',
+                    style: TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold), // 텍스트 크기 증가
+                  ),
+                ),
+              ),
+            ],
           ),
         ],
       ),
@@ -369,26 +408,36 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       return LayoutBuilder(
         builder: (context, constraints) {
           // 화면 크기에 맞게 카드 크기 계산
-          final availableWidth = constraints.maxWidth - 32; // 패딩 제외
-          final availableHeight = constraints.maxHeight - 32; // 패딩 제외
+          final availableWidth = constraints.maxWidth - 32; // 좌우 패딩 제외
+          final availableHeight = constraints.maxHeight - 80; // 하단 마진 80px 확보
 
           // 2x4 그리드에 맞게 카드 크기 계산 (2개씩 4줄)
-          final cardWidth = (availableWidth - (1 * 2)) / 2; // 1개 간격, 2개 카드
-          final cardHeight = (availableHeight - (3 * 2)) / 4; // 3개 간격, 4개 카드
+          final cardWidth = (availableWidth - 8) / 2; // 8px 간격, 2개 카드
+          final cardHeight = (availableHeight - 24) / 4; // 24px 간격, 4개 카드
           final cardSize = cardWidth < cardHeight ? cardWidth : cardHeight;
+
+          // 최소/최대 카드 크기 제한
+          final minCardSize = 60.0;
+          final maxCardSize = 120.0;
+          final finalCardSize = cardSize.clamp(minCardSize, maxCardSize);
 
           return Center(
             child: Padding(
-              padding: const EdgeInsets.all(16),
+              padding: const EdgeInsets.only(
+                left: 16,
+                right: 16,
+                top: 16,
+                bottom: 80, // 하단 마진 80px
+              ),
               child: SizedBox(
-                width: cardSize * 2 + 1 * 2, // 카드 2개 + 간격 1개
-                height: cardSize * 4 + 3 * 2, // 카드 4개 + 간격 3개
+                width: finalCardSize * 2 + 8, // 카드 2개 + 간격 8px
+                height: finalCardSize * 4 + 24, // 카드 4개 + 간격 24px
                 child: GridView.builder(
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                     crossAxisCount: 2,
-                    crossAxisSpacing: 2,
-                    mainAxisSpacing: 2,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
                     childAspectRatio: 1,
                   ),
                   itemCount: _gameBoard.cards.length,
@@ -408,28 +457,61 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       );
     }
 
-    // 보통/어려움 난이도: 스크롤 가능
-    return SingleChildScrollView(
-      padding: const EdgeInsets.all(16),
-      child: GridView.builder(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: _gameBoard.gridWidth,
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 1,
-        ),
-        itemCount: _gameBoard.cards.length,
-        itemBuilder: (context, index) {
-          final card = _gameBoard.cards[index];
-          return GameCardWidget(
-            card: card,
-            onTap: () => _onCardTapped(card),
-            flipAnimation: _flipAnimationController,
-          );
-        },
-      ),
+    // 보통/어려움 난이도: 화면에 맞게 카드 크기 조정
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 화면 크기에 맞게 카드 크기 계산
+        final availableWidth = constraints.maxWidth - 32; // 좌우 패딩 제외
+        final availableHeight = constraints.maxHeight - 80; // 하단 마진 80px 확보
+
+        // 그리드 크기에 맞게 카드 크기 계산
+        final cardWidth = (availableWidth - ((_gameBoard.gridWidth - 1) * 8)) /
+            _gameBoard.gridWidth;
+        final cardHeight =
+            (availableHeight - ((_gameBoard.gridHeight - 1) * 8)) /
+                _gameBoard.gridHeight;
+        final cardSize = cardWidth < cardHeight ? cardWidth : cardHeight;
+
+        // 최소/최대 카드 크기 제한
+        final minCardSize = 40.0;
+        final maxCardSize = 100.0;
+        final finalCardSize = cardSize.clamp(minCardSize, maxCardSize);
+
+        return Center(
+          child: Padding(
+            padding: const EdgeInsets.only(
+              left: 16,
+              right: 16,
+              top: 16,
+              bottom: 80, // 하단 마진 80px
+            ),
+            child: SizedBox(
+              width: finalCardSize * _gameBoard.gridWidth +
+                  ((_gameBoard.gridWidth - 1) * 8),
+              height: finalCardSize * _gameBoard.gridHeight +
+                  ((_gameBoard.gridHeight - 1) * 8),
+              child: GridView.builder(
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: _gameBoard.gridWidth,
+                  crossAxisSpacing: 8,
+                  mainAxisSpacing: 8,
+                  childAspectRatio: 1,
+                ),
+                itemCount: _gameBoard.cards.length,
+                itemBuilder: (context, index) {
+                  final card = _gameBoard.cards[index];
+                  return GameCardWidget(
+                    card: card,
+                    onTap: () => _onCardTapped(card),
+                    flipAnimation: _flipAnimationController,
+                  );
+                },
+              ),
+            ),
+          ),
+        );
+      },
     );
   }
 
