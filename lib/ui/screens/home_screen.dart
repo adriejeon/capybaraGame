@@ -16,45 +16,96 @@ class HomeScreen extends StatelessWidget {
           image: DecorationImage(
             image: AssetImage('assets/images/main.jpg'),
             fit: BoxFit.cover,
+            alignment: Alignment.bottomCenter, // 이미지를 하단에 맞춤
           ),
         ),
         child: SafeArea(
-          child: Column(
-            children: [
-              const Spacer(flex: 1),
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 화면 크기에 따라 버튼 크기 조정
+              final screenWidth = constraints.maxWidth;
+              final screenHeight = constraints.maxHeight;
 
-              // 난이도 선택 버튼들
-              Column(
+              // 버튼 크기를 화면 크기에 맞게 조정
+              final buttonWidth = (screenWidth * 0.6).clamp(280.0, 400.0);
+              final buttonHeight = (buttonWidth * 0.34).clamp(90.0, 140.0);
+
+              // 화면 비율에 따라 버튼 위치 조정
+              final isTablet = screenWidth > 800; // 태블릿/아이패드 감지
+              final topFlex = 1; // 모든 디바이스에서 상단 여백 최소화
+              final bottomFlex = isTablet ? 5 : 6; // 모든 디바이스에서 하단 영역 조금 더 늘림
+
+              return Column(
                 children: [
-                  // 쉬움 버튼
-                  _buildImageButton(
-                    context,
-                    'assets/images/button-easy.png',
-                    GameDifficulty.easy,
+                  // 상단 여백 (반응형)
+                  Expanded(
+                    flex: topFlex,
+                    child: Container(),
                   ),
 
-                  const SizedBox(height: 25),
+                  // 버튼 영역 (반응형 위치)
+                  Expanded(
+                    flex: bottomFlex,
+                    child: SingleChildScrollView(
+                      child: Padding(
+                        padding: EdgeInsets.only(
+                          bottom: screenHeight * 0.02, // 모든 디바이스에서 하단 여백 더 최소화
+                          left: 20,
+                          right: 20,
+                        ),
+                        child: Column(
+                          mainAxisAlignment:
+                              MainAxisAlignment.center, // 모든 디바이스에서 중앙 정렬
+                          children: [
+                            // 난이도 선택 버튼들
+                            Column(
+                              children: [
+                                // 쉬움 버튼
+                                _buildImageButton(
+                                  context,
+                                  'assets/images/button-easy.png',
+                                  GameDifficulty.easy,
+                                  buttonWidth,
+                                  buttonHeight,
+                                ),
 
-                  // 보통 버튼
-                  _buildImageButton(
-                    context,
-                    'assets/images/button-normal.png',
-                    GameDifficulty.medium,
-                  ),
+                                SizedBox(
+                                    height: isTablet
+                                        ? screenHeight * 0.02
+                                        : screenHeight * 0.025),
 
-                  const SizedBox(height: 25),
+                                // 보통 버튼
+                                _buildImageButton(
+                                  context,
+                                  'assets/images/button-normal.png',
+                                  GameDifficulty.medium,
+                                  buttonWidth,
+                                  buttonHeight,
+                                ),
 
-                  // 어려움 버튼
-                  _buildImageButton(
-                    context,
-                    'assets/images/button-hard.png',
-                    GameDifficulty.hard,
+                                SizedBox(
+                                    height: isTablet
+                                        ? screenHeight * 0.02
+                                        : screenHeight * 0.025),
+
+                                // 어려움 버튼
+                                _buildImageButton(
+                                  context,
+                                  'assets/images/button-hard.png',
+                                  GameDifficulty.hard,
+                                  buttonWidth,
+                                  buttonHeight,
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
                   ),
                 ],
-              ),
-
-              const Spacer(flex: 4),
-            ],
+              );
+            },
           ),
         ),
       ),
@@ -66,12 +117,14 @@ class HomeScreen extends StatelessWidget {
     BuildContext context,
     String imagePath,
     GameDifficulty difficulty,
+    double width,
+    double height,
   ) {
     return GestureDetector(
       onTap: () => _startGame(context, difficulty),
       child: Container(
-        width: 320,
-        height: 110,
+        width: width,
+        height: height,
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(20),
         ),
@@ -80,8 +133,8 @@ class HomeScreen extends StatelessWidget {
           child: Image.asset(
             imagePath,
             fit: BoxFit.contain,
-            width: 320,
-            height: 110,
+            width: width,
+            height: height,
           ),
         ),
       ),

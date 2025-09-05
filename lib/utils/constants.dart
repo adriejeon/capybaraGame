@@ -3,7 +3,7 @@ class GameConstants {
   // 게임 설정 - 카드 개수 기준
   static const int easyCardCount = 8; // 4쌍
   static const int mediumCardCount = 24; // 12쌍
-  static const int hardCardCount = 48; // 24쌍
+  static const int hardCardCount = 40; // 20쌍 (40개 카드)
 
   // 그리드 크기 계산 (카드 개수에 따라)
   static int getGridSize(GameDifficulty difficulty) {

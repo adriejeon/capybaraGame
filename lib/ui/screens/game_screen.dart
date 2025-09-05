@@ -335,7 +335,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F8FF), // 연한 파스텔 하늘색
       appBar: AppBar(
-        title: Text('카피바라 짝 맞추기 - ${_getDifficultyText()}'),
+        title: Text('카피바라를 찾아라 - ${_getDifficultyText()}'),
         backgroundColor: Colors.white, // 하얀색 헤더
         elevation: 0,
         foregroundColor: Colors.black87,
@@ -416,10 +416,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
           final cardHeight = (availableHeight - 24) / 4; // 24px 간격, 4개 카드
           final cardSize = cardWidth < cardHeight ? cardWidth : cardHeight;
 
-          // 최소/최대 카드 크기 제한
-          final minCardSize = 60.0;
-          final maxCardSize = 120.0;
-          final finalCardSize = cardSize.clamp(minCardSize, maxCardSize);
+          // 카드 크기를 조정 (0.9배)
+          final finalCardSize = cardSize * 0.9;
 
           return Center(
             child: Padding(
@@ -472,10 +470,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                 _gameBoard.gridHeight;
         final cardSize = cardWidth < cardHeight ? cardWidth : cardHeight;
 
-        // 최소/최대 카드 크기 제한
-        final minCardSize = 40.0;
-        final maxCardSize = 100.0;
-        final finalCardSize = cardSize.clamp(minCardSize, maxCardSize);
+        // 카드 크기를 조정 (0.9배)
+        final finalCardSize = cardSize * 0.9;
 
         return Center(
           child: Padding(

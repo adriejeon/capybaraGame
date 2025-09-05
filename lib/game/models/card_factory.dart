@@ -103,9 +103,9 @@ class CapybaraCardFactory {
     // 카드들을 섞기
     final shuffledCards = GameHelpers.shuffleList(cards);
 
-    // 그리드 크기 계산 (어려움 단계는 6x8 고정)
+    // 그리드 크기 계산 (어려움 단계는 5x8 고정)
     final gridSize = difficulty == GameDifficulty.hard
-        ? GridSize(6, 8) // 어려움: 6x8 (48개 카드)
+        ? GridSize(5, 8) // 어려움: 5x8 (40개 카드)
         : _calculateGridSize(cardCount);
 
     return GameBoard(
