@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../utils/constants.dart';
 import 'game_screen.dart';
+import 'collection_screen.dart';
 
 /// 메인 홈 화면
 class HomeScreen extends StatelessWidget {
@@ -96,6 +97,18 @@ class HomeScreen extends StatelessWidget {
                                   buttonWidth,
                                   buttonHeight,
                                 ),
+
+                                SizedBox(
+                                    height: isTablet
+                                        ? screenHeight * 0.02
+                                        : screenHeight * 0.025),
+
+                                // 컬렉션 버튼
+                                _buildCollectionButton(
+                                  context,
+                                  buttonWidth,
+                                  buttonHeight,
+                                ),
                               ],
                             ),
                           ],
@@ -141,12 +154,49 @@ class HomeScreen extends StatelessWidget {
     );
   }
 
+  /// 컬렉션 버튼 생성
+  Widget _buildCollectionButton(
+    BuildContext context,
+    double width,
+    double height,
+  ) {
+    return GestureDetector(
+      onTap: () => _openCollection(context),
+      child: Container(
+        width: width,
+        height: height,
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(20),
+          child: Image.asset(
+            'assets/images/button-collection.png',
+            fit: BoxFit.contain,
+            width: width,
+            height: height,
+          ),
+        ),
+      ),
+    );
+  }
+
   /// 게임 시작
   void _startGame(BuildContext context, GameDifficulty difficulty) {
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => GameScreen(difficulty: difficulty),
+      ),
+    );
+  }
+
+  /// 컬렉션 화면 열기
+  void _openCollection(BuildContext context) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const CollectionScreen(),
       ),
     );
   }

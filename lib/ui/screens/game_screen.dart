@@ -6,6 +6,9 @@ import '../../utils/helpers.dart';
 import '../../game/models/card.dart';
 import '../../game/models/card_factory.dart';
 import '../widgets/game_card_widget.dart';
+import '../../sound_manager.dart';
+import '../../data/collection_manager.dart';
+import 'collection_screen.dart';
 
 /// 실제 게임 화면
 class GameScreen extends StatefulWidget {
@@ -23,9 +26,12 @@ class GameScreen extends StatefulWidget {
 class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   late GameBoard _gameBoard;
   late AnimationController _flipAnimationController;
+  final SoundManager _soundManager = SoundManager();
+  final CollectionManager _collectionManager = CollectionManager();
 
   Timer? _gameTimer;
   Timer? _hintTimer;
+  Timer? _idleTimer; // 사용자 비활성 상태 체크용 타이머
   int _remainingTime = 0;
   int _score = 0;
   int _moves = 0;
@@ -34,6 +40,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   final List<GameCard> _selectedCards = [];
   bool _isProcessing = false;
   GameState _gameState = GameState.playing;
+  bool _isShowingHint = false; // 카드 힌트 표시 중인지 확인
 
   @override
   void initState() {
@@ -46,7 +53,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void dispose() {
     _gameTimer?.cancel();
     _hintTimer?.cancel();
+    _idleTimer?.cancel();
     _flipAnimationController.dispose();
+    _soundManager.dispose();
     super.dispose();
   }
 
@@ -57,7 +66,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     // 타이머 설정
     _remainingTime = GameHelpers.getTimeLimit(widget.difficulty);
     _startTimer();
-    _startHintTimer();
+    _startIdleTimer();
 
     // 초기값 설정
     _score = 0;
@@ -65,6 +74,10 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     _comboCount = 0;
     _selectedCards.clear();
     _gameState = GameState.playing;
+    _isShowingHint = false;
+
+    // 게임 시작 시 카드 힌트 표시
+    _showInitialCardHint();
   }
 
   void _setupAnimations() {
@@ -87,14 +100,47 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     });
   }
 
-  void _startHintTimer() {
+  /// 사용자 비활성 상태 체크 타이머 시작
+  void _startIdleTimer() {
     // 쉬움 난이도에서는 힌트 제공하지 않음
     if (widget.difficulty == GameDifficulty.easy) return;
 
-    _hintTimer?.cancel();
-    _hintTimer = Timer.periodic(const Duration(seconds: 3), (timer) {
-      if (_gameState == GameState.playing && !_isProcessing) {
+    _idleTimer?.cancel();
+    _idleTimer = Timer(const Duration(seconds: 5), () {
+      if (_gameState == GameState.playing &&
+          !_isProcessing &&
+          !_isShowingHint) {
         _showHint();
+      }
+    });
+  }
+
+  /// 사용자 액션 시 비활성 타이머 리셋
+  void _resetIdleTimer() {
+    _idleTimer?.cancel();
+    _startIdleTimer();
+  }
+
+  /// 게임 시작 시 모든 카드 힌트 표시
+  void _showInitialCardHint() {
+    setState(() {
+      _isShowingHint = true;
+      // 모든 카드를 앞면으로 뒤집기
+      for (final card in _gameBoard.cards) {
+        card.flip();
+      }
+    });
+
+    // 3초 후 모든 카드를 뒷면으로 뒤집기
+    Timer(const Duration(milliseconds: 3000), () {
+      if (mounted) {
+        setState(() {
+          _isShowingHint = false;
+          // 모든 카드를 뒷면으로 뒤집기
+          for (final card in _gameBoard.cards) {
+            card.flip();
+          }
+        });
       }
     });
   }
@@ -137,6 +183,8 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
             }
           }
         });
+        // 힌트 표시 후 비활성 타이머 다시 시작
+        _resetIdleTimer();
       }
     });
   }
@@ -146,15 +194,23 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
         card.isMatched ||
         card.isFlipped ||
         _selectedCards.length >= 2 ||
-        _gameState != GameState.playing) {
+        _gameState != GameState.playing ||
+        _isShowingHint) {
+      // 힌트 표시 중에는 카드 선택 불가
       return;
     }
+
+    // 카드 선택 시 사운드 재생
+    _soundManager.playCardFlipSound();
 
     setState(() {
       card.flip();
       _selectedCards.add(card);
       _moves++;
     });
+
+    // 사용자 액션 시 비활성 타이머 리셋
+    _resetIdleTimer();
 
     if (_selectedCards.length == 2) {
       _checkMatch();
@@ -178,6 +234,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
 
   void _handleMatch(GameCard card1, GameCard card2) {
     _comboCount++;
+
+    // 카드 매칭 성공 시 사운드 재생
+    _soundManager.playMatchSuccessSound();
 
     setState(() {
       card1.markAsMatched();
@@ -214,6 +273,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   void _endGame(bool isWin) {
     _gameTimer?.cancel();
     _hintTimer?.cancel();
+    _idleTimer?.cancel();
 
     setState(() {
       _gameState = isWin ? GameState.gameOver : GameState.gameOver;
@@ -222,54 +282,144 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     if (isWin) {
       // 시간 보너스 추가
       _score += _remainingTime * GameConstants.timeBonus;
-    }
+      // 게임 완료 시 사운드 재생
+      _soundManager.playGameCompleteSound();
 
-    // 결과 다이얼로그 표시
-    _showGameResultDialog(isWin);
+      // 컬렉션에 새 카드 추가
+      _addToCollection();
+    } else {
+      // 결과 다이얼로그 표시
+      _showGameResultDialog(isWin, null);
+    }
   }
 
-  void _showGameResultDialog(bool isWin) {
+  /// 컬렉션에 새 카드 추가
+  void _addToCollection() async {
+    // 컬렉션 매니저 초기화
+    await _collectionManager.initializeCollection();
+    final result = await _collectionManager.addNewCard(widget.difficulty);
+    _showGameResultDialog(true, result);
+  }
+
+  void _showGameResultDialog(bool isWin, CollectionResult? result) {
+    if (isWin && result != null) {
+      // 게임 승리 시 선물 박스 다이얼로그 먼저 표시
+      _showGiftBoxDialog(result);
+    } else {
+      // 게임 실패 시 기존 다이얼로그 표시
+      _showFailureDialog();
+    }
+  }
+
+  /// 선물 박스 다이얼로그 표시
+  void _showGiftBoxDialog(CollectionResult result) {
     showDialog(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.white, // 하얀색 배경
-        title: Text(
-          isWin ? '축하합니다!' : '시간 종료',
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        backgroundColor: Colors.white,
+        title: const Text(
+          '축하합니다!',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         content: SizedBox(
-          width:
-              MediaQuery.of(context).size.width * 0.8, // 다이얼로그 너비를 화면의 80%로 설정
+          width: MediaQuery.of(context).size.width * 0.8,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start, // 전체 컨텐츠 좌측 정렬
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              Text(
-                isWin ? '모든 카드를 맞추셨습니다!' : '다시 도전해보세요!',
-                style: const TextStyle(fontSize: 18),
+              const Text(
+                '모든 카드를 맞추셨습니다!',
+                style: TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 20),
+              // 선물 박스 이미지
+              GestureDetector(
+                onTap: () => _openGiftBox(context, result),
+                child: Container(
+                  width: 120,
+                  height: 120,
+                  decoration: BoxDecoration(
+                    borderRadius: BorderRadius.circular(15),
+                    border: Border.all(
+                      color: const Color(0xFFFFD700), // 골드 색상
+                      width: 3,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.1),
+                        blurRadius: 8,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: Image.asset(
+                      'assets/capybara/collection/gift_box.jpg',
+                      fit: BoxFit.cover,
+                      errorBuilder: (context, error, stackTrace) {
+                        return Container(
+                          color: Colors.grey[200],
+                          child: const Icon(
+                            Icons.card_giftcard,
+                            color: Colors.grey,
+                            size: 50,
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFFFD700), width: 1),
+                ),
+                child: const Row(
+                  children: [
+                    Icon(
+                      Icons.touch_app,
+                      color: Color(0xFFB8860B),
+                      size: 20,
+                    ),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '눌러서 카피바라 캐릭터를 뽑으세요!',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Color(0xFFB8860B),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               const SizedBox(height: 20),
               Container(
-                width: double.infinity, // 다이얼로그에 꽉 차게
+                width: double.infinity,
                 padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA), // 연한 회색
+                  color: const Color(0xFFF8F9FA),
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFE6F3FF)),
                 ),
                 child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start, // 좌측 정렬
+                  crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
                     Text('점수: $_score점', style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
                     Text('이동 횟수: $_moves번',
                         style: const TextStyle(fontSize: 16)),
-                    if (isWin) ...[
-                      const SizedBox(height: 8),
-                      Text('남은 시간: ${GameHelpers.formatTime(_remainingTime)}',
-                          style: const TextStyle(fontSize: 16)),
-                    ],
+                    const SizedBox(height: 8),
+                    Text('남은 시간: ${GameHelpers.formatTime(_remainingTime)}',
+                        style: const TextStyle(fontSize: 16)),
                   ],
                 ),
               ),
@@ -286,14 +436,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     Navigator.of(context).pop(); // 홈으로 돌아가기
                   },
                   style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF4A90E2), // 파란색 텍스트
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 16), // 버튼 높이 증가
+                    foregroundColor: const Color(0xFF4A90E2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
                     '홈으로',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold), // 텍스트 크기 증가
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -305,15 +453,299 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
                     _restartGame();
                   },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2), // 진한 파란색 배경
-                    foregroundColor: Colors.white, // 흰색 텍스트
-                    padding:
-                        const EdgeInsets.symmetric(vertical: 16), // 버튼 높이 증가
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
                     '다시 하기',
-                    style: TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold), // 텍스트 크기 증가
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 게임 실패 다이얼로그 표시
+  void _showFailureDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: const Text(
+          '시간 종료',
+          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Text(
+                '다시 도전해보세요!',
+                style: TextStyle(fontSize: 18),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF8F9FA),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: const Color(0xFFE6F3FF)),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text('점수: $_score점', style: const TextStyle(fontSize: 16)),
+                    const SizedBox(height: 8),
+                    Text('이동 횟수: $_moves번',
+                        style: const TextStyle(fontSize: 16)),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // 홈으로 돌아가기
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    '홈으로',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _restartGame();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    '다시 하기',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 선물 박스 열기 (카드 뽑기)
+  void _openGiftBox(BuildContext context, CollectionResult result) {
+    Navigator.of(context).pop(); // 선물 박스 다이얼로그 닫기
+
+    // 카드 뽑기 다이얼로그 표시
+    _showCardDrawDialog(result);
+  }
+
+  /// 카드 뽑기 다이얼로그 표시 (애니메이션 포함)
+  void _showCardDrawDialog(CollectionResult result) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _CardDrawDialog(
+        result: result,
+        onComplete: () {
+          Navigator.of(context).pop(); // 카드 뽑기 다이얼로그 닫기
+          _showFinalResultDialog(result); // 최종 결과 다이얼로그 표시
+        },
+      ),
+    );
+  }
+
+  /// 최종 결과 다이얼로그 표시
+  void _showFinalResultDialog(CollectionResult result) {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        title: Text(
+          result.isNewCard ? '새로운 카피바라!' : '카피바라 카드',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.center,
+            children: [
+              // 카드 이미지
+              Container(
+                width: 120,
+                height: 120,
+                decoration: BoxDecoration(
+                  borderRadius: BorderRadius.circular(15),
+                  border: Border.all(
+                    color: result.isNewCard
+                        ? const Color(0xFF4A90E2)
+                        : const Color(0xFFF0AD4E),
+                    width: 3,
+                  ),
+                ),
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: result.card != null
+                      ? Image.asset(
+                          result.card!.imagePath,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[200],
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                                size: 30,
+                              ),
+                            );
+                          },
+                        )
+                      : Container(
+                          color: Colors.grey[200],
+                          child: const Icon(
+                            Icons.image_not_supported,
+                            color: Colors.grey,
+                            size: 30,
+                          ),
+                        ),
+                ),
+              ),
+              const SizedBox(height: 16),
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: result.isNewCard
+                      ? const Color(0xFFE8F5E8)
+                      : const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(
+                      color: result.isNewCard
+                          ? const Color(0xFF4A90E2)
+                          : const Color(0xFFF0AD4E),
+                      width: 1),
+                ),
+                child: Row(
+                  children: [
+                    Icon(
+                      result.isNewCard ? Icons.stars : Icons.info,
+                      color: result.isNewCard
+                          ? const Color(0xFF4A90E2)
+                          : const Color(0xFFF0AD4E),
+                      size: 20,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        result.message,
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: result.isNewCard
+                              ? const Color(0xFF2C5F8B)
+                              : const Color(0xFFB8860B),
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          if (result.isNewCard) ...[
+            // 새로운 카드 획득 시 컬렉션 확인 버튼 표시
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton(
+                onPressed: () {
+                  Navigator.of(context).pop(); // 다이얼로그 닫기
+                  Navigator.of(context).pushAndRemoveUntil(
+                    MaterialPageRoute(
+                      builder: (context) => const CollectionScreen(),
+                    ),
+                    (route) => route.isFirst, // 첫 번째 페이지(메인)까지만 유지
+                  );
+                },
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4A90E2),
+                  side: const BorderSide(
+                    color: Color(0xFF4A90E2),
+                    width: 2,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 16),
+                ),
+                child: const Text(
+                  '컬렉션 확인하기',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
+          Row(
+            children: [
+              Expanded(
+                child: TextButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    Navigator.of(context).pop(); // 홈으로 돌아가기
+                  },
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    '홈으로',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                ),
+              ),
+              const SizedBox(width: 8),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _restartGame();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: const Text(
+                    '다시 하기',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -335,7 +767,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
     return Scaffold(
       backgroundColor: const Color(0xFFF0F8FF), // 연한 파스텔 하늘색
       appBar: AppBar(
-        title: Text('카피바라를 찾아라 - ${_getDifficultyText()}'),
+        title: Text('카피바라 찾기 - ${_getDifficultyText()}'),
         backgroundColor: Colors.white, // 하얀색 헤더
         elevation: 0,
         foregroundColor: Colors.black87,
@@ -363,7 +795,9 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   Widget _buildGameInfoBar() {
     return Container(
       padding: const EdgeInsets.all(16),
-      color: const Color(0xFFE6F3FF), // 연한 파스텔 하늘색
+      color: _isShowingHint
+          ? const Color(0xFFFFF8E1) // 힌트 표시 중일 때는 주황색
+          : const Color(0xFFE6F3FF), // 연한 파스텔 하늘색
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
@@ -520,5 +954,233 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       case GameDifficulty.hard:
         return '어려움';
     }
+  }
+}
+
+/// 카드 뽑기 애니메이션 다이얼로그
+class _CardDrawDialog extends StatefulWidget {
+  final CollectionResult result;
+  final VoidCallback onComplete;
+
+  const _CardDrawDialog({
+    required this.result,
+    required this.onComplete,
+  });
+
+  @override
+  State<_CardDrawDialog> createState() => _CardDrawDialogState();
+}
+
+class _CardDrawDialogState extends State<_CardDrawDialog>
+    with TickerProviderStateMixin {
+  late AnimationController _scaleController;
+  late AnimationController _rotationController;
+  late AnimationController _fadeController;
+  late Animation<double> _scaleAnimation;
+  late Animation<double> _rotationAnimation;
+  late Animation<double> _fadeAnimation;
+
+  bool _showCard = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupAnimations();
+    _startAnimation();
+  }
+
+  void _setupAnimations() {
+    // 스케일 애니메이션 (선물 박스 -> 카드)
+    _scaleController = AnimationController(
+      duration: const Duration(milliseconds: 800),
+      vsync: this,
+    );
+    _scaleAnimation = Tween<double>(
+      begin: 1.0,
+      end: 1.2,
+    ).animate(CurvedAnimation(
+      parent: _scaleController,
+      curve: Curves.elasticOut,
+    ));
+
+    // 회전 애니메이션
+    _rotationController = AnimationController(
+      duration: const Duration(milliseconds: 1000),
+      vsync: this,
+    );
+    _rotationAnimation = Tween<double>(
+      begin: 0.0,
+      end: 2.0,
+    ).animate(CurvedAnimation(
+      parent: _rotationController,
+      curve: Curves.easeInOut,
+    ));
+
+    // 페이드 애니메이션
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 600),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    ));
+  }
+
+  void _startAnimation() async {
+    // 1. 선물 박스 스케일 애니메이션
+    await _scaleController.forward();
+
+    // 2. 회전 애니메이션과 함께 카드로 변환
+    _rotationController.forward();
+
+    // 0.5초 후 카드 표시
+    await Future.delayed(const Duration(milliseconds: 500));
+    setState(() {
+      _showCard = true;
+    });
+
+    // 3. 카드 페이드 인
+    await _fadeController.forward();
+
+    // 2초 후 완료 콜백 호출
+    await Future.delayed(const Duration(milliseconds: 2000));
+    widget.onComplete();
+  }
+
+  @override
+  void dispose() {
+    _scaleController.dispose();
+    _rotationController.dispose();
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text(
+              '카드를 뽑는 중...',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            const SizedBox(height: 30),
+            // 애니메이션 영역
+            SizedBox(
+              width: 150,
+              height: 150,
+              child: AnimatedBuilder(
+                animation: Listenable.merge([
+                  _scaleController,
+                  _rotationController,
+                  _fadeController,
+                ]),
+                builder: (context, child) {
+                  return Transform.scale(
+                    scale: _scaleAnimation.value,
+                    child: Transform.rotate(
+                      angle: _rotationAnimation.value * 3.14159,
+                      child: Container(
+                        width: 150,
+                        height: 150,
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(15),
+                          border: Border.all(
+                            color: _showCard
+                                ? (widget.result.isNewCard
+                                    ? const Color(0xFF4A90E2)
+                                    : const Color(0xFFF0AD4E))
+                                : const Color(0xFFFFD700),
+                            width: 3,
+                          ),
+                          boxShadow: [
+                            BoxShadow(
+                              color: Colors.black.withOpacity(0.3),
+                              blurRadius: 10,
+                              offset: const Offset(0, 5),
+                            ),
+                          ],
+                        ),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: _showCard
+                              ? FadeTransition(
+                                  opacity: _fadeAnimation,
+                                  child: widget.result.card != null
+                                      ? Image.asset(
+                                          widget.result.card!.imagePath,
+                                          fit: BoxFit.cover,
+                                          errorBuilder:
+                                              (context, error, stackTrace) {
+                                            return Container(
+                                              color: Colors.grey[200],
+                                              child: const Icon(
+                                                Icons.image_not_supported,
+                                                color: Colors.grey,
+                                                size: 40,
+                                              ),
+                                            );
+                                          },
+                                        )
+                                      : Container(
+                                          color: Colors.grey[200],
+                                          child: const Icon(
+                                            Icons.image_not_supported,
+                                            color: Colors.grey,
+                                            size: 40,
+                                          ),
+                                        ),
+                                )
+                              : Image.asset(
+                                  'assets/capybara/collection/gift_box.jpg',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[200],
+                                      child: const Icon(
+                                        Icons.card_giftcard,
+                                        color: Colors.grey,
+                                        size: 50,
+                                      ),
+                                    );
+                                  },
+                                ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 30),
+            if (_showCard) ...[
+              FadeTransition(
+                opacity: _fadeAnimation,
+                child: Text(
+                  widget.result.isNewCard ? '새로운 카피바라!' : '이미 가지고 있는 카피바라',
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
   }
 }
