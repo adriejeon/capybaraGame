@@ -22,11 +22,19 @@ class _CollectionScreenState extends State<CollectionScreen> {
   }
 
   Future<void> _loadCollection() async {
-    await _collectionManager.initializeCollection();
-    setState(() {
-      _collection = _collectionManager.collection;
-      _isLoading = false;
-    });
+    try {
+      await _collectionManager.initializeCollection();
+      setState(() {
+        _collection = _collectionManager.collection;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('컬렉션 로드 실패: $e');
+      setState(() {
+        _collection = [];
+        _isLoading = false;
+      });
+    }
   }
 
   @override
@@ -170,7 +178,7 @@ class _CollectionScreenState extends State<CollectionScreen> {
   /// 컬렉션 카드 위젯
   Widget _buildCollectionCard(CollectionItem item, int index) {
     return GestureDetector(
-      onTap: () => _showCardDetail(item, index),
+      onTap: () => _onCardTapped(item, index),
       child: Container(
         decoration: BoxDecoration(
           borderRadius: BorderRadius.circular(12),
@@ -211,6 +219,35 @@ class _CollectionScreenState extends State<CollectionScreen> {
                   },
                 ),
               ),
+              // NEW 태그
+              if (item.isUnlocked && item.isNew)
+                Positioned(
+                  top: 4,
+                  left: 4,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFF4444), // 빨간색 배경
+                      borderRadius: BorderRadius.circular(8),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 4,
+                          offset: const Offset(0, 1),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'NEW',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ),
             ],
           ),
         ),
@@ -240,6 +277,19 @@ class _CollectionScreenState extends State<CollectionScreen> {
       case GameDifficulty.hard:
         return '어려움';
     }
+  }
+
+  /// 카드 클릭 처리
+  void _onCardTapped(CollectionItem item, int index) async {
+    // NEW 태그가 있는 카드를 클릭한 경우 태그 제거
+    if (item.isUnlocked && item.isNew) {
+      await _collectionManager.removeNewTag(item.id);
+      // 컬렉션 다시 로드하여 UI 업데이트
+      await _loadCollection();
+    }
+
+    // 카드 상세 정보 다이얼로그 표시
+    _showCardDetail(item, index);
   }
 
   /// 카드 상세 정보 다이얼로그

@@ -22,12 +22,14 @@ class CollectionItem {
   final GameDifficulty difficulty;
   final String imagePath;
   final bool isUnlocked;
+  final bool isNew; // NEW 태그 표시 여부
 
   CollectionItem({
     required this.id,
     required this.difficulty,
     required this.imagePath,
     required this.isUnlocked,
+    this.isNew = false,
   });
 
   Map<String, dynamic> toJson() {
@@ -36,6 +38,7 @@ class CollectionItem {
       'difficulty': difficulty.name,
       'imagePath': imagePath,
       'isUnlocked': isUnlocked,
+      'isNew': isNew,
     };
   }
 
@@ -46,16 +49,18 @@ class CollectionItem {
         (e) => e.name == json['difficulty'],
       ),
       imagePath: json['imagePath'],
-      isUnlocked: json['isUnlocked'],
+      isUnlocked: json['isUnlocked'] ?? false,
+      isNew: json['isNew'] ?? false, // 기존 데이터 호환성을 위해 기본값 false
     );
   }
 
-  CollectionItem copyWith({bool? isUnlocked}) {
+  CollectionItem copyWith({bool? isUnlocked, bool? isNew}) {
     return CollectionItem(
       id: id,
       difficulty: difficulty,
       imagePath: imagePath,
       isUnlocked: isUnlocked ?? this.isUnlocked,
+      isNew: isNew ?? this.isNew,
     );
   }
 }
@@ -78,10 +83,20 @@ class CollectionManager {
     final collectionData = prefs.getString(_collectionKey);
 
     if (collectionData != null) {
-      // 저장된 데이터가 있으면 로드
-      final jsonList = jsonDecode(collectionData) as List;
-      _collection =
-          jsonList.map((json) => CollectionItem.fromJson(json)).toList();
+      try {
+        // 저장된 데이터가 있으면 로드
+        final jsonList = jsonDecode(collectionData) as List;
+        _collection = jsonList.map((json) {
+          // 안전하게 JSON 파싱
+          final Map<String, dynamic> safeJson = Map<String, dynamic>.from(json);
+          return CollectionItem.fromJson(safeJson);
+        }).toList();
+      } catch (e) {
+        // 데이터 파싱 실패 시 기본 컬렉션 생성
+        print('컬렉션 데이터 파싱 실패, 기본 컬렉션 생성: $e');
+        _collection = _createDefaultCollection();
+        await _saveCollection();
+      }
     } else {
       // 처음 실행 시 기본 컬렉션 생성
       _collection = _createDefaultCollection();
@@ -193,6 +208,7 @@ class CollectionManager {
       difficulty: selectedSlot.difficulty,
       imagePath: selectedImagePath,
       isUnlocked: true,
+      isNew: true, // 새로 획득한 카드이므로 NEW 태그 표시
     );
 
     await _saveCollection();
@@ -246,6 +262,15 @@ class CollectionManager {
   /// 난이도별 전체 카드 수 반환
   int getTotalCountByDifficulty(GameDifficulty difficulty) {
     return _collection.where((item) => item.difficulty == difficulty).length;
+  }
+
+  /// NEW 태그 제거 (카드 클릭 시 호출)
+  Future<void> removeNewTag(int cardId) async {
+    final index = _collection.indexWhere((item) => item.id == cardId);
+    if (index != -1 && _collection[index].isNew) {
+      _collection[index] = _collection[index].copyWith(isNew: false);
+      await _saveCollection();
+    }
   }
 
   /// 컬렉션 초기화 (디버깅/테스트용)
