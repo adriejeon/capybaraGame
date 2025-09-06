@@ -1,7 +1,13 @@
 import 'package:flutter/material.dart';
 import 'ui/screens/home_screen.dart';
+import 'sound_manager.dart';
 
-void main() {
+void main() async {
+  WidgetsFlutterBinding.ensureInitialized();
+
+  // SoundManager 초기화
+  await SoundManager().initialize();
+
   runApp(const CapybaraGameApp());
 }
 

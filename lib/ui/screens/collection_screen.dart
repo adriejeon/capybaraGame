@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../data/collection_manager.dart';
 import '../../utils/constants.dart';
+import '../../sound_manager.dart';
 
 /// 컬렉션 화면
 class CollectionScreen extends StatefulWidget {
@@ -10,15 +11,43 @@ class CollectionScreen extends StatefulWidget {
   State<CollectionScreen> createState() => _CollectionScreenState();
 }
 
-class _CollectionScreenState extends State<CollectionScreen> {
+class _CollectionScreenState extends State<CollectionScreen>
+    with WidgetsBindingObserver {
   final CollectionManager _collectionManager = CollectionManager();
+  final SoundManager _soundManager = SoundManager();
   List<CollectionItem> _collection = [];
   bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _loadCollection();
+  }
+
+  @override
+  void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
+    super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        _soundManager.pauseBgm();
+        break;
+      case AppLifecycleState.resumed:
+        _soundManager.resumeBgm();
+        break;
+      case AppLifecycleState.detached:
+        break;
+      case AppLifecycleState.hidden:
+        _soundManager.pauseBgm();
+        break;
+    }
   }
 
   Future<void> _loadCollection() async {

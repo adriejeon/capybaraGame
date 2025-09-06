@@ -23,7 +23,8 @@ class GameScreen extends StatefulWidget {
   State<GameScreen> createState() => _GameScreenState();
 }
 
-class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
+class _GameScreenState extends State<GameScreen>
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   late GameBoard _gameBoard;
   late AnimationController _flipAnimationController;
   final SoundManager _soundManager = SoundManager();
@@ -45,18 +46,42 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this);
     _initializeGame();
     _setupAnimations();
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _gameTimer?.cancel();
     _hintTimer?.cancel();
     _idleTimer?.cancel();
     _flipAnimationController.dispose();
-    _soundManager.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    switch (state) {
+      case AppLifecycleState.paused:
+      case AppLifecycleState.inactive:
+        // 앱이 백그라운드로 이동하거나 비활성화될 때 배경음 일시정지
+        _soundManager.pauseBgm();
+        break;
+      case AppLifecycleState.resumed:
+        // 앱이 다시 활성화될 때 배경음 재개
+        _soundManager.resumeBgm();
+        break;
+      case AppLifecycleState.detached:
+        // 앱이 종료될 때는 특별한 처리 없음
+        break;
+      case AppLifecycleState.hidden:
+        // 앱이 숨겨질 때 배경음 일시정지
+        _soundManager.pauseBgm();
+        break;
+    }
   }
 
   void _initializeGame() {
@@ -285,26 +310,18 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
       // 게임 완료 시 사운드 재생
       _soundManager.playGameCompleteSound();
 
-      // 컬렉션에 새 카드 추가
-      _addToCollection();
+      // 선물 박스 다이얼로그 표시 (카드는 아직 추가하지 않음)
+      _showGiftBoxDialog();
     } else {
       // 결과 다이얼로그 표시
       _showGameResultDialog(isWin, null);
     }
   }
 
-  /// 컬렉션에 새 카드 추가
-  void _addToCollection() async {
-    // 컬렉션 매니저 초기화
-    await _collectionManager.initializeCollection();
-    final result = await _collectionManager.addNewCard(widget.difficulty);
-    _showGameResultDialog(true, result);
-  }
-
   void _showGameResultDialog(bool isWin, CollectionResult? result) {
     if (isWin && result != null) {
       // 게임 승리 시 선물 박스 다이얼로그 먼저 표시
-      _showGiftBoxDialog(result);
+      _showGiftBoxDialog();
     } else {
       // 게임 실패 시 기존 다이얼로그 표시
       _showFailureDialog();
@@ -312,7 +329,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   /// 선물 박스 다이얼로그 표시
-  void _showGiftBoxDialog(CollectionResult result) {
+  void _showGiftBoxDialog() {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -335,7 +352,7 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
               const SizedBox(height: 20),
               // 선물 박스 이미지
               GestureDetector(
-                onTap: () => _openGiftBox(context, result),
+                onTap: () => _openGiftBox(context),
                 child: Container(
                   width: 120,
                   height: 120,
@@ -558,8 +575,12 @@ class _GameScreenState extends State<GameScreen> with TickerProviderStateMixin {
   }
 
   /// 선물 박스 열기 (카드 뽑기)
-  void _openGiftBox(BuildContext context, CollectionResult result) {
+  void _openGiftBox(BuildContext context) async {
     Navigator.of(context).pop(); // 선물 박스 다이얼로그 닫기
+
+    // 컬렉션에 새 카드 추가
+    await _collectionManager.initializeCollection();
+    final result = await _collectionManager.addNewCard(widget.difficulty);
 
     // 카드 뽑기 다이얼로그 표시
     _showCardDrawDialog(result);
