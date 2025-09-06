@@ -1,4 +1,4 @@
-package com.example.capybara_game
+package com.adrie.copybaraGame
 
 import io.flutter.embedding.android.FlutterActivity
 
