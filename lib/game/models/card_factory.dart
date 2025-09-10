@@ -10,7 +10,6 @@ class CapybaraCardFactory {
     'capybara/black1.jpg',
     'capybara/black2.jpg',
     'capybara/black3.jpg',
-    'capybara/blue1-1.jpg',
     'capybara/blue1.jpg',
     'capybara/blue2.jpg',
     'capybara/blue3.jpg',

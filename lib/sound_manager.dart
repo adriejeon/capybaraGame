@@ -80,8 +80,38 @@ class SoundManager {
         return;
       }
 
+      // 안드로이드에서 배경음 끊김 방지를 위한 설정
       await _bgmPlayer!.setReleaseMode(ReleaseMode.loop);
-      await _bgmPlayer!.setPlayerMode(PlayerMode.lowLatency);
+      await _bgmPlayer!.setPlayerMode(
+          PlayerMode.mediaPlayer); // lowLatency 대신 mediaPlayer 사용
+      await _bgmPlayer!.setAudioContext(AudioContext(
+        iOS: AudioContextIOS(
+          category: AVAudioSessionCategory.playback,
+          options: [
+            AVAudioSessionOptions.allowBluetooth,
+            AVAudioSessionOptions.allowBluetoothA2DP,
+            AVAudioSessionOptions.mixWithOthers,
+          ],
+        ),
+        android: AudioContextAndroid(
+          isSpeakerphoneOn: false,
+          stayAwake: true,
+          contentType: AndroidContentType.music,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gain,
+        ),
+      ));
+
+      // 배경음 재생 완료 시 자동으로 다시 시작하도록 리스너 추가 (안드로이드 끊김 방지)
+      _bgmPlayer!.onPlayerComplete.listen((event) async {
+        if (_isBgmEnabled && _bgmPlayer != null) {
+          try {
+            await _bgmPlayer!.play(AssetSource(bgmSound));
+          } catch (e) {
+            // 재시작 실패 시 조용히 처리
+          }
+        }
+      });
 
       if (_isBgmEnabled) {
         await _startBgmInternal();
@@ -186,9 +216,19 @@ class SoundManager {
       // 매번 새로운 AudioPlayer 인스턴스 생성 (제미나이 방법)
       final player = AudioPlayer();
 
-      // iOS 오디오 세션 설정
-      await player.setPlayerMode(PlayerMode.lowLatency);
+      // 안드로이드에서 효과음 끊김 방지를 위한 설정
+      await player.setPlayerMode(
+          PlayerMode.mediaPlayer); // lowLatency 대신 mediaPlayer 사용
       await player.setReleaseMode(ReleaseMode.stop);
+      await player.setAudioContext(AudioContext(
+        android: AudioContextAndroid(
+          isSpeakerphoneOn: false,
+          stayAwake: false,
+          contentType: AndroidContentType.sonification,
+          usageType: AndroidUsageType.media,
+          audioFocus: AndroidAudioFocus.gainTransientMayDuck,
+        ),
+      ));
 
       // 재생 완료 이벤트 리스너 추가
       player.onPlayerComplete.listen((event) {

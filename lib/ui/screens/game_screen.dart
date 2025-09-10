@@ -407,7 +407,7 @@ class _GameScreenState extends State<GameScreen>
                     SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '눌러서 카피바라 캐릭터를 뽑으세요!',
+                        '눌러서 카피바라 뽑기!',
                         style: TextStyle(
                           fontSize: 14,
                           color: Color(0xFFB8860B),

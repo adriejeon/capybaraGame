@@ -1,12 +1,25 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_native_splash/flutter_native_splash.dart';
 import '../../utils/constants.dart';
 import 'game_screen.dart';
 import 'collection_screen.dart';
 import '../widgets/sound_settings_dialog.dart';
 
 /// 메인 홈 화면
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
+
+  @override
+  State<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends State<HomeScreen> {
+  @override
+  void initState() {
+    super.initState();
+    // 스플래시 화면 종료
+    FlutterNativeSplash.remove();
+  }
 
   @override
   Widget build(BuildContext context) {
