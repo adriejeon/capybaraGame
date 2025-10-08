@@ -8,6 +8,8 @@ import '../../game/models/card_factory.dart';
 import '../widgets/game_card_widget.dart';
 import '../../sound_manager.dart';
 import '../../data/collection_manager.dart';
+import '../../data/game_counter.dart';
+import '../../ads/admob_handler.dart';
 import 'collection_screen.dart';
 
 /// 실제 게임 화면
@@ -49,6 +51,13 @@ class _GameScreenState extends State<GameScreen>
     WidgetsBinding.instance.addObserver(this);
     _initializeGame();
     _setupAnimations();
+    // 전면 광고 미리 로드 (약간의 지연 후)
+    Future.delayed(const Duration(milliseconds: 1000), () {
+      AdMobHandler().loadInterstitialAd();
+      print('게임 화면 - 전면 광고 로드 시작');
+    });
+    // 캐릭터 수령용 전면 광고 미리 로드
+    AdMobHandler().loadRewardInterstitialAd();
   }
 
   @override
@@ -604,6 +613,17 @@ class _GameScreenState extends State<GameScreen>
   void _openGiftBox(BuildContext context) async {
     Navigator.of(context).pop(); // 선물 박스 다이얼로그 닫기
 
+    // 광고 표시 후 캐릭터 받기
+    AdMobHandler().showRewardInterstitialAd(
+      onAdClosed: () {
+        // 광고가 닫힌 후 캐릭터 받기
+        _giveCharacterReward();
+      },
+    );
+  }
+
+  /// 캐릭터 보상 지급
+  void _giveCharacterReward() async {
     // 컬렉션에 새 카드 추가
     await _collectionManager.initializeCollection();
     final result = await _collectionManager.addNewCard(widget.difficulty);
@@ -799,7 +819,49 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  void _restartGame() {
+  void _restartGame() async {
+    // 게임 횟수 증가
+    await GameCounter.incrementGameCount();
+
+    // 현재 게임 횟수와 광고 표시 여부 확인
+    final gameCount = await GameCounter.getTodayGameCount();
+    final shouldShowAd = await GameCounter.shouldShowAd();
+    print('게임 재시작 - 현재 횟수: $gameCount, 광고 표시: $shouldShowAd');
+
+    if (shouldShowAd) {
+      print('전면 광고 표시 시작 (재시작)');
+      // 광고가 준비되지 않았으면 강제로 로드
+      if (!AdMobHandler().isInterstitialAdReady) {
+        print('광고 준비 안됨 - 강제 로드 시작 (재시작)');
+        AdMobHandler().loadInterstitialAd();
+        // 2초 후 다시 시도
+        Future.delayed(const Duration(seconds: 2), () {
+          AdMobHandler().showInterstitialAd(
+            onAdClosed: () {
+              print('전면 광고 닫힘 - 게임 재시작');
+              _restartGameDirectly();
+            },
+          );
+        });
+      } else {
+        // 광고 표시 후 게임 재시작
+        AdMobHandler().showInterstitialAd(
+          onAdClosed: () {
+            print('전면 광고 닫힘 - 게임 재시작');
+            // 광고가 닫힌 후 게임 재시작
+            _restartGameDirectly();
+          },
+        );
+      }
+    } else {
+      print('광고 없이 게임 재시작');
+      // 광고 없이 바로 게임 재시작
+      _restartGameDirectly();
+    }
+  }
+
+  /// 게임 직접 재시작 (광고 로직 없이)
+  void _restartGameDirectly() {
     setState(() {
       _initializeGame();
     });

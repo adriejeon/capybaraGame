@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'ui/screens/home_screen.dart';
 import 'sound_manager.dart';
+import 'ads/admob_handler.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -12,6 +13,9 @@ void main() async {
 
   // SoundManager 초기화
   await SoundManager().initialize();
+
+  // AdMob 초기화
+  await AdMobHandler.initialize();
 
   runApp(const CapybaraGameApp());
 }

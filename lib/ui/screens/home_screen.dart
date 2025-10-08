@@ -4,6 +4,9 @@ import '../../utils/constants.dart';
 import 'game_screen.dart';
 import 'collection_screen.dart';
 import '../widgets/sound_settings_dialog.dart';
+import '../../ads/banner_ad_widget.dart';
+import '../../ads/admob_handler.dart';
+import '../../data/game_counter.dart';
 
 /// 메인 홈 화면
 class HomeScreen extends StatefulWidget {
@@ -19,6 +22,11 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // 스플래시 화면 종료
     FlutterNativeSplash.remove();
+    // 전면 광고 미리 로드 (약간의 지연 후)
+    Future.delayed(const Duration(milliseconds: 500), () {
+      AdMobHandler().loadInterstitialAd();
+      print('홈 화면 - 전면 광고 로드 시작');
+    });
   }
 
   @override
@@ -42,6 +50,13 @@ class _HomeScreenState extends State<HomeScreen> {
                 top: 16,
                 right: 16,
                 child: _buildSettingsButton(context),
+              ),
+              // 배너 광고 (하단에서 40px 위)
+              Positioned(
+                bottom: 40,
+                left: 0,
+                right: 0,
+                child: const BannerAdWidget(),
               ),
               // 메인 콘텐츠
               LayoutBuilder(
@@ -255,7 +270,49 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 
   /// 게임 시작
-  void _startGame(BuildContext context, GameDifficulty difficulty) {
+  void _startGame(BuildContext context, GameDifficulty difficulty) async {
+    // 게임 횟수 증가
+    await GameCounter.incrementGameCount();
+
+    // 현재 게임 횟수와 광고 표시 여부 확인
+    final gameCount = await GameCounter.getTodayGameCount();
+    final shouldShowAd = await GameCounter.shouldShowAd();
+    print('게임 시작 - 현재 횟수: $gameCount, 광고 표시: $shouldShowAd');
+
+    if (shouldShowAd) {
+      print('전면 광고 표시 시작');
+      // 광고가 준비되지 않았으면 강제로 로드
+      if (!AdMobHandler().isInterstitialAdReady) {
+        print('광고 준비 안됨 - 강제 로드 시작');
+        AdMobHandler().loadInterstitialAd();
+        // 2초 후 다시 시도
+        Future.delayed(const Duration(seconds: 2), () {
+          AdMobHandler().showInterstitialAd(
+            onAdClosed: () {
+              print('전면 광고 닫힘 - 게임 시작');
+              _navigateToGame(context, difficulty);
+            },
+          );
+        });
+      } else {
+        // 광고 표시 후 게임 시작
+        AdMobHandler().showInterstitialAd(
+          onAdClosed: () {
+            print('전면 광고 닫힘 - 게임 시작');
+            // 광고가 닫힌 후 게임 시작
+            _navigateToGame(context, difficulty);
+          },
+        );
+      }
+    } else {
+      print('광고 없이 게임 시작');
+      // 광고 없이 바로 게임 시작
+      _navigateToGame(context, difficulty);
+    }
+  }
+
+  /// 게임 화면으로 이동
+  void _navigateToGame(BuildContext context, GameDifficulty difficulty) {
     Navigator.push(
       context,
       MaterialPageRoute(
