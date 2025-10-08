@@ -343,7 +343,7 @@ class _GameScreenState extends State<GameScreen>
           width: MediaQuery.of(context).size.width * 0.8,
           child: Column(
             mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.center,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               const Text(
                 '모든 카드를 맞추셨습니다!',
@@ -351,40 +351,68 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(height: 20),
               // 선물 박스 이미지
-              GestureDetector(
-                onTap: () => _openGiftBox(context),
-                child: Container(
-                  width: 120,
-                  height: 120,
-                  decoration: BoxDecoration(
-                    borderRadius: BorderRadius.circular(15),
-                    border: Border.all(
-                      color: const Color(0xFFFFD700), // 골드 색상
-                      width: 3,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 4),
+              Center(
+                child: GestureDetector(
+                  onTap: () => _openGiftBox(context),
+                  child: AnimatedContainer(
+                    duration: const Duration(milliseconds: 200),
+                    width: 120,
+                    height: 120,
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(15),
+                      border: Border.all(
+                        color: const Color(0xFFFFD700), // 골드 색상
+                        width: 3,
                       ),
-                    ],
-                  ),
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: Image.asset(
-                      'assets/capybara/collection/gift_box.jpg',
-                      fit: BoxFit.cover,
-                      errorBuilder: (context, error, stackTrace) {
-                        return Container(
-                          color: Colors.grey[200],
-                          child: const Icon(
-                            Icons.card_giftcard,
-                            color: Colors.grey,
-                            size: 50,
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.white.withOpacity(0.2),
+                          Colors.transparent,
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.2),
+                          blurRadius: 15,
+                          offset: const Offset(0, 8),
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: const Color(0xFFFFD700).withOpacity(0.3),
+                          blurRadius: 20,
+                          offset: const Offset(0, 0),
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: () => _openGiftBox(context),
+                        borderRadius: BorderRadius.circular(12),
+                        splashColor: const Color(0xFFFFD700).withOpacity(0.3),
+                        highlightColor:
+                            const Color(0xFFFFD700).withOpacity(0.1),
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(12),
+                          child: Image.asset(
+                            'assets/capybara/collection/gift_box.jpg',
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[200],
+                                child: const Icon(
+                                  Icons.card_giftcard,
+                                  color: Colors.grey,
+                                  size: 50,
+                                ),
+                              );
+                            },
                           ),
-                        );
-                      },
+                        ),
+                      ),
                     ),
                   ),
                 ),
@@ -464,14 +492,13 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(
+                child: TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     _restartGame();
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
@@ -551,14 +578,13 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(
+                child: TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     _restartGame();
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
@@ -705,7 +731,7 @@ class _GameScreenState extends State<GameScreen>
             // 새로운 카드 획득 시 컬렉션 확인 버튼 표시
             SizedBox(
               width: double.infinity,
-              child: OutlinedButton(
+              child: ElevatedButton(
                 onPressed: () {
                   Navigator.of(context).pop(); // 다이얼로그 닫기
                   Navigator.of(context).pushAndRemoveUntil(
@@ -715,12 +741,9 @@ class _GameScreenState extends State<GameScreen>
                     (route) => route.isFirst, // 첫 번째 페이지(메인)까지만 유지
                   );
                 },
-                style: OutlinedButton.styleFrom(
-                  foregroundColor: const Color(0xFF4A90E2),
-                  side: const BorderSide(
-                    color: Color(0xFF4A90E2),
-                    width: 2,
-                  ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A90E2),
+                  foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
                 child: const Text(
@@ -754,14 +777,13 @@ class _GameScreenState extends State<GameScreen>
               ),
               const SizedBox(width: 8),
               Expanded(
-                child: ElevatedButton(
+                child: TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     _restartGame();
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: const Text(
@@ -788,7 +810,7 @@ class _GameScreenState extends State<GameScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF0F8FF), // 연한 파스텔 하늘색
       appBar: AppBar(
-        title: Text('카피바라 찾기 - ${_getDifficultyText()}'),
+        title: Text(_getDifficultyText()),
         backgroundColor: Colors.white, // 하얀색 헤더
         elevation: 0,
         foregroundColor: Colors.black87,
@@ -969,11 +991,11 @@ class _GameScreenState extends State<GameScreen>
   String _getDifficultyText() {
     switch (widget.difficulty) {
       case GameDifficulty.easy:
-        return '쉬움';
+        return '쉬워요!';
       case GameDifficulty.medium:
-        return '보통';
+        return '할만해요!';
       case GameDifficulty.hard:
-        return '어려움';
+        return '어려워요..';
     }
   }
 }
