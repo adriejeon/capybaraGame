@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../sound_manager.dart';
 
 /// 사운드 설정 다이얼로그
@@ -51,9 +52,9 @@ class _SoundSettingsDialogState extends State<SoundSettingsDialog> {
                   size: 24,
                 ),
                 const SizedBox(width: 8),
-                const Text(
-                  '사운드 설정',
-                  style: TextStyle(
+                Text(
+                  AppLocalizations.of(context)!.settingsTitle,
+                  style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                     color: Color(0xFF2C5F8B),
@@ -81,10 +82,10 @@ class _SoundSettingsDialogState extends State<SoundSettingsDialog> {
                     size: 24,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '효과음',
-                      style: TextStyle(
+                      AppLocalizations.of(context)!.soundEffects,
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                         color: Color(0xFF2C5F8B),
@@ -125,10 +126,10 @@ class _SoundSettingsDialogState extends State<SoundSettingsDialog> {
                     size: 24,
                   ),
                   const SizedBox(width: 12),
-                  const Expanded(
+                  Expanded(
                     child: Text(
-                      '배경음',
-                      style: TextStyle(
+                      AppLocalizations.of(context)!.backgroundMusic,
+                      style: const TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.w500,
                         color: Color(0xFF2C5F8B),
@@ -166,9 +167,9 @@ class _SoundSettingsDialogState extends State<SoundSettingsDialog> {
                   ),
                   elevation: 2,
                 ),
-                child: const Text(
-                  '확인',
-                  style: TextStyle(
+                child: Text(
+                  AppLocalizations.of(context)!.confirm,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),

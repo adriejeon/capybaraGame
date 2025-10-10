@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../l10n/app_localizations.dart';
 import '../../data/collection_manager.dart';
 import '../../utils/constants.dart';
 import '../../sound_manager.dart';
@@ -71,7 +72,7 @@ class _CollectionScreenState extends State<CollectionScreen>
     return Scaffold(
       backgroundColor: const Color(0xFFF0F8FF), // 연한 파스텔 하늘색
       appBar: AppBar(
-        title: const Text('카피바라 컬렉션'),
+        title: Text(AppLocalizations.of(context)!.collectionTitle),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black87,
@@ -116,22 +117,22 @@ class _CollectionScreenState extends State<CollectionScreen>
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
               _buildStatItem(
-                '전체',
+                AppLocalizations.of(context)!.total,
                 '${_collectionManager.unlockedCount}/${_collectionManager.totalCount}',
                 const Color(0xFF4A90E2),
               ),
               _buildStatItem(
-                '쉬움',
+                AppLocalizations.of(context)!.easy,
                 '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.easy)}/20',
                 const Color(0xFFFFD700), // 노란색
               ),
               _buildStatItem(
-                '보통',
+                AppLocalizations.of(context)!.normal,
                 '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.medium)}/15',
                 const Color(0xFF4A90E2), // 파란색
               ),
               _buildStatItem(
-                '어려움',
+                AppLocalizations.of(context)!.hard,
                 '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.hard)}/10',
                 const Color(0xFF9B59B6), // 보라색
               ),
@@ -147,7 +148,7 @@ class _CollectionScreenState extends State<CollectionScreen>
           ),
           const SizedBox(height: 8),
           Text(
-            '완료율: ${((_collectionManager.unlockedCount / _collectionManager.totalCount) * 100).toStringAsFixed(1)}%',
+            '${AppLocalizations.of(context)!.completionRate}: ${((_collectionManager.unlockedCount / _collectionManager.totalCount) * 100).toStringAsFixed(1)}%',
             style: const TextStyle(
               fontSize: 14,
               color: Color(0xFF4A90E2),
@@ -300,11 +301,11 @@ class _CollectionScreenState extends State<CollectionScreen>
   String _getDifficultyText(GameDifficulty difficulty) {
     switch (difficulty) {
       case GameDifficulty.easy:
-        return '쉬움';
+        return AppLocalizations.of(context)!.easy;
       case GameDifficulty.medium:
-        return '보통';
+        return AppLocalizations.of(context)!.normal;
       case GameDifficulty.hard:
-        return '어려움';
+        return AppLocalizations.of(context)!.hard;
     }
   }
 
@@ -382,7 +383,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '카드 번호',
+                          AppLocalizations.of(context)!.cardNumber,
                           style: const TextStyle(
                             fontSize: 14,
                             color: Colors.grey,
@@ -402,7 +403,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '난이도',
+                          AppLocalizations.of(context)!.difficulty,
                           style: const TextStyle(
                             fontSize: 14,
                             color: Colors.grey,
@@ -431,14 +432,16 @@ class _CollectionScreenState extends State<CollectionScreen>
                       mainAxisAlignment: MainAxisAlignment.spaceBetween,
                       children: [
                         Text(
-                          '상태',
+                          AppLocalizations.of(context)!.status,
                           style: const TextStyle(
                             fontSize: 14,
                             color: Colors.grey,
                           ),
                         ),
                         Text(
-                          item.isUnlocked ? '잠금 해제됨' : '잠금됨',
+                          item.isUnlocked
+                              ? AppLocalizations.of(context)!.unlocked
+                              : AppLocalizations.of(context)!.locked,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.bold,
@@ -458,9 +461,9 @@ class _CollectionScreenState extends State<CollectionScreen>
         actions: [
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
-            child: const Text(
-              '닫기',
-              style: TextStyle(
+            child: Text(
+              AppLocalizations.of(context)!.close,
+              style: const TextStyle(
                 fontSize: 16,
                 color: Color(0xFF4A90E2),
               ),

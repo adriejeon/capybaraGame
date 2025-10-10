@@ -1,0 +1,8 @@
+# .arb 파일들이 위치할 폴더
+arb-dir: lib/l10n
+
+# 기본 언어(템플릿)가 될 파일
+template-arb-file: app_ko.arb
+
+# 자동 생성될 Dart 파일 이름
+output-localization-file: app_localizations.dart

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import '../../l10n/app_localizations.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
 import '../../game/models/card.dart';
@@ -31,6 +32,7 @@ class _GameScreenState extends State<GameScreen>
   late AnimationController _flipAnimationController;
   final SoundManager _soundManager = SoundManager();
   final CollectionManager _collectionManager = CollectionManager();
+  final AdmobHandler _adMobHandler = AdmobHandler();
 
   Timer? _gameTimer;
   Timer? _hintTimer;
@@ -52,12 +54,10 @@ class _GameScreenState extends State<GameScreen>
     _initializeGame();
     _setupAnimations();
     // 전면 광고 미리 로드 (약간의 지연 후)
-    Future.delayed(const Duration(milliseconds: 1000), () {
-      AdMobHandler().loadInterstitialAd();
+    Future.delayed(const Duration(milliseconds: 1000), () async {
+      await _adMobHandler.loadInterstitialAd();
       print('게임 화면 - 전면 광고 로드 시작');
     });
-    // 캐릭터 수령용 전면 광고 미리 로드
-    AdMobHandler().loadRewardInterstitialAd();
   }
 
   @override
@@ -344,9 +344,9 @@ class _GameScreenState extends State<GameScreen>
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        title: const Text(
-          '축하합니다!',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        title: Text(
+          AppLocalizations.of(context)!.gameComplete,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         content: SizedBox(
           width: MediaQuery.of(context).size.width * 0.8,
@@ -354,9 +354,9 @@ class _GameScreenState extends State<GameScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '모든 카드를 맞추셨습니다!',
-                style: TextStyle(fontSize: 18),
+              Text(
+                AppLocalizations.of(context)!.gameCompleteMessage,
+                style: const TextStyle(fontSize: 18),
               ),
               const SizedBox(height: 20),
               // 선물 박스 이미지
@@ -434,18 +434,18 @@ class _GameScreenState extends State<GameScreen>
                   borderRadius: BorderRadius.circular(10),
                   border: Border.all(color: const Color(0xFFFFD700), width: 1),
                 ),
-                child: const Row(
+                child: Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.touch_app,
                       color: Color(0xFFB8860B),
                       size: 20,
                     ),
-                    SizedBox(width: 8),
+                    const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        '눌러서 카피바라 뽑기!',
-                        style: TextStyle(
+                        AppLocalizations.of(context)!.gameAllMatched,
+                        style: const TextStyle(
                           fontSize: 14,
                           color: Color(0xFFB8860B),
                           fontWeight: FontWeight.bold,
@@ -467,12 +467,14 @@ class _GameScreenState extends State<GameScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('점수: $_score점', style: const TextStyle(fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Text('이동 횟수: $_moves번',
+                    Text('${AppLocalizations.of(context)!.gameScore}: $_score점',
                         style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
-                    Text('남은 시간: ${GameHelpers.formatTime(_remainingTime)}',
+                    Text('${AppLocalizations.of(context)!.moves}: $_moves번',
+                        style: const TextStyle(fontSize: 16)),
+                    const SizedBox(height: 8),
+                    Text(
+                        '${AppLocalizations.of(context)!.gameTime}: ${GameHelpers.formatTime(_remainingTime)}',
                         style: const TextStyle(fontSize: 16)),
                   ],
                 ),
@@ -493,9 +495,10 @@ class _GameScreenState extends State<GameScreen>
                     foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text(
-                    '홈으로',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    AppLocalizations.of(context)!.gameHome,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -510,9 +513,10 @@ class _GameScreenState extends State<GameScreen>
                     foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text(
-                    '다시 하기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    AppLocalizations.of(context)!.playAgain,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -530,9 +534,9 @@ class _GameScreenState extends State<GameScreen>
       barrierDismissible: false,
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
-        title: const Text(
-          '시간 종료',
-          style: TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        title: Text(
+          AppLocalizations.of(context)!.gameFailure,
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         content: SizedBox(
           width: MediaQuery.of(context).size.width * 0.8,
@@ -540,9 +544,9 @@ class _GameScreenState extends State<GameScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              const Text(
-                '다시 도전해보세요!',
-                style: TextStyle(fontSize: 18),
+              Text(
+                AppLocalizations.of(context)!.gameFailedMessage,
+                style: const TextStyle(fontSize: 18),
               ),
               const SizedBox(height: 20),
               Container(
@@ -556,9 +560,10 @@ class _GameScreenState extends State<GameScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('점수: $_score점', style: const TextStyle(fontSize: 16)),
+                    Text('${AppLocalizations.of(context)!.score}: $_score점',
+                        style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
-                    Text('이동 횟수: $_moves번',
+                    Text('${AppLocalizations.of(context)!.moves}: $_moves번',
                         style: const TextStyle(fontSize: 16)),
                   ],
                 ),
@@ -579,9 +584,10 @@ class _GameScreenState extends State<GameScreen>
                     foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text(
-                    '홈으로',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    AppLocalizations.of(context)!.gameHome,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -596,9 +602,10 @@ class _GameScreenState extends State<GameScreen>
                     foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text(
-                    '다시 하기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    AppLocalizations.of(context)!.playAgain,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -614,12 +621,9 @@ class _GameScreenState extends State<GameScreen>
     Navigator.of(context).pop(); // 선물 박스 다이얼로그 닫기
 
     // 광고 표시 후 캐릭터 받기
-    AdMobHandler().showRewardInterstitialAd(
-      onAdClosed: () {
-        // 광고가 닫힌 후 캐릭터 받기
-        _giveCharacterReward();
-      },
-    );
+    await _adMobHandler.showInterstitialAd();
+    // 광고가 닫힌 후 캐릭터 받기
+    _giveCharacterReward();
   }
 
   /// 캐릭터 보상 지급
@@ -655,7 +659,9 @@ class _GameScreenState extends State<GameScreen>
       builder: (context) => AlertDialog(
         backgroundColor: Colors.white,
         title: Text(
-          result.isNewCard ? '새로운 카피바라!' : '카피바라 카드',
+          result.isNewCard
+              ? AppLocalizations.of(context)!.gameSuccess
+              : AppLocalizations.of(context)!.gameCompleted,
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         content: SizedBox(
@@ -766,9 +772,9 @@ class _GameScreenState extends State<GameScreen>
                   foregroundColor: Colors.white,
                   padding: const EdgeInsets.symmetric(vertical: 16),
                 ),
-                child: const Text(
-                  '컬렉션 확인하기',
-                  style: TextStyle(
+                child: Text(
+                  AppLocalizations.of(context)!.collection,
+                  style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
                   ),
@@ -789,9 +795,10 @@ class _GameScreenState extends State<GameScreen>
                     foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text(
-                    '홈으로',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    AppLocalizations.of(context)!.gameHome,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -806,9 +813,10 @@ class _GameScreenState extends State<GameScreen>
                     foregroundColor: const Color(0xFF4A90E2),
                     padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
-                  child: const Text(
-                    '다시 하기',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  child: Text(
+                    AppLocalizations.of(context)!.playAgain,
+                    style: const TextStyle(
+                        fontSize: 16, fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -831,27 +839,20 @@ class _GameScreenState extends State<GameScreen>
     if (shouldShowAd) {
       print('전면 광고 표시 시작 (재시작)');
       // 광고가 준비되지 않았으면 강제로 로드
-      if (!AdMobHandler().isInterstitialAdReady) {
+      if (!_adMobHandler.isInterstitialAdLoaded) {
         print('광고 준비 안됨 - 강제 로드 시작 (재시작)');
-        AdMobHandler().loadInterstitialAd();
+        await _adMobHandler.loadInterstitialAd();
         // 2초 후 다시 시도
-        Future.delayed(const Duration(seconds: 2), () {
-          AdMobHandler().showInterstitialAd(
-            onAdClosed: () {
-              print('전면 광고 닫힘 - 게임 재시작');
-              _restartGameDirectly();
-            },
-          );
+        Future.delayed(const Duration(seconds: 2), () async {
+          await _adMobHandler.showInterstitialAd();
+          print('전면 광고 닫힘 - 게임 재시작');
+          _restartGameDirectly();
         });
       } else {
         // 광고 표시 후 게임 재시작
-        AdMobHandler().showInterstitialAd(
-          onAdClosed: () {
-            print('전면 광고 닫힘 - 게임 재시작');
-            // 광고가 닫힌 후 게임 재시작
-            _restartGameDirectly();
-          },
-        );
+        await _adMobHandler.showInterstitialAd();
+        print('전면 광고 닫힘 - 게임 재시작');
+        _restartGameDirectly();
       }
     } else {
       print('광고 없이 게임 재시작');
@@ -906,11 +907,14 @@ class _GameScreenState extends State<GameScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
+          _buildInfoItem(AppLocalizations.of(context)!.time,
+              GameHelpers.formatTime(_remainingTime), Icons.timer),
           _buildInfoItem(
-              '시간', GameHelpers.formatTime(_remainingTime), Icons.timer),
-          _buildInfoItem('점수', '$_score', Icons.star),
-          _buildInfoItem('이동', '$_moves', Icons.touch_app),
-          _buildInfoItem('콤보', '$_comboCount', Icons.local_fire_department),
+              AppLocalizations.of(context)!.score, '$_score', Icons.star),
+          _buildInfoItem(
+              AppLocalizations.of(context)!.moves, '$_moves', Icons.touch_app),
+          _buildInfoItem(AppLocalizations.of(context)!.combo, '$_comboCount',
+              Icons.local_fire_department),
         ],
       ),
     );
@@ -1053,11 +1057,11 @@ class _GameScreenState extends State<GameScreen>
   String _getDifficultyText() {
     switch (widget.difficulty) {
       case GameDifficulty.easy:
-        return '쉬워요!';
+        return AppLocalizations.of(context)!.easy;
       case GameDifficulty.medium:
-        return '할만해요!';
+        return AppLocalizations.of(context)!.normal;
       case GameDifficulty.hard:
-        return '어려워요..';
+        return AppLocalizations.of(context)!.hard;
     }
   }
 }
@@ -1173,9 +1177,9 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text(
-              '카드를 뽑는 중...',
-              style: TextStyle(
+            Text(
+              AppLocalizations.of(context)!.drawingCard,
+              style: const TextStyle(
                 color: Colors.white,
                 fontSize: 18,
                 fontWeight: FontWeight.bold,
@@ -1274,7 +1278,9 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
               FadeTransition(
                 opacity: _fadeAnimation,
                 child: Text(
-                  widget.result.isNewCard ? '새로운 카피바라!' : '이미 가지고 있는 카피바라',
+                  widget.result.isNewCard
+                      ? AppLocalizations.of(context)!.gameSuccess
+                      : AppLocalizations.of(context)!.gameCompleted,
                   style: const TextStyle(
                     color: Colors.white,
                     fontSize: 16,

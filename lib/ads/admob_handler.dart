@@ -1,257 +1,306 @@
+import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:io';
+import 'dart:async';
+import '../utils/app_environment.dart';
 
-class AdMobHandler {
-  static final AdMobHandler _instance = AdMobHandler._internal();
-  factory AdMobHandler() => _instance;
-  AdMobHandler._internal();
+class AdmobHandler {
+  // 싱글톤 구현
+  static final AdmobHandler _instance = AdmobHandler._internal();
+  factory AdmobHandler() => _instance;
+  AdmobHandler._internal();
 
-  // 테스트 광고 단위 ID
-  static const String _testBannerAdUnitId =
-      'ca-app-pub-3940256099942544/6300978111';
-  static const String _testInterstitialAdUnitId =
+  // 상태 업데이트 콜백
+  void Function()? _onBannerStateChanged;
+
+  // 광고 활성화 여부
+  static bool isAdEnabled = true;
+
+  // Ad Unit IDs - 테스트 광고 ID
+  static const String _androidBannerTestId =
+      'ca-app-pub-3940256099942544/9214589741';
+  static const String _iosBannerTestId =
+      'ca-app-pub-3940256099942544/2435281174';
+  static const String _androidInterstitialTestId =
       'ca-app-pub-3940256099942544/1033173712';
+  static const String _iosInterstitialTestId =
+      'ca-app-pub-3940256099942544/4411468910';
 
-  // 실제 광고 단위 ID
-  static const String _bannerAdUnitId =
+  // Ad Unit IDs - 실제 광고 ID
+  static const String _androidBannerRealId = 'Android_배너_광고단위_아이디';
+  static const String _iosBannerRealId =
       'ca-app-pub-9203710218960521/5167293358';
-  static const String _interstitialAdUnitId =
+  static const String _androidInterstitialRealId = 'Android_전면_광고단위_아이디';
+  static const String _iosInterstitialRealId =
       'ca-app-pub-9203710218960521/4568527551';
-  static const String _rewardAdUnitId =
-      'ca-app-pub-9203710218960521/5715331537';
 
+  // 광고 상태 관리
   BannerAd? _bannerAd;
   InterstitialAd? _interstitialAd;
-  InterstitialAd? _rewardInterstitialAd;
-  bool _isInterstitialAdReady = false;
-  bool _isRewardInterstitialAdReady = false;
+  bool _isInterstitialAdLoaded = false;
 
-  // 광고 콜백 함수들
-  VoidCallback? _onAdClosed;
-  VoidCallback? _onRewardAdClosed;
-
-  // AdMob 초기화
-  static Future<void> initialize() async {
-    await MobileAds.instance.initialize();
-
-    // 가족 광고 설정 (미성년자 보호)
-    await MobileAds.instance.updateRequestConfiguration(
-      RequestConfiguration(
-        tagForChildDirectedTreatment: TagForChildDirectedTreatment.yes,
-        tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.yes,
-        maxAdContentRating: MaxAdContentRating.g,
-        testDeviceIds: ['SIMULATOR'], // 시뮬레이터를 테스트 디바이스로 설정
-      ),
-    );
-
-    print('AdMob 초기화 완료 - 테스트 디바이스 설정됨');
+  // 지원되는 플랫폼인지 확인
+  bool get _isSupported {
+    return Platform.isIOS || Platform.isAndroid;
   }
 
-  // 배너 광고 생성
-  BannerAd createBannerAd() {
-    return BannerAd(
-      adUnitId: getBannerAdUnitId(),
+  // 광고 ID 가져오기
+  Future<String> get _bannerAdUnitId async {
+    if (!_isSupported) {
+      isAdEnabled = false;
+      return '';
+    }
+
+    // 앱스토어 버전일 때만 실제 광고 ID 사용
+    if (await AppEnvironment.isAppStore()) {
+      print("AdMob: Production environment detected. Using REAL ad units.");
+      if (Platform.isAndroid) {
+        return _androidBannerRealId;
+      }
+      if (Platform.isIOS) {
+        return _iosBannerRealId;
+      }
+    }
+
+    // 그 외 모든 경우(Debug, TestFlight, Ad Hoc 등)는 테스트 광고 ID 사용
+    print("AdMob: Test/Debug environment detected. Using TEST ad units.");
+    if (Platform.isAndroid) {
+      return _androidBannerTestId;
+    }
+    // iOS
+    return _iosBannerTestId;
+  }
+
+  Future<String> get _interstitialAdUnitId async {
+    if (!_isSupported) {
+      isAdEnabled = false;
+      return '';
+    }
+
+    // 앱스토어 버전일 때만 실제 광고 ID 사용
+    if (await AppEnvironment.isAppStore()) {
+      print(
+          "AdMob: Production environment detected. Using REAL interstitial ad units.");
+      if (Platform.isAndroid) {
+        return _androidInterstitialRealId;
+      }
+      if (Platform.isIOS) {
+        return _iosInterstitialRealId;
+      }
+    }
+
+    // 그 외 모든 경우(Debug, TestFlight, Ad Hoc 등)는 테스트 광고 ID 사용
+    print(
+        "AdMob: Test/Debug environment detected. Using TEST interstitial ad units.");
+    if (Platform.isAndroid) {
+      return _androidInterstitialTestId;
+    }
+    // iOS
+    return _iosInterstitialTestId;
+  }
+
+  // 초기화
+  Future<void> initialize() async {
+    if (!_isSupported) {
+      isAdEnabled = false;
+      print('AdMob: 지원되지 않는 플랫폼');
+      return;
+    }
+
+    try {
+      print('AdMob: 초기화 시작...');
+
+      // MobileAds 초기화
+      await MobileAds.instance.initialize();
+      print('AdMob: MobileAds 초기화 완료');
+
+      // RequestConfiguration 설정
+      await MobileAds.instance.updateRequestConfiguration(
+        RequestConfiguration(
+          tagForChildDirectedTreatment: TagForChildDirectedTreatment.yes,
+          tagForUnderAgeOfConsent: TagForUnderAgeOfConsent.yes,
+          maxAdContentRating: MaxAdContentRating.g,
+          testDeviceIds: kDebugMode ? ['SIMULATOR'] : [],
+        ),
+      );
+      print('AdMob: RequestConfiguration 설정 완료');
+
+      // 배너 광고는 지연 로딩 (UI가 준비된 후)
+      Future.delayed(const Duration(seconds: 1), () async {
+        if (_isSupported && isAdEnabled) {
+          await _loadBannerAd();
+          print('AdMob: 배너 광고 로드 시작 (지연 로딩)');
+        }
+      });
+    } catch (e) {
+      debugPrint('AdMob 초기화 실패: $e');
+      isAdEnabled = false;
+      print('AdMob: 광고 비활성화됨');
+    }
+  }
+
+  // 상태 업데이트 콜백 설정
+  void setBannerCallback(void Function() callback) {
+    _onBannerStateChanged = callback;
+  }
+
+  // 상태 업데이트 알림
+  void _notifyBannerStateChanged() {
+    _onBannerStateChanged?.call();
+  }
+
+  // 배너 광고 위젯
+  Widget getBannerAd() {
+    if (!isAdEnabled) {
+      return Container(
+        height: 50,
+        width: double.infinity,
+        color: Colors.grey[300],
+        child: const Center(
+          child: Text(
+            '광고 비활성화',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      );
+    }
+
+    if (_bannerAd == null) {
+      return Container(
+        height: 50,
+        width: double.infinity,
+        color: Colors.grey[300],
+        child: const Center(
+          child: Text(
+            '광고 로딩 중...',
+            style: TextStyle(
+              color: Colors.grey,
+              fontSize: 12,
+            ),
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      width: _bannerAd!.size.width.toDouble(),
+      height: _bannerAd!.size.height.toDouble(),
+      child: AdWidget(ad: _bannerAd!),
+    );
+  }
+
+  // 배너 광고 로드
+  Future<void> _loadBannerAd() async {
+    final adUnitId = await _bannerAdUnitId;
+    print('AdMob: 배너 광고 로드 시작 - ID: $adUnitId');
+
+    _bannerAd = BannerAd(
       size: AdSize.banner,
-      request: const AdRequest(),
+      adUnitId: adUnitId,
       listener: BannerAdListener(
         onAdLoaded: (ad) {
-          debugPrint('배너 광고 로드됨');
+          print('AdMob: 배너 광고 로드 완료');
+          debugPrint('배너 광고 로드 완료');
+          _notifyBannerStateChanged(); // 상태 변경 알림
         },
         onAdFailedToLoad: (ad, error) {
+          print('AdMob: 배너 광고 로드 실패: $error');
           debugPrint('배너 광고 로드 실패: $error');
           ad.dispose();
-        },
-        onAdOpened: (ad) {
-          debugPrint('배너 광고 열림');
-        },
-        onAdClosed: (ad) {
-          debugPrint('배너 광고 닫힘');
+          _bannerAd = null;
+          _notifyBannerStateChanged(); // 상태 변경 알림
         },
       ),
+      request: const AdRequest(),
     );
+
+    print('AdMob: 배너 광고 로드 요청 전송');
+    _bannerAd?.load();
   }
 
   // 전면 광고 로드
-  void loadInterstitialAd() {
-    print('전면 광고 로드 시작 - AdUnitId: ${getInterstitialAdUnitId()}');
-    InterstitialAd.load(
-      adUnitId: getInterstitialAdUnitId(),
+  Future<void> loadInterstitialAd() async {
+    if (!isAdEnabled) return;
+
+    final adUnitId = await _interstitialAdUnitId;
+    final completer = Completer<void>();
+
+    await InterstitialAd.load(
+      adUnitId: adUnitId,
       request: const AdRequest(),
       adLoadCallback: InterstitialAdLoadCallback(
         onAdLoaded: (ad) {
           _interstitialAd = ad;
-          _isInterstitialAdReady = true;
-          print('전면 광고 로드 성공 - 준비 완료');
-
-          ad.fullScreenContentCallback = FullScreenContentCallback(
-            onAdShowedFullScreenContent: (ad) {
-              print('전면 광고 표시됨');
-            },
-            onAdDismissedFullScreenContent: (ad) {
-              print('전면 광고 닫힘');
-              ad.dispose();
-              _interstitialAd = null;
-              _isInterstitialAdReady = false;
-              // 광고가 닫힌 후 콜백 실행
-              if (_onAdClosed != null) {
-                _onAdClosed!();
-                _onAdClosed = null;
-              }
-              // 광고가 닫힌 후 새로운 광고 로드
-              print('전면 광고 재로드 시작');
-              loadInterstitialAd();
-            },
-            onAdFailedToShowFullScreenContent: (ad, error) {
-              print('전면 광고 표시 실패: $error');
-              ad.dispose();
-              _interstitialAd = null;
-              _isInterstitialAdReady = false;
-            },
-          );
+          _isInterstitialAdLoaded = true;
+          completer.complete();
         },
         onAdFailedToLoad: (error) {
-          print('전면 광고 로드 실패: $error');
-          _isInterstitialAdReady = false;
-          // 3초 후 재시도
-          Future.delayed(const Duration(seconds: 3), () {
-            print('전면 광고 재시도 로드');
-            loadInterstitialAd();
-          });
+          _isInterstitialAdLoaded = false;
+          completer.completeError(error);
+        },
+      ),
+    );
+
+    return completer.future;
+  }
+
+  // 다음 광고 미리 로드 (대기하지 않음)
+  Future<void> preloadNextAd() async {
+    if (!isAdEnabled) return;
+
+    final adUnitId = await _interstitialAdUnitId;
+
+    InterstitialAd.load(
+      adUnitId: adUnitId,
+      request: const AdRequest(),
+      adLoadCallback: InterstitialAdLoadCallback(
+        onAdLoaded: (ad) {
+          _interstitialAd = ad;
+          _isInterstitialAdLoaded = true;
+        },
+        onAdFailedToLoad: (error) {
+          _isInterstitialAdLoaded = false;
+          debugPrint('다음 광고 로드 실패: $error');
         },
       ),
     );
   }
 
   // 전면 광고 표시
-  void showInterstitialAd({VoidCallback? onAdClosed}) {
-    print(
-        '전면 광고 표시 시도 - 준비 상태: $_isInterstitialAdReady, 광고 인스턴스: ${_interstitialAd != null}');
-    if (_interstitialAd != null && _isInterstitialAdReady) {
-      _onAdClosed = onAdClosed;
-      print('전면 광고 표시 실행');
-      _interstitialAd!.show();
-    } else {
-      print('전면 광고가 준비되지 않음 - 콜백 즉시 실행');
-      // 광고가 준비되지 않았으면 콜백 즉시 실행
-      if (onAdClosed != null) {
-        onAdClosed();
-      }
+  Future<void> showInterstitialAd() async {
+    if (!isAdEnabled || !_isInterstitialAdLoaded) {
+      return;
     }
-  }
 
-  // 캐릭터 수령용 전면 광고 로드
-  void loadRewardInterstitialAd() {
-    print('캐릭터 수령용 전면 광고 로드 시작');
-    InterstitialAd.load(
-      adUnitId: getRewardInterstitialAdUnitId(),
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardInterstitialAd = ad;
-          _isRewardInterstitialAdReady = true;
-          print('캐릭터 수령용 전면 광고 로드 성공');
-
-          ad.fullScreenContentCallback = FullScreenContentCallback(
-            onAdShowedFullScreenContent: (ad) {
-              print('캐릭터 수령용 전면 광고 표시됨');
-            },
-            onAdDismissedFullScreenContent: (ad) {
-              print('캐릭터 수령용 전면 광고 닫힘');
-              ad.dispose();
-              _rewardInterstitialAd = null;
-              _isRewardInterstitialAdReady = false;
-              // 광고가 닫힌 후 콜백 실행
-              if (_onRewardAdClosed != null) {
-                _onRewardAdClosed!();
-                _onRewardAdClosed = null;
-              }
-            },
-            onAdFailedToShowFullScreenContent: (ad, error) {
-              print('캐릭터 수령용 전면 광고 표시 실패: $error');
-              ad.dispose();
-              _rewardInterstitialAd = null;
-              _isRewardInterstitialAdReady = false;
-            },
-          );
-        },
-        onAdFailedToLoad: (error) {
-          print('캐릭터 수령용 전면 광고 로드 실패: $error');
-          _isRewardInterstitialAdReady = false;
-        },
-      ),
+    _interstitialAd?.fullScreenContentCallback = FullScreenContentCallback(
+      onAdDismissedFullScreenContent: (ad) {
+        ad.dispose();
+        _isInterstitialAdLoaded = false;
+        preloadNextAd(); // 다음 광고 미리 로드 (non-blocking)
+      },
+      onAdFailedToShowFullScreenContent: (ad, error) {
+        ad.dispose();
+        _isInterstitialAdLoaded = false;
+        preloadNextAd(); // 실패해도 다음 광고 미리 로드
+      },
     );
+
+    await _interstitialAd?.show();
   }
 
-  // 캐릭터 수령용 전면 광고 표시
-  void showRewardInterstitialAd({VoidCallback? onAdClosed}) {
-    if (_rewardInterstitialAd != null && _isRewardInterstitialAdReady) {
-      _onRewardAdClosed = onAdClosed;
-      _rewardInterstitialAd!.show();
-    } else {
-      debugPrint('캐릭터 수령용 전면 광고가 준비되지 않음');
-      // 광고가 준비되지 않았으면 콜백 즉시 실행
-      if (onAdClosed != null) {
-        onAdClosed();
-      }
-    }
-  }
+  // 배너 광고 인스턴스 접근
+  BannerAd? get bannerAd => _bannerAd;
 
-  // 캐릭터 수령용 전면 광고 준비 상태 확인
-  bool get isRewardInterstitialAdReady => _isRewardInterstitialAdReady;
+  // 전면 광고 로드 상태 확인
+  bool get isInterstitialAdLoaded => _isInterstitialAdLoaded;
 
-  // 전면 광고 준비 상태 확인
-  bool get isInterstitialAdReady => _isInterstitialAdReady;
-
-  // 배너 광고 정리
-  void disposeBannerAd() {
-    _bannerAd?.dispose();
-    _bannerAd = null;
-  }
-
-  // 전면 광고 정리
-  void disposeInterstitialAd() {
-    _interstitialAd?.dispose();
-    _interstitialAd = null;
-    _isInterstitialAdReady = false;
-  }
-
-  // 모든 광고 정리
+  // 리소스 정리
   void dispose() {
-    disposeBannerAd();
-    disposeInterstitialAd();
-  }
-
-  // 테스트 모드 확인
-  bool get isTestMode {
-    // 디버그 모드이거나 시뮬레이터에서는 항상 테스트 모드
-    return kDebugMode || _isTestDevice();
-  }
-
-  // 테스트 디바이스 확인 (TestFlight, 시뮬레이터 등)
-  bool _isTestDevice() {
-    // 시뮬레이터나 TestFlight 환경에서는 테스트 광고 사용
-    return true; // 개발 중에는 항상 테스트 광고 사용
-  }
-
-  // 배너 광고 단위 ID 반환
-  String getBannerAdUnitId() {
-    final adUnitId = isTestMode ? _testBannerAdUnitId : _bannerAdUnitId;
-    print('배너 광고 ID 선택 - 테스트 모드: $isTestMode, AdUnitId: $adUnitId');
-    return adUnitId;
-  }
-
-  // 전면 광고 단위 ID 반환
-  String getInterstitialAdUnitId() {
-    final adUnitId =
-        isTestMode ? _testInterstitialAdUnitId : _interstitialAdUnitId;
-    print('전면 광고 ID 선택 - 테스트 모드: $isTestMode, AdUnitId: $adUnitId');
-    return adUnitId;
-  }
-
-  // 캐릭터 수령용 전면 광고 단위 ID 반환
-  String getRewardInterstitialAdUnitId() {
-    final adUnitId = isTestMode ? _testInterstitialAdUnitId : _rewardAdUnitId;
-    print('캐릭터 수령용 전면 광고 ID 선택 - 테스트 모드: $isTestMode, AdUnitId: $adUnitId');
-    return adUnitId;
+    _interstitialAd?.dispose();
+    _bannerAd?.dispose();
   }
 }
