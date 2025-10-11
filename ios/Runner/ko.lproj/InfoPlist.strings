@@ -1,0 +1,8 @@
+/* 
+  InfoPlist.strings
+  Runner
+
+  Created by Flutter.
+*/
+
+CFBundleDisplayName = "카피바라 찾기";
