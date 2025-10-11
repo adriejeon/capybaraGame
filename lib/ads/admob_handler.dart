@@ -28,10 +28,12 @@ class AdmobHandler {
       'ca-app-pub-3940256099942544/4411468910';
 
   // Ad Unit IDs - 실제 광고 ID
-  static const String _androidBannerRealId = 'Android_배너_광고단위_아이디';
+  static const String _androidBannerRealId =
+      'ca-app-pub-9203710218960521/5357551967';
   static const String _iosBannerRealId =
       'ca-app-pub-9203710218960521/5167293358';
-  static const String _androidInterstitialRealId = 'Android_전면_광고단위_아이디';
+  static const String _androidInterstitialRealId =
+      'ca-app-pub-9203710218960521/6154153533';
   static const String _iosInterstitialRealId =
       'ca-app-pub-9203710218960521/4568527551';
 
