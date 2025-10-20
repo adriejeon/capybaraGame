@@ -697,6 +697,36 @@ abstract class AppLocalizations {
   /// In ko, this message translates to:
   /// **'기본 카피바라'**
   String get capybaraDefault;
+
+  /// No description provided for @timeUpTitle.
+  ///
+  /// In ko, this message translates to:
+  /// **'시간이 부족해요!'**
+  String get timeUpTitle;
+
+  /// No description provided for @timeUpMessage.
+  ///
+  /// In ko, this message translates to:
+  /// **'광고를 보고 30초 더 얻어보세요!'**
+  String get timeUpMessage;
+
+  /// No description provided for @timeUpSubMessage.
+  ///
+  /// In ko, this message translates to:
+  /// **'게임을 이어서 진행할 수 있어요'**
+  String get timeUpSubMessage;
+
+  /// No description provided for @giveUp.
+  ///
+  /// In ko, this message translates to:
+  /// **'포기하기'**
+  String get giveUp;
+
+  /// No description provided for @watchAd.
+  ///
+  /// In ko, this message translates to:
+  /// **'광고 보러가기'**
+  String get watchAd;
 }
 
 class _AppLocalizationsDelegate

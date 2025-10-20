@@ -311,4 +311,19 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get capybaraDefault => '기본 카피바라';
+
+  @override
+  String get timeUpTitle => '시간이 부족해요!';
+
+  @override
+  String get timeUpMessage => '광고를 보고 30초 더 얻어보세요!';
+
+  @override
+  String get timeUpSubMessage => '게임을 이어서 진행할 수 있어요';
+
+  @override
+  String get giveUp => '포기하기';
+
+  @override
+  String get watchAd => '광고 보러가기';
 }

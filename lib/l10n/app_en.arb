@@ -116,5 +116,11 @@
   "capybara13": "Yellow Capybara",
   "capybara14": "Cook Capybara",
   "capybara15": "Doctor Capybara",
-  "capybaraDefault": "Default Capybara"
+  "capybaraDefault": "Default Capybara",
+  
+  "timeUpTitle": "Time's Running Out!",
+  "timeUpMessage": "Watch an ad to get 30 more seconds!",
+  "timeUpSubMessage": "You can continue playing the game",
+  "giveUp": "Give Up",
+  "watchAd": "Watch Ad"
 }

@@ -322,8 +322,8 @@ class _GameScreenState extends State<GameScreen>
       // 선물 박스 다이얼로그 표시 (카드는 아직 추가하지 않음)
       _showGiftBoxDialog();
     } else {
-      // 결과 다이얼로그 표시
-      _showGameResultDialog(isWin, null);
+      // 시간 초과 시 항상 광고 보고 시간 연장 다이얼로그 표시
+      _showTimeExtensionDialog();
     }
   }
 
@@ -831,34 +831,9 @@ class _GameScreenState extends State<GameScreen>
     // 게임 횟수 증가
     await GameCounter.incrementGameCount();
 
-    // 현재 게임 횟수와 광고 표시 여부 확인
-    final gameCount = await GameCounter.getTodayGameCount();
-    final shouldShowAd = await GameCounter.shouldShowAd();
-    print('게임 재시작 - 현재 횟수: $gameCount, 광고 표시: $shouldShowAd');
-
-    if (shouldShowAd) {
-      print('전면 광고 표시 시작 (재시작)');
-      // 광고가 준비되지 않았으면 강제로 로드
-      if (!_adMobHandler.isInterstitialAdLoaded) {
-        print('광고 준비 안됨 - 강제 로드 시작 (재시작)');
-        await _adMobHandler.loadInterstitialAd();
-        // 2초 후 다시 시도
-        Future.delayed(const Duration(seconds: 2), () async {
-          await _adMobHandler.showInterstitialAd();
-          print('전면 광고 닫힘 - 게임 재시작');
-          _restartGameDirectly();
-        });
-      } else {
-        // 광고 표시 후 게임 재시작
-        await _adMobHandler.showInterstitialAd();
-        print('전면 광고 닫힘 - 게임 재시작');
-        _restartGameDirectly();
-      }
-    } else {
-      print('광고 없이 게임 재시작');
-      // 광고 없이 바로 게임 재시작
-      _restartGameDirectly();
-    }
+    print('게임 재시작 - 광고 없이 바로 재시작');
+    // 게임 완료 후 다시 플레이 시에는 광고 없이 바로 재시작
+    _restartGameDirectly();
   }
 
   /// 게임 직접 재시작 (광고 로직 없이)
@@ -866,6 +841,144 @@ class _GameScreenState extends State<GameScreen>
     setState(() {
       _initializeGame();
     });
+  }
+
+  /// 시간 연장 다이얼로그 표시
+  void _showTimeExtensionDialog() {
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Text(
+          AppLocalizations.of(context)!.timeUpTitle,
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+            color: Colors.black,
+          ),
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              const Icon(
+                Icons.schedule,
+                size: 64,
+                color: Color(0xFF333333),
+              ),
+              const SizedBox(height: 16),
+              Text(
+                AppLocalizations.of(context)!.timeUpMessage,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 8),
+              Text(
+                AppLocalizations.of(context)!.timeUpSubMessage,
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Colors.grey,
+                ),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          Row(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                  // 포기하기 선택 시 게임 실패 처리
+                  _showGameResultDialog(false, null);
+                },
+                style: TextButton.styleFrom(
+                  foregroundColor: Colors.grey,
+                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text(
+                  AppLocalizations.of(context)!.giveUp,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w500,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 16),
+              Expanded(
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop();
+                    _watchAdForTimeExtension();
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(10),
+                    ),
+                  ),
+                  child: Text(
+                    AppLocalizations.of(context)!.watchAd,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 광고 시청 후 시간 연장
+  void _watchAdForTimeExtension() async {
+    print('시간 연장을 위한 광고 시청 시작');
+    
+    // 광고가 준비되지 않았으면 강제로 로드
+    if (!_adMobHandler.isInterstitialAdLoaded) {
+      print('광고 준비 안됨 - 강제 로드 시작 (시간 연장)');
+      await _adMobHandler.loadInterstitialAd();
+      // 2초 후 다시 시도
+      Future.delayed(const Duration(seconds: 2), () async {
+        await _adMobHandler.showInterstitialAd();
+        print('시간 연장 광고 닫힘');
+        _extendGameTime();
+      });
+    } else {
+      // 광고 표시 후 시간 연장
+      await _adMobHandler.showInterstitialAd();
+      print('시간 연장 광고 닫힘');
+      _extendGameTime();
+    }
+  }
+
+  /// 게임 시간 연장 (30초 추가)
+  void _extendGameTime() {
+    setState(() {
+      _remainingTime = 30; // 30초 추가
+      _gameState = GameState.playing;
+    });
+    
+    // 타이머 재시작
+    _startTimer();
+    _startIdleTimer();
+    
+    print('게임 시간 30초 연장 완료');
   }
 
   @override

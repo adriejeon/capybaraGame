@@ -419,34 +419,9 @@ class _HomeScreenState extends State<HomeScreen> {
     // 게임 횟수 증가
     await GameCounter.incrementGameCount();
 
-    // 현재 게임 횟수와 광고 표시 여부 확인
-    final gameCount = await GameCounter.getTodayGameCount();
-    final shouldShowAd = await GameCounter.shouldShowAd();
-    print('게임 시작 - 현재 횟수: $gameCount, 광고 표시: $shouldShowAd');
-
-    if (shouldShowAd) {
-      print('전면 광고 표시 시작');
-      // 광고가 준비되지 않았으면 강제로 로드
-      if (!_adMobHandler.isInterstitialAdLoaded) {
-        print('광고 준비 안됨 - 강제 로드 시작');
-        await _adMobHandler.loadInterstitialAd();
-        // 2초 후 다시 시도
-        Future.delayed(const Duration(seconds: 2), () async {
-          await _adMobHandler.showInterstitialAd();
-          print('전면 광고 닫힘 - 게임 시작');
-          _navigateToGame(context, difficulty);
-        });
-      } else {
-        // 광고 표시 후 게임 시작
-        await _adMobHandler.showInterstitialAd();
-        print('전면 광고 닫힘 - 게임 시작');
-        _navigateToGame(context, difficulty);
-      }
-    } else {
-      print('광고 없이 게임 시작');
-      // 광고 없이 바로 게임 시작
-      _navigateToGame(context, difficulty);
-    }
+    print('홈 화면에서 게임 시작 - 광고 없이 바로 시작');
+    // 홈 화면에서 게임 시작 시에는 광고 없이 바로 시작
+    _navigateToGame(context, difficulty);
   }
 
   /// 게임 화면으로 이동

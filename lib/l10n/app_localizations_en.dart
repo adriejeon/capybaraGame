@@ -315,4 +315,19 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get capybaraDefault => 'Default Capybara';
+
+  @override
+  String get timeUpTitle => 'Time\'s Running Out!';
+
+  @override
+  String get timeUpMessage => 'Watch an ad to get 30 more seconds!';
+
+  @override
+  String get timeUpSubMessage => 'You can continue playing the game';
+
+  @override
+  String get giveUp => 'Give Up';
+
+  @override
+  String get watchAd => 'Watch Ad';
 }

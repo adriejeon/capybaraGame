@@ -116,5 +116,11 @@
   "capybara13": "노란 카피바라",
   "capybara14": "요리사 카피바라",
   "capybara15": "의사 카피바라",
-  "capybaraDefault": "기본 카피바라"
+  "capybaraDefault": "기본 카피바라",
+  
+  "timeUpTitle": "시간이 부족해요!",
+  "timeUpMessage": "광고를 보고 30초 더 얻어보세요!",
+  "timeUpSubMessage": "게임을 이어서 진행할 수 있어요",
+  "giveUp": "포기하기",
+  "watchAd": "광고 보러가기"
 }

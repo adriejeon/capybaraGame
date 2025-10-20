@@ -23,9 +23,9 @@ class GameConstants {
   static const double cardSpacing = 10.0;
 
   // 게임 시간
-  static const int easyTimeLimit = 60; // 1분
-  static const int mediumTimeLimit = 120; // 2분
-  static const int hardTimeLimit = 180; // 3분
+  static const int easyTimeLimit = 20; // 20초
+  static const int mediumTimeLimit = 50; // 50초
+  static const int hardTimeLimit = 100; // 1분 40초
 
   // 점수 계산
   static const int baseScore = 100;
