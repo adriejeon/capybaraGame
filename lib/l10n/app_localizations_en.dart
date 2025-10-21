@@ -255,7 +255,13 @@ class AppLocalizationsEn extends AppLocalizations {
   String get gameCompleted => 'Completed!';
 
   @override
-  String get gameAllMatched => 'Click the gift box above!';
+  String get gameAllMatched => 'Click the gift box!';
+
+  @override
+  String get alreadyCollected => 'You already collected this capybara';
+
+  @override
+  String get newCapybaraFound => 'You found a new capybara!';
 
   @override
   String gameCompletionTime(Object time) {

@@ -3,6 +3,7 @@ import '../../l10n/app_localizations.dart';
 import '../../data/collection_manager.dart';
 import '../../utils/constants.dart';
 import '../../sound_manager.dart';
+import '../../services/share_service.dart';
 
 /// 컬렉션 화면
 class CollectionScreen extends StatefulWidget {
@@ -459,6 +460,39 @@ class _CollectionScreenState extends State<CollectionScreen>
           ),
         ),
         actions: [
+          // 친구에게 보여주기 버튼 (잠금 해제된 카드에만 표시, 테두리만 있는 스타일)
+          if (item.isUnlocked) ...[
+            SizedBox(
+              width: double.infinity,
+              child: OutlinedButton.icon(
+                onPressed: () async {
+                  await ShareService.shareCharacter(
+                    characterImagePath: item.imagePath,
+                    context: context,
+                  );
+                },
+                icon: const Icon(Icons.share, size: 20),
+                label: Text(
+                  Localizations.localeOf(context).languageCode == 'ko'
+                      ? '친구에게 보여주기'
+                      : 'Show to Friends',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: OutlinedButton.styleFrom(
+                  foregroundColor: const Color(0xFF4A90E2),
+                  side: const BorderSide(
+                    color: Color(0xFF4A90E2),
+                    width: 2,
+                  ),
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+          ],
           TextButton(
             onPressed: () => Navigator.of(context).pop(),
             child: Text(

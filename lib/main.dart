@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
+import 'package:kakao_flutter_sdk_common/kakao_flutter_sdk_common.dart';
 import 'ui/screens/home_screen.dart';
 import 'sound_manager.dart';
 import 'ads/admob_handler.dart';
@@ -10,6 +11,11 @@ import 'l10n/app_localizations.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 카카오 SDK 초기화
+  KakaoSdk.init(
+    nativeAppKey: '941590ef92057f63649c0c5b886f918c',
+  );
 
   // 스플래시 화면 유지
   FlutterNativeSplash.preserve(

@@ -581,8 +581,20 @@ abstract class AppLocalizations {
   /// No description provided for @gameAllMatched.
   ///
   /// In ko, this message translates to:
-  /// **'모든 카드를 매칭했습니다!'**
+  /// **'선물상자를 클릭해 보세요!'**
   String get gameAllMatched;
+
+  /// No description provided for @alreadyCollected.
+  ///
+  /// In ko, this message translates to:
+  /// **'이미 수집한 카피바라입니다'**
+  String get alreadyCollected;
+
+  /// No description provided for @newCapybaraFound.
+  ///
+  /// In ko, this message translates to:
+  /// **'새로운 카피바라를 발견했습니다!'**
+  String get newCapybaraFound;
 
   /// No description provided for @gameCompletionTime.
   ///

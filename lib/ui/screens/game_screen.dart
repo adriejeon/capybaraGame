@@ -12,6 +12,7 @@ import '../../data/collection_manager.dart';
 import '../../data/game_counter.dart';
 import '../../ads/admob_handler.dart';
 import 'collection_screen.dart';
+import '../../services/share_service.dart';
 
 /// 실제 게임 화면
 class GameScreen extends StatefulWidget {
@@ -736,7 +737,9 @@ class _GameScreenState extends State<GameScreen>
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
-                        result.message,
+                        result.isNewCard
+                            ? AppLocalizations.of(context)!.newCapybaraFound
+                            : AppLocalizations.of(context)!.alreadyCollected,
                         style: TextStyle(
                           fontSize: 14,
                           color: result.isNewCard
@@ -783,6 +786,51 @@ class _GameScreenState extends State<GameScreen>
             ),
             const SizedBox(height: 8),
           ],
+          // 친구에게 자랑하기 버튼 (테두리만 있는 스타일)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () async {
+                final locale = Localizations.localeOf(context);
+                final isKorean = locale.languageCode == 'ko';
+                final difficultyText = widget.difficulty == GameDifficulty.easy
+                    ? 'easy'
+                    : widget.difficulty == GameDifficulty.medium
+                        ? 'medium'
+                        : 'hard';
+                
+                // 게임 완료 시간 계산 (초기 시간 - 남은 시간)
+                final initialTime = GameHelpers.getTimeLimit(widget.difficulty);
+                final completedTime = initialTime - _remainingTime;
+                
+                await ShareService.shareGameScore(
+                  score: _score,
+                  difficulty: difficultyText,
+                  gameTime: completedTime,
+                  context: context,
+                );
+              },
+              icon: const Icon(Icons.share, size: 20),
+              label: Text(
+                Localizations.localeOf(context).languageCode == 'ko'
+                    ? '친구에게 자랑하기'
+                    : 'Share with Friends',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4A90E2),
+                side: const BorderSide(
+                  color: Color(0xFF4A90E2),
+                  width: 2,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           Row(
             children: [
               Expanded(

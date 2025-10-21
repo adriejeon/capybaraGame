@@ -251,7 +251,13 @@ class AppLocalizationsKo extends AppLocalizations {
   String get gameCompleted => '완료!';
 
   @override
-  String get gameAllMatched => '모든 카드를 매칭했습니다!';
+  String get gameAllMatched => '선물상자를 클릭해 보세요!';
+
+  @override
+  String get alreadyCollected => '이미 수집한 카피바라입니다';
+
+  @override
+  String get newCapybaraFound => '새로운 카피바라를 발견했습니다!';
 
   @override
   String gameCompletionTime(Object time) {

@@ -7,12 +7,10 @@ import '../utils/constants.dart';
 class CollectionResult {
   final bool isNewCard;
   final CollectionItem? card;
-  final String message;
 
   CollectionResult({
     required this.isNewCard,
     required this.card,
-    required this.message,
   });
 }
 
@@ -177,7 +175,7 @@ class CollectionManager {
     if (existingCard.id != -1) {
       // 이미 존재하는 카드인 경우
       return CollectionResult(
-          isNewCard: false, card: existingCard, message: "이미 수집한 카피바라입니다!");
+          isNewCard: false, card: existingCard);
     }
 
     // 새로운 카드인 경우, 잠금 해제되지 않은 슬롯 중 첫 번째에 추가
@@ -195,8 +193,7 @@ class CollectionManager {
           unlockedCards[random.nextInt(unlockedCards.length)];
       return CollectionResult(
           isNewCard: false,
-          card: existingRandomCard,
-          message: "이미 수집한 카피바라입니다!");
+          card: existingRandomCard);
     }
 
     // 첫 번째 잠금된 슬롯에 새 카드 추가
@@ -214,8 +211,7 @@ class CollectionManager {
     await _saveCollection();
     return CollectionResult(
         isNewCard: true,
-        card: _collection[index],
-        message: "새로운 카피바라를 발견했습니다!");
+        card: _collection[index]);
   }
 
   /// 난이도별 모든 가능한 카드 이미지 경로 반환
