@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:provider/provider.dart';
 import '../../utils/constants.dart';
 import 'game_screen.dart';
@@ -23,8 +22,6 @@ class _HomeScreenState extends State<HomeScreen> {
   @override
   void initState() {
     super.initState();
-    // 스플래시 화면 종료
-    FlutterNativeSplash.remove();
     // 전면 광고 미리 로드 (즉시 로드)
     Future.delayed(const Duration(milliseconds: 0), () async {
       await _adMobHandler.loadInterstitialAd();

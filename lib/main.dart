@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_native_splash/flutter_native_splash.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:kakao_flutter_sdk_common/kakao_flutter_sdk_common.dart';
@@ -16,10 +15,6 @@ void main() async {
   KakaoSdk.init(
     nativeAppKey: '941590ef92057f63649c0c5b886f918c',
   );
-
-  // 스플래시 화면 유지
-  FlutterNativeSplash.preserve(
-      widgetsBinding: WidgetsFlutterBinding.ensureInitialized());
 
   // SoundManager 초기화
   await SoundManager().initialize();

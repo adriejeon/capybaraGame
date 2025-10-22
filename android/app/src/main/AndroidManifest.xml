@@ -64,5 +64,7 @@
             <data
                 android:mimeType="text/plain"/>
         </intent>
+        <!-- 카카오톡 공유를 위한 쿼리 -->
+        <package android:name="com.kakao.talk" />
     </queries>
 </manifest>
