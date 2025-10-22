@@ -332,4 +332,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get watchAd => '광고 보러가기';
+
+  @override
+  String get scoreUnit => '점';
+
+  @override
+  String get movesUnit => '번';
 }

@@ -468,10 +468,10 @@ class _GameScreenState extends State<GameScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${AppLocalizations.of(context)!.gameScore}: $_score점',
+                    Text('${AppLocalizations.of(context)!.gameScore}: $_score${AppLocalizations.of(context)!.scoreUnit}',
                         style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
-                    Text('${AppLocalizations.of(context)!.moves}: $_moves번',
+                    Text('${AppLocalizations.of(context)!.moves}: $_moves${AppLocalizations.of(context)!.movesUnit}',
                         style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
                     Text(
@@ -561,10 +561,10 @@ class _GameScreenState extends State<GameScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${AppLocalizations.of(context)!.score}: $_score점',
+                    Text('${AppLocalizations.of(context)!.score}: $_score${AppLocalizations.of(context)!.scoreUnit}',
                         style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
-                    Text('${AppLocalizations.of(context)!.moves}: $_moves번',
+                    Text('${AppLocalizations.of(context)!.moves}: $_moves${AppLocalizations.of(context)!.movesUnit}',
                         style: const TextStyle(fontSize: 16)),
                   ],
                 ),

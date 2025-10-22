@@ -739,6 +739,18 @@ abstract class AppLocalizations {
   /// In ko, this message translates to:
   /// **'광고 보러가기'**
   String get watchAd;
+
+  /// No description provided for @scoreUnit.
+  ///
+  /// In ko, this message translates to:
+  /// **'점'**
+  String get scoreUnit;
+
+  /// No description provided for @movesUnit.
+  ///
+  /// In ko, this message translates to:
+  /// **'번'**
+  String get movesUnit;
 }
 
 class _AppLocalizationsDelegate

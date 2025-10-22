@@ -336,4 +336,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get watchAd => 'Watch Ad';
+
+  @override
+  String get scoreUnit => 'pts';
+
+  @override
+  String get movesUnit => 'moves';
 }

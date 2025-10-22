@@ -128,11 +128,11 @@ class AdmobHandler {
       );
       print('AdMob: RequestConfiguration 설정 완료');
 
-      // 배너 광고는 지연 로딩 (UI가 준비된 후)
-      Future.delayed(const Duration(seconds: 1), () async {
+      // 배너 광고는 즉시 로딩
+      Future.delayed(const Duration(milliseconds: 0), () async {
         if (_isSupported && isAdEnabled) {
           await _loadBannerAd();
-          print('AdMob: 배너 광고 로드 시작 (지연 로딩)');
+          print('AdMob: 배너 광고 로드 시작 (즉시 로딩)');
         }
       });
     } catch (e) {

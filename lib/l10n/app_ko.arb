@@ -124,5 +124,8 @@
   "timeUpMessage": "광고를 보고 30초 더 얻어보세요!",
   "timeUpSubMessage": "게임을 이어서 진행할 수 있어요",
   "giveUp": "포기하기",
-  "watchAd": "광고 보러가기"
+  "watchAd": "광고 보러가기",
+  
+  "scoreUnit": "점",
+  "movesUnit": "번"
 }

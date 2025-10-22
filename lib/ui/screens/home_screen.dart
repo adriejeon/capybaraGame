@@ -25,8 +25,8 @@ class _HomeScreenState extends State<HomeScreen> {
     super.initState();
     // 스플래시 화면 종료
     FlutterNativeSplash.remove();
-    // 전면 광고 미리 로드 (약간의 지연 후)
-    Future.delayed(const Duration(milliseconds: 500), () async {
+    // 전면 광고 미리 로드 (즉시 로드)
+    Future.delayed(const Duration(milliseconds: 0), () async {
       await _adMobHandler.loadInterstitialAd();
       print('홈 화면 - 전면 광고 로드 시작');
     });
