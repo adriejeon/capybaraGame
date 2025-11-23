@@ -8,7 +8,6 @@ import '../utils/helpers.dart';
 
 class ShareService {
   static const String _smartLink = 'https://onelink.to/73hdmp';
-  static const String _nativeAppKey = '941590ef92057f63649c0c5b886f918c';
   static const String _gameShareLink =
       'https://adriejeon.github.io/capybaraPolicy/share.html';
   static const String _gameShareLinkEn =
@@ -149,18 +148,41 @@ class ShareService {
         ],
       );
 
-      // 카카오톡 설치 여부 확인
-      bool isKakaoTalkSharingAvailable =
-          await ShareClient.instance.isKakaoTalkSharingAvailable();
+      // 카카오톡으로 직접 공유 시도
+      try {
+        // 카카오톡 설치 여부 확인
+        bool isKakaoTalkSharingAvailable =
+            await ShareClient.instance.isKakaoTalkSharingAvailable();
 
-      if (isKakaoTalkSharingAvailable) {
-        // 카카오톡 설치되어 있음
-        final uri = await ShareClient.instance.shareDefault(template: template);
-        await ShareClient.instance.launchKakaoTalk(uri);
-      } else {
-        // 카카오톡 미설치 - 웹 공유로 대체
-        final uri = await ShareClient.instance.shareDefault(template: template);
-        await ShareClient.instance.launchKakaoTalk(uri);
+        print('카카오톡 설치 여부: $isKakaoTalkSharingAvailable');
+
+        if (isKakaoTalkSharingAvailable) {
+          // 카카오톡 설치되어 있음 - 카카오톡으로 공유
+          final uri =
+              await ShareClient.instance.shareDefault(template: template);
+          await ShareClient.instance.launchKakaoTalk(uri);
+          print('카카오톡 공유 성공');
+        } else {
+          // 카카오톡 미설치 - 웹 공유 URL 시도
+          print('카카오톡 미설치 - 웹 공유로 전환');
+          final uri =
+              await ShareClient.instance.shareDefault(template: template);
+          await ShareClient.instance.launchKakaoTalk(uri);
+        }
+      } catch (e) {
+        print('카카오톡 공유 시도 중 오류: $e');
+        // 카카오톡 미설치 알림
+        if (context.mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(isKorean
+                  ? '카카오톡이 설치되어 있지 않습니다. 카카오톡을 설치한 후 다시 시도해주세요.'
+                  : 'KakaoTalk is not installed. Please install KakaoTalk and try again.'),
+              duration: const Duration(seconds: 3),
+            ),
+          );
+        }
+        rethrow;
       }
     } catch (e) {
       print('카카오톡 캐릭터 공유 오류: $e');

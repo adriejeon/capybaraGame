@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "678961948576",
+    "project_id": "capybara-match-9b849",
+    "storage_bucket": "capybara-match-9b849.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:678961948576:android:7eb2f5fb612e1f4cb3e6c5",
+        "android_client_info": {
+          "package_name": "com.adrie.copybaraGame"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyDdbLh8uAcb49luL9ZQtQlGQwoFzcZMpaw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}

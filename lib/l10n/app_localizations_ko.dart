@@ -42,6 +42,21 @@ class AppLocalizationsKo extends AppLocalizations {
   String get hard => '어려움';
 
   @override
+  String get level1 => '아기 단계';
+
+  @override
+  String get level2 => '어린이 단계';
+
+  @override
+  String get level3 => '청소년 단계';
+
+  @override
+  String get level4 => '어른 단계';
+
+  @override
+  String get level5 => '신의 경지';
+
+  @override
   String get collection => '컬렉션';
 
   @override
@@ -100,6 +115,15 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get soundEffectsDesc => '버튼 클릭 및 게임 효과음';
+
+  @override
+  String get language => '언어 설정';
+
+  @override
+  String get languageKorean => '한국어';
+
+  @override
+  String get languageEnglish => 'English';
 
   @override
   String get vibration => '진동 효과';
@@ -332,6 +356,9 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get watchAd => '광고 보러가기';
+
+  @override
+  String get redrawCapybara => '카피바라 다시 뽑기';
 
   @override
   String get scoreUnit => '점';

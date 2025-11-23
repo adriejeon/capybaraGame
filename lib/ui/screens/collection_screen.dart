@@ -4,6 +4,7 @@ import '../../data/collection_manager.dart';
 import '../../utils/constants.dart';
 import '../../sound_manager.dart';
 import '../../services/share_service.dart';
+import '../../data/home_character_manager.dart';
 
 /// 컬렉션 화면
 class CollectionScreen extends StatefulWidget {
@@ -17,6 +18,7 @@ class _CollectionScreenState extends State<CollectionScreen>
     with WidgetsBindingObserver {
   final CollectionManager _collectionManager = CollectionManager();
   final SoundManager _soundManager = SoundManager();
+  final HomeCharacterManager _homeCharacterManager = HomeCharacterManager();
   List<CollectionItem> _collection = [];
   bool _isLoading = true;
 
@@ -123,19 +125,29 @@ class _CollectionScreenState extends State<CollectionScreen>
                 const Color(0xFF4A90E2),
               ),
               _buildStatItem(
-                AppLocalizations.of(context)!.easy,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.easy)}/20',
-                const Color(0xFFFFD700), // 노란색
+                AppLocalizations.of(context)!.level1,
+                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level1)}/10',
+                const Color(0xFF4CAF50), // 초록색
               ),
               _buildStatItem(
-                AppLocalizations.of(context)!.normal,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.medium)}/15',
-                const Color(0xFF4A90E2), // 파란색
+                AppLocalizations.of(context)!.level2,
+                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level2)}/10',
+                const Color(0xFF2196F3), // 파란색
               ),
               _buildStatItem(
-                AppLocalizations.of(context)!.hard,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.hard)}/10',
-                const Color(0xFF9B59B6), // 보라색
+                AppLocalizations.of(context)!.level3,
+                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level3)}/10',
+                const Color(0xFFFF9800), // 주황색
+              ),
+              _buildStatItem(
+                AppLocalizations.of(context)!.level4,
+                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level4)}/10',
+                const Color(0xFF9C27B0), // 보라색
+              ),
+              _buildStatItem(
+                AppLocalizations.of(context)!.level5,
+                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level5)}/15',
+                const Color(0xFFE91E63), // 핑크색
               ),
             ],
           ),
@@ -289,24 +301,32 @@ class _CollectionScreenState extends State<CollectionScreen>
   /// 난이도별 색상 반환
   Color _getDifficultyColor(GameDifficulty difficulty) {
     switch (difficulty) {
-      case GameDifficulty.easy:
-        return const Color(0xFFFFD700); // 노란색
-      case GameDifficulty.medium:
-        return const Color(0xFF4A90E2); // 파란색
-      case GameDifficulty.hard:
-        return const Color(0xFF9B59B6); // 보라색
+      case GameDifficulty.level1:
+        return const Color(0xFF4CAF50); // 초록색
+      case GameDifficulty.level2:
+        return const Color(0xFF2196F3); // 파란색
+      case GameDifficulty.level3:
+        return const Color(0xFFFF9800); // 주황색
+      case GameDifficulty.level4:
+        return const Color(0xFF9C27B0); // 보라색
+      case GameDifficulty.level5:
+        return const Color(0xFFE91E63); // 핑크색
     }
   }
 
   /// 난이도 텍스트 반환
   String _getDifficultyText(GameDifficulty difficulty) {
     switch (difficulty) {
-      case GameDifficulty.easy:
-        return AppLocalizations.of(context)!.easy;
-      case GameDifficulty.medium:
-        return AppLocalizations.of(context)!.normal;
-      case GameDifficulty.hard:
-        return AppLocalizations.of(context)!.hard;
+      case GameDifficulty.level1:
+        return AppLocalizations.of(context)!.level1;
+      case GameDifficulty.level2:
+        return AppLocalizations.of(context)!.level2;
+      case GameDifficulty.level3:
+        return AppLocalizations.of(context)!.level3;
+      case GameDifficulty.level4:
+        return AppLocalizations.of(context)!.level4;
+      case GameDifficulty.level5:
+        return AppLocalizations.of(context)!.level5;
     }
   }
 
@@ -460,8 +480,52 @@ class _CollectionScreenState extends State<CollectionScreen>
           ),
         ),
         actions: [
-          // 친구에게 보여주기 버튼 (잠금 해제된 카드에만 표시, 테두리만 있는 스타일)
+          // 잠금 해제된 카드에만 버튼 표시
           if (item.isUnlocked) ...[
+            // 홈에 배치 버튼
+            SizedBox(
+              width: double.infinity,
+              child: ElevatedButton.icon(
+                onPressed: () async {
+                  // 컬렉션 이미지 경로를 홈 캐릭터 ID로 변환
+                  final characterId = _homeCharacterManager
+                      .convertCollectionPathToCharacterId(item.imagePath);
+                  await _homeCharacterManager.setHomeCharacter(characterId);
+                  
+                  if (mounted) {
+                    Navigator.of(context).pop();
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text(
+                          Localizations.localeOf(context).languageCode == 'ko'
+                              ? '홈 화면에 배치되었습니다!'
+                              : 'Set as home character!',
+                        ),
+                        duration: const Duration(seconds: 2),
+                        backgroundColor: const Color(0xFF4CAF50),
+                      ),
+                    );
+                  }
+                },
+                icon: const Icon(Icons.home, size: 20),
+                label: Text(
+                  Localizations.localeOf(context).languageCode == 'ko'
+                      ? '홈에 배치하기'
+                      : 'Set as Home',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: const Color(0xFF4A90E2),
+                  foregroundColor: Colors.white,
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                ),
+              ),
+            ),
+            const SizedBox(height: 8),
+            // 친구에게 보여주기 버튼 (테두리만 있는 스타일)
             SizedBox(
               width: double.infinity,
               child: OutlinedButton.icon(

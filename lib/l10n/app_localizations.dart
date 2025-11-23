@@ -164,6 +164,36 @@ abstract class AppLocalizations {
   /// **'어려움'**
   String get hard;
 
+  /// No description provided for @level1.
+  ///
+  /// In ko, this message translates to:
+  /// **'아기 단계'**
+  String get level1;
+
+  /// No description provided for @level2.
+  ///
+  /// In ko, this message translates to:
+  /// **'어린이 단계'**
+  String get level2;
+
+  /// No description provided for @level3.
+  ///
+  /// In ko, this message translates to:
+  /// **'청소년 단계'**
+  String get level3;
+
+  /// No description provided for @level4.
+  ///
+  /// In ko, this message translates to:
+  /// **'어른 단계'**
+  String get level4;
+
+  /// No description provided for @level5.
+  ///
+  /// In ko, this message translates to:
+  /// **'신의 경지'**
+  String get level5;
+
   /// No description provided for @collection.
   ///
   /// In ko, this message translates to:
@@ -283,6 +313,24 @@ abstract class AppLocalizations {
   /// In ko, this message translates to:
   /// **'버튼 클릭 및 게임 효과음'**
   String get soundEffectsDesc;
+
+  /// No description provided for @language.
+  ///
+  /// In ko, this message translates to:
+  /// **'언어 설정'**
+  String get language;
+
+  /// No description provided for @languageKorean.
+  ///
+  /// In ko, this message translates to:
+  /// **'한국어'**
+  String get languageKorean;
+
+  /// No description provided for @languageEnglish.
+  ///
+  /// In ko, this message translates to:
+  /// **'English'**
+  String get languageEnglish;
 
   /// No description provided for @vibration.
   ///
@@ -739,6 +787,12 @@ abstract class AppLocalizations {
   /// In ko, this message translates to:
   /// **'광고 보러가기'**
   String get watchAd;
+
+  /// No description provided for @redrawCapybara.
+  ///
+  /// In ko, this message translates to:
+  /// **'카피바라 다시 뽑기'**
+  String get redrawCapybara;
 
   /// No description provided for @scoreUnit.
   ///

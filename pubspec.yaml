@@ -2,8 +2,8 @@ name: capybara_game
 description: "카피바라 찾기 - 카피바라 캐릭터 카드 짝 맞추기 게임"
 publish_to: "none"
 
-# version: 1.1.6+2
-version: 1.1.5+17
+# version: 1.1.8+1
+version: 1.1.5+24
 
 environment:
   sdk: ">=3.0.0 <4.0.0"
@@ -30,6 +30,13 @@ dependencies:
 
   # 광고
   google_mobile_ads: ^5.1.0
+
+  # Firebase
+  firebase_core: ^3.6.0
+  firebase_analytics: ^11.3.3
+
+  # iOS 추적 권한
+  app_tracking_transparency: ^2.0.6+1
 
   # UI
   flutter_svg: ^2.0.9
@@ -73,6 +80,7 @@ flutter:
     - assets/capybara/collection/
     - assets/images/
     - assets/audio/
+    - assets/home_capybara/
 
 # 앱 아이콘 설정
 flutter_launcher_icons:

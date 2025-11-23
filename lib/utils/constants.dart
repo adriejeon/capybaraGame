@@ -1,19 +1,25 @@
 /// 게임 상수 정의
 class GameConstants {
   // 게임 설정 - 카드 개수 기준
-  static const int easyCardCount = 8; // 4쌍
-  static const int mediumCardCount = 24; // 12쌍
-  static const int hardCardCount = 40; // 20쌍 (40개 카드)
+  static const int level1CardCount = 6; // 3쌍 (아기 단계)
+  static const int level2CardCount = 12; // 6쌍 (어린이 단계)
+  static const int level3CardCount = 16; // 8쌍 (청소년 단계)
+  static const int level4CardCount = 24; // 12쌍 (어른 단계)
+  static const int level5CardCount = 40; // 20쌍 (신의 경지)
 
   // 그리드 크기 계산 (카드 개수에 따라)
   static int getGridSize(GameDifficulty difficulty) {
     switch (difficulty) {
-      case GameDifficulty.easy:
-        return 4; // 2x4 또는 4x2
-      case GameDifficulty.medium:
+      case GameDifficulty.level1:
+        return 3; // 2x3 또는 3x2
+      case GameDifficulty.level2:
+        return 4; // 3x4 또는 4x3
+      case GameDifficulty.level3:
+        return 4; // 4x4
+      case GameDifficulty.level4:
         return 6; // 4x6 또는 6x4
-      case GameDifficulty.hard:
-        return 8; // 4x8 또는 8x4
+      case GameDifficulty.level5:
+        return 8; // 5x8 또는 8x5
     }
   }
 
@@ -23,9 +29,11 @@ class GameConstants {
   static const double cardSpacing = 10.0;
 
   // 게임 시간
-  static const int easyTimeLimit = 20; // 20초
-  static const int mediumTimeLimit = 50; // 50초
-  static const int hardTimeLimit = 100; // 1분 40초
+  static const int level1TimeLimit = 15; // 15초
+  static const int level2TimeLimit = 30; // 30초
+  static const int level3TimeLimit = 45; // 45초
+  static const int level4TimeLimit = 70; // 70초
+  static const int level5TimeLimit = 120; // 2분
 
   // 점수 계산
   static const int baseScore = 100;
@@ -58,9 +66,11 @@ class GameConstants {
 
 /// 게임 난이도 열거형
 enum GameDifficulty {
-  easy,
-  medium,
-  hard,
+  level1, // 아기 단계 - 6장
+  level2, // 어린이 단계 - 12장
+  level3, // 청소년 단계 - 16장
+  level4, // 어른 단계 - 24장
+  level5, // 신의 경지 - 40장
 }
 
 /// 게임 상태 열거형

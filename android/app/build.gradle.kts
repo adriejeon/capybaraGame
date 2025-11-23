@@ -6,6 +6,8 @@ plugins {
     id("kotlin-android")
     // The Flutter Gradle Plugin must be applied after the Android and Kotlin Gradle plugins.
     id("dev.flutter.flutter-gradle-plugin")
+    // Google Services plugin for Firebase
+    id("com.google.gms.google-services")
 }
 
 // Load keystore properties
@@ -17,7 +19,8 @@ if (keystorePropertiesFile.exists()) {
 
 android {
     namespace = "com.adrie.copybaraGame"
-    compileSdk = flutter.compileSdkVersion
+    // Flutter 기본값 대신 명시적으로 35로 설정 (카카오 SDK 호환성)
+    compileSdk = 36
     ndkVersion = "27.0.12077973"
 
     compileOptions {
@@ -35,7 +38,8 @@ android {
         // You can update the following values to match your application needs.
         // For more information, see: https://flutter.dev/to/review-gradle-config.
         minSdk = flutter.minSdkVersion
-        targetSdk = flutter.targetSdkVersion
+        // 카카오 SDK 호환성을 위해 35로 설정 (Android 15)
+        targetSdk = 35
         versionCode = flutter.versionCode
         versionName = flutter.versionName
     }
@@ -58,10 +62,17 @@ android {
             }
             isMinifyEnabled = false
             isShrinkResources = false
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }
 
 flutter {
     source = "../.."
+}
+
+dependencies {
+    // Firebase BOM and Analytics
+    implementation(platform("com.google.firebase:firebase-bom:33.6.0"))
+    implementation("com.google.firebase:firebase-analytics")
 }

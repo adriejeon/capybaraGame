@@ -42,6 +42,21 @@ class AppLocalizationsEn extends AppLocalizations {
   String get hard => 'Hard';
 
   @override
+  String get level1 => 'Baby Level';
+
+  @override
+  String get level2 => 'Child Level';
+
+  @override
+  String get level3 => 'Teen Level';
+
+  @override
+  String get level4 => 'Adult Level';
+
+  @override
+  String get level5 => 'God Mode';
+
+  @override
   String get collection => 'Collection';
 
   @override
@@ -100,6 +115,15 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get soundEffectsDesc => 'Button clicks and game sound effects';
+
+  @override
+  String get language => 'Language';
+
+  @override
+  String get languageKorean => '한국어';
+
+  @override
+  String get languageEnglish => 'English';
 
   @override
   String get vibration => 'Vibration';
@@ -336,6 +360,9 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get watchAd => 'Watch Ad';
+
+  @override
+  String get redrawCapybara => 'Redraw Capybara';
 
   @override
   String get scoreUnit => 'pts';

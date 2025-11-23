@@ -2,14 +2,23 @@ import 'package:flutter/material.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'package:kakao_flutter_sdk_common/kakao_flutter_sdk_common.dart';
+import 'package:firebase_core/firebase_core.dart';
+import 'package:app_tracking_transparency/app_tracking_transparency.dart';
 import 'ui/screens/home_screen.dart';
 import 'sound_manager.dart';
 import 'ads/admob_handler.dart';
 import 'state/locale_state.dart';
 import 'l10n/app_localizations.dart';
+import 'data/home_character_manager.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // Firebase 초기화
+  await Firebase.initializeApp();
+
+  // iOS 추적 권한 요청
+  await AppTrackingTransparency.requestTrackingAuthorization();
 
   // 카카오 SDK 초기화
   KakaoSdk.init(
@@ -26,6 +35,9 @@ void main() async {
   // LocaleState 초기화
   final localeState = LocaleState();
   await localeState.loadSavedLocale();
+
+  // HomeCharacterManager 초기화
+  await HomeCharacterManager().initialize();
 
   runApp(CapybaraGameApp(localeState: localeState));
 }

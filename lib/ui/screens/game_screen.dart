@@ -47,6 +47,8 @@ class _GameScreenState extends State<GameScreen>
   bool _isProcessing = false;
   GameState _gameState = GameState.playing;
   bool _isShowingHint = false; // 카드 힌트 표시 중인지 확인
+  bool _hasReceivedReward = false; // 보상형 광고에서 보상을 받았는지 추적
+  CollectionResult? _currentRewardResult; // 현재 뽑은 카피바라 결과 저장
 
   @override
   void initState() {
@@ -58,6 +60,11 @@ class _GameScreenState extends State<GameScreen>
     Future.delayed(const Duration(milliseconds: 1000), () async {
       await _adMobHandler.loadInterstitialAd();
       print('게임 화면 - 전면 광고 로드 시작');
+    });
+    // 보상형 광고 미리 로드 (약간의 지연 후)
+    Future.delayed(const Duration(milliseconds: 1500), () async {
+      await _adMobHandler.loadRewardedAd();
+      print('게임 화면 - 보상형 광고 로드 시작');
     });
   }
 
@@ -137,8 +144,8 @@ class _GameScreenState extends State<GameScreen>
 
   /// 사용자 비활성 상태 체크 타이머 시작
   void _startIdleTimer() {
-    // 쉬움 난이도에서는 힌트 제공하지 않음
-    if (widget.difficulty == GameDifficulty.easy) return;
+    // 레벨 1에서는 힌트 제공하지 않음
+    if (widget.difficulty == GameDifficulty.level1) return;
 
     _idleTimer?.cancel();
     _idleTimer = Timer(const Duration(seconds: 5), () {
@@ -632,6 +639,9 @@ class _GameScreenState extends State<GameScreen>
     // 컬렉션에 새 카드 추가
     await _collectionManager.initializeCollection();
     final result = await _collectionManager.addNewCard(widget.difficulty);
+    
+    // 현재 뽑은 결과 저장 (다시 뽑기 기능용)
+    _currentRewardResult = result;
 
     // 카드 뽑기 다이얼로그 표시
     _showCardDrawDialog(result);
@@ -786,18 +796,56 @@ class _GameScreenState extends State<GameScreen>
             ),
             const SizedBox(height: 8),
           ],
+          // 카피바라 다시 뽑기 버튼 (항상 표시)
+          SizedBox(
+            width: double.infinity,
+            child: OutlinedButton.icon(
+              onPressed: () {
+                Navigator.of(context).pop(); // 다이얼로그 닫기
+                _redrawCapybaraWithRewardedAd();
+              },
+              icon: const Icon(Icons.refresh, size: 20),
+              label: Text(
+                AppLocalizations.of(context)!.redrawCapybara,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+              style: OutlinedButton.styleFrom(
+                foregroundColor: const Color(0xFF4A90E2),
+                side: const BorderSide(
+                  color: Color(0xFF4A90E2),
+                  width: 2,
+                ),
+                padding: const EdgeInsets.symmetric(vertical: 16),
+              ),
+            ),
+          ),
+          const SizedBox(height: 8),
           // 친구에게 자랑하기 버튼 (테두리만 있는 스타일)
           SizedBox(
             width: double.infinity,
             child: OutlinedButton.icon(
               onPressed: () async {
-                final locale = Localizations.localeOf(context);
-                final isKorean = locale.languageCode == 'ko';
-                final difficultyText = widget.difficulty == GameDifficulty.easy
-                    ? 'easy'
-                    : widget.difficulty == GameDifficulty.medium
-                        ? 'medium'
-                        : 'hard';
+                String difficultyText;
+                switch (widget.difficulty) {
+                  case GameDifficulty.level1:
+                    difficultyText = 'level1';
+                    break;
+                  case GameDifficulty.level2:
+                    difficultyText = 'level2';
+                    break;
+                  case GameDifficulty.level3:
+                    difficultyText = 'level3';
+                    break;
+                  case GameDifficulty.level4:
+                    difficultyText = 'level4';
+                    break;
+                  case GameDifficulty.level5:
+                    difficultyText = 'level5';
+                    break;
+                }
                 
                 // 게임 완료 시간 계산 (초기 시간 - 남은 시간)
                 final initialTime = GameHelpers.getTimeLimit(widget.difficulty);
@@ -914,10 +962,19 @@ class _GameScreenState extends State<GameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
-                Icons.schedule,
-                size: 64,
-                color: Color(0xFF333333),
+              Image.asset(
+                'assets/images/gameover.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  // 이미지 로드 실패 시 기본 아이콘 표시
+                  return const Icon(
+                    Icons.schedule,
+                    size: 64,
+                    color: Color(0xFF333333),
+                  );
+                },
               ),
               const SizedBox(height: 16),
               Text(
@@ -993,25 +1050,101 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  /// 광고 시청 후 시간 연장
+  /// 광고 시청 후 시간 연장 (보상형 광고 사용)
   void _watchAdForTimeExtension() async {
-    print('시간 연장을 위한 광고 시청 시작');
+    print('시간 연장을 위한 보상형 광고 시청 시작');
     
-    // 광고가 준비되지 않았으면 강제로 로드
-    if (!_adMobHandler.isInterstitialAdLoaded) {
-      print('광고 준비 안됨 - 강제 로드 시작 (시간 연장)');
-      await _adMobHandler.loadInterstitialAd();
+    // 보상 받음 플래그 초기화
+    _hasReceivedReward = false;
+    
+    // 보상형 광고가 준비되지 않았으면 강제로 로드
+    if (!_adMobHandler.isRewardedAdLoaded) {
+      print('보상형 광고 준비 안됨 - 강제 로드 시작 (시간 연장)');
+      await _adMobHandler.loadRewardedAd();
       // 2초 후 다시 시도
       Future.delayed(const Duration(seconds: 2), () async {
-        await _adMobHandler.showInterstitialAd();
-        print('시간 연장 광고 닫힘');
-        _extendGameTime();
+        if (_adMobHandler.isRewardedAdLoaded) {
+          await _adMobHandler.showRewardedAd(
+            onRewarded: (reward) {
+              print('보상 획득: ${reward.type}, ${reward.amount}');
+              _hasReceivedReward = true; // 보상 받음 플래그 설정
+              // 보상을 받았으면 즉시 시간 연장하지 않고, 광고가 닫힐 때 처리
+            },
+            onAdDismissed: () {
+              print('보상형 광고 닫힘');
+              if (mounted) {
+                if (_hasReceivedReward) {
+                  // 보상을 받았으면 시간 연장
+                  print('보상을 받았으므로 시간 연장');
+                  _extendGameTime();
+                } else {
+                  // 보상을 받지 않았으면 게임 종료하고 홈으로
+                  print('보상을 받지 않았으므로 게임 종료');
+                  _gameTimer?.cancel();
+                  _hintTimer?.cancel();
+                  _idleTimer?.cancel();
+                  Navigator.of(context).pop(); // 홈으로 돌아가기
+                }
+              }
+            },
+            onAdFailedToShow: (ad) {
+              print('보상형 광고 표시 실패 - 게임 종료');
+              // 광고 표시 실패 시 게임 종료하고 홈으로
+              if (mounted) {
+                _gameTimer?.cancel();
+                _hintTimer?.cancel();
+                _idleTimer?.cancel();
+                Navigator.of(context).pop(); // 홈으로 돌아가기
+              }
+            },
+          );
+        } else {
+          print('보상형 광고 로드 실패 - 게임 종료');
+          // 광고 로드 실패 시 게임 종료하고 홈으로
+          if (mounted) {
+            _gameTimer?.cancel();
+            _hintTimer?.cancel();
+            _idleTimer?.cancel();
+            Navigator.of(context).pop(); // 홈으로 돌아가기
+          }
+        }
       });
     } else {
-      // 광고 표시 후 시간 연장
-      await _adMobHandler.showInterstitialAd();
-      print('시간 연장 광고 닫힘');
-      _extendGameTime();
+      // 보상형 광고 표시
+      await _adMobHandler.showRewardedAd(
+        onRewarded: (reward) {
+          print('보상 획득: ${reward.type}, ${reward.amount}');
+          _hasReceivedReward = true; // 보상 받음 플래그 설정
+          // 보상을 받았으면 즉시 시간 연장하지 않고, 광고가 닫힐 때 처리
+        },
+        onAdDismissed: () {
+          print('보상형 광고 닫힘');
+          if (mounted) {
+            if (_hasReceivedReward) {
+              // 보상을 받았으면 시간 연장
+              print('보상을 받았으므로 시간 연장');
+              _extendGameTime();
+            } else {
+              // 보상을 받지 않았으면 게임 종료하고 홈으로
+              print('보상을 받지 않았으므로 게임 종료');
+              _gameTimer?.cancel();
+              _hintTimer?.cancel();
+              _idleTimer?.cancel();
+              Navigator.of(context).pop(); // 홈으로 돌아가기
+            }
+          }
+        },
+        onAdFailedToShow: (ad) {
+          print('보상형 광고 표시 실패 - 게임 종료');
+          // 광고 표시 실패 시 게임 종료하고 홈으로
+          if (mounted) {
+            _gameTimer?.cancel();
+            _hintTimer?.cancel();
+            _idleTimer?.cancel();
+            Navigator.of(context).pop(); // 홈으로 돌아가기
+          }
+        },
+      );
     }
   }
 
@@ -1027,6 +1160,71 @@ class _GameScreenState extends State<GameScreen>
     _startIdleTimer();
     
     print('게임 시간 30초 연장 완료');
+  }
+
+  /// 보상형 광고를 보고 카피바라 다시 뽑기
+  void _redrawCapybaraWithRewardedAd() async {
+    if (_currentRewardResult == null || _currentRewardResult!.card == null) {
+      print('뽑을 카피바라 정보가 없습니다.');
+      return;
+    }
+
+    // 보상 받음 플래그 초기화
+    _hasReceivedReward = false;
+    final previousCardId = _currentRewardResult!.card!.id;
+    // 이전 결과를 백업 (보상을 받지 않았을 때 복원하기 위해)
+    final previousResult = _currentRewardResult;
+
+    // 보상형 광고가 준비되지 않았으면 로드
+    if (!_adMobHandler.isRewardedAdLoaded) {
+      await _adMobHandler.loadRewardedAd();
+    }
+
+    // 보상형 광고 표시
+    await _adMobHandler.showRewardedAd(
+      onRewarded: (reward) {
+        print('보상 획득: ${reward.type}, ${reward.amount}');
+        _hasReceivedReward = true;
+      },
+      onAdDismissed: () {
+        if (mounted) {
+          if (_hasReceivedReward) {
+            // 보상을 받았으면 다시 뽑기
+            print('보상을 받았으므로 카피바라 다시 뽑기');
+            _redrawCapybara(previousCardId);
+          } else {
+            // 보상을 받지 않았으면 이전 결과 팝업 다시 표시
+            print('보상을 받지 않았으므로 이전 결과 팝업 복원');
+            if (previousResult != null) {
+              _showFinalResultDialog(previousResult);
+            }
+          }
+        }
+      },
+      onAdFailedToShow: (ad) {
+        print('보상형 광고 표시 실패 - 이전 결과 팝업 복원');
+        // 광고 표시 실패 시에도 이전 결과 팝업 다시 표시
+        if (mounted && previousResult != null) {
+          _showFinalResultDialog(previousResult);
+        }
+      },
+    );
+  }
+
+  /// 카피바라 다시 뽑기 (이전 카드 잠금 후 새 카드 뽑기)
+  void _redrawCapybara(int previousCardId) async {
+    // 이전 카드를 잠금 상태로 되돌리기
+    await _collectionManager.lockCard(previousCardId);
+
+    // 새 카드 뽑기
+    await _collectionManager.initializeCollection();
+    final newResult = await _collectionManager.addNewCard(widget.difficulty);
+    
+    // 현재 뽑은 결과 업데이트
+    _currentRewardResult = newResult;
+
+    // 새 카드 뽑기 다이얼로그 표시
+    _showCardDrawDialog(newResult);
   }
 
   @override
@@ -1107,8 +1305,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   Widget _buildGameBoard() {
-    if (widget.difficulty == GameDifficulty.easy) {
-      // 쉬움 난이도: 화면에 맞게 카드 크기 조정 및 중앙 정렬
+    if (widget.difficulty == GameDifficulty.level1) {
+      // 레벨 1: 화면에 맞게 카드 크기 조정 및 중앙 정렬
       return LayoutBuilder(
         builder: (context, constraints) {
           // 화면 크기에 맞게 카드 크기 계산
@@ -1217,12 +1415,16 @@ class _GameScreenState extends State<GameScreen>
 
   String _getDifficultyText() {
     switch (widget.difficulty) {
-      case GameDifficulty.easy:
-        return AppLocalizations.of(context)!.easy;
-      case GameDifficulty.medium:
-        return AppLocalizations.of(context)!.normal;
-      case GameDifficulty.hard:
-        return AppLocalizations.of(context)!.hard;
+      case GameDifficulty.level1:
+        return AppLocalizations.of(context)!.level1;
+      case GameDifficulty.level2:
+        return AppLocalizations.of(context)!.level2;
+      case GameDifficulty.level3:
+        return AppLocalizations.of(context)!.level3;
+      case GameDifficulty.level4:
+        return AppLocalizations.of(context)!.level4;
+      case GameDifficulty.level5:
+        return AppLocalizations.of(context)!.level5;
     }
   }
 }

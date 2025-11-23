@@ -58,12 +58,16 @@ class CapybaraCardFactory {
   /// 난이도에 따른 카드 개수 반환
   static int getCardCount(GameDifficulty difficulty) {
     switch (difficulty) {
-      case GameDifficulty.easy:
-        return GameConstants.easyCardCount;
-      case GameDifficulty.medium:
-        return GameConstants.mediumCardCount;
-      case GameDifficulty.hard:
-        return GameConstants.hardCardCount;
+      case GameDifficulty.level1:
+        return GameConstants.level1CardCount;
+      case GameDifficulty.level2:
+        return GameConstants.level2CardCount;
+      case GameDifficulty.level3:
+        return GameConstants.level3CardCount;
+      case GameDifficulty.level4:
+        return GameConstants.level4CardCount;
+      case GameDifficulty.level5:
+        return GameConstants.level5CardCount;
     }
   }
 
@@ -102,10 +106,25 @@ class CapybaraCardFactory {
     // 카드들을 섞기
     final shuffledCards = GameHelpers.shuffleList(cards);
 
-    // 그리드 크기 계산 (어려움 단계는 5x8 고정)
-    final gridSize = difficulty == GameDifficulty.hard
-        ? GridSize(5, 8) // 어려움: 5x8 (40개 카드)
-        : _calculateGridSize(cardCount);
+    // 그리드 크기 계산
+    GridSize gridSize;
+    switch (difficulty) {
+      case GameDifficulty.level1:
+        gridSize = GridSize(2, 3); // 레벨 1: 2x3 (6개 카드)
+        break;
+      case GameDifficulty.level2:
+        gridSize = GridSize(3, 4); // 레벨 2: 3x4 (12개 카드)
+        break;
+      case GameDifficulty.level3:
+        gridSize = GridSize(4, 4); // 레벨 3: 4x4 (16개 카드)
+        break;
+      case GameDifficulty.level4:
+        gridSize = GridSize(4, 6); // 레벨 4: 4x6 (24개 카드)
+        break;
+      case GameDifficulty.level5:
+        gridSize = GridSize(5, 8); // 레벨 5: 5x8 (40개 카드)
+        break;
+    }
 
     return GameBoard(
       cards: shuffledCards,
@@ -115,27 +134,6 @@ class CapybaraCardFactory {
     );
   }
 
-  /// 카드 개수에 따른 최적의 그리드 크기 계산
-  static GridSize _calculateGridSize(int cardCount) {
-    // 가능한 조합들 중에서 가장 정사각형에 가까운 형태 선택
-    final List<GridSize> possibleSizes = [];
-
-    for (int width = 2; width <= cardCount; width++) {
-      if (cardCount % width == 0) {
-        final height = cardCount ~/ width;
-        possibleSizes.add(GridSize(width, height));
-      }
-    }
-
-    // 가장 정사각형에 가까운 크기 선택
-    possibleSizes.sort((a, b) {
-      final ratioA = (a.width / a.height - 1).abs();
-      final ratioB = (b.width / b.height - 1).abs();
-      return ratioA.compareTo(ratioB);
-    });
-
-    return possibleSizes.first;
-  }
 
   /// 사용 가능한 이미지 개수 반환
   static int get availableImageCount => _capybaraImages.length;

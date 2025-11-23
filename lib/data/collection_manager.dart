@@ -106,31 +106,51 @@ class CollectionManager {
   List<CollectionItem> _createDefaultCollection() {
     final List<CollectionItem> items = [];
 
-    // Easy 카드들 (1-20번 슬롯)
-    for (int i = 1; i <= 20; i++) {
+    // Level 1 카드들 (1-10번 슬롯)
+    for (int i = 1; i <= 10; i++) {
       items.add(CollectionItem(
         id: i,
-        difficulty: GameDifficulty.easy,
+        difficulty: GameDifficulty.level1,
         imagePath: _defaultImagePath,
         isUnlocked: false,
       ));
     }
 
-    // Normal 카드들 (21-35번 슬롯)
-    for (int i = 21; i <= 35; i++) {
+    // Level 2 카드들 (11-20번 슬롯)
+    for (int i = 11; i <= 20; i++) {
       items.add(CollectionItem(
         id: i,
-        difficulty: GameDifficulty.medium,
+        difficulty: GameDifficulty.level2,
         imagePath: _defaultImagePath,
         isUnlocked: false,
       ));
     }
 
-    // Hard 카드들 (36-45번 슬롯)
-    for (int i = 36; i <= 45; i++) {
+    // Level 3 카드들 (21-30번 슬롯)
+    for (int i = 21; i <= 30; i++) {
       items.add(CollectionItem(
         id: i,
-        difficulty: GameDifficulty.hard,
+        difficulty: GameDifficulty.level3,
+        imagePath: _defaultImagePath,
+        isUnlocked: false,
+      ));
+    }
+
+    // Level 4 카드들 (31-40번 슬롯)
+    for (int i = 31; i <= 40; i++) {
+      items.add(CollectionItem(
+        id: i,
+        difficulty: GameDifficulty.level4,
+        imagePath: _defaultImagePath,
+        isUnlocked: false,
+      ));
+    }
+
+    // Level 5 카드들 (41-55번 슬롯)
+    for (int i = 41; i <= 55; i++) {
+      items.add(CollectionItem(
+        id: i,
+        difficulty: GameDifficulty.level5,
         imagePath: _defaultImagePath,
         isUnlocked: false,
       ));
@@ -219,19 +239,38 @@ class CollectionManager {
     final List<String> cards = [];
 
     switch (difficulty) {
-      case GameDifficulty.easy:
-        for (int i = 1; i <= 20; i++) {
+      case GameDifficulty.level1:
+        // easy1-20 중 10개 사용
+        for (int i = 1; i <= 10; i++) {
           cards.add('assets/capybara/collection/easy$i.jpg');
         }
         break;
-      case GameDifficulty.medium:
-        for (int i = 1; i <= 15; i++) {
+      case GameDifficulty.level2:
+        // normal1-15 중 10개 사용
+        for (int i = 1; i <= 10; i++) {
           cards.add('assets/capybara/collection/normal$i.jpg');
         }
         break;
-      case GameDifficulty.hard:
+      case GameDifficulty.level3:
+        // normal1-15 중 나머지 5개 + 추가 5개 사용
+        for (int i = 6; i <= 15; i++) {
+          cards.add('assets/capybara/collection/normal$i.jpg');
+        }
+        break;
+      case GameDifficulty.level4:
+        // easy11-20 사용
+        for (int i = 11; i <= 20; i++) {
+          cards.add('assets/capybara/collection/easy$i.jpg');
+        }
+        break;
+      case GameDifficulty.level5:
+        // hard1-10 + easy의 일부 사용
         for (int i = 1; i <= 10; i++) {
           cards.add('assets/capybara/collection/hard$i.jpg');
+        }
+        // 추가 5개는 normal의 일부 재사용
+        for (int i = 1; i <= 5; i++) {
+          cards.add('assets/capybara/collection/normal$i.jpg');
         }
         break;
     }
@@ -265,6 +304,21 @@ class CollectionManager {
     final index = _collection.indexWhere((item) => item.id == cardId);
     if (index != -1 && _collection[index].isNew) {
       _collection[index] = _collection[index].copyWith(isNew: false);
+      await _saveCollection();
+    }
+  }
+
+  /// 특정 카드를 잠금 상태로 되돌리기 (다시 뽑기 기능용)
+  Future<void> lockCard(int cardId) async {
+    final index = _collection.indexWhere((item) => item.id == cardId);
+    if (index != -1 && _collection[index].isUnlocked) {
+      _collection[index] = CollectionItem(
+        id: _collection[index].id,
+        difficulty: _collection[index].difficulty,
+        imagePath: '', // 이미지 경로 제거
+        isUnlocked: false, // 잠금 상태로 변경
+        isNew: false,
+      );
       await _saveCollection();
     }
   }

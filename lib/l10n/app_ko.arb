@@ -14,6 +14,11 @@
   "easy": "쉬움",
   "normal": "보통",
   "hard": "어려움",
+  "level1": "아기 단계",
+  "level2": "어린이 단계",
+  "level3": "청소년 단계",
+  "level4": "어른 단계",
+  "level5": "신의 경지",
   "collection": "컬렉션",
   
   "gameComplete": "축하합니다!",
@@ -38,6 +43,9 @@
   "backgroundMusicDesc": "게임 배경음악 재생",
   "soundEffects": "효과음",
   "soundEffectsDesc": "버튼 클릭 및 게임 효과음",
+  "language": "언어 설정",
+  "languageKorean": "한국어",
+  "languageEnglish": "English",
   "vibration": "진동 효과",
   "vibrationDesc": "터치 시 진동 피드백",
   
@@ -125,6 +133,7 @@
   "timeUpSubMessage": "게임을 이어서 진행할 수 있어요",
   "giveUp": "포기하기",
   "watchAd": "광고 보러가기",
+  "redrawCapybara": "카피바라 다시 뽑기",
   
   "scoreUnit": "점",
   "movesUnit": "번"

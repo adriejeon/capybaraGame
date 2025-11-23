@@ -23,24 +23,32 @@ class GameHelpers {
   /// 난이도에 따른 카드 쌍 수 계산
   static int getPairCount(GameDifficulty difficulty) {
     switch (difficulty) {
-      case GameDifficulty.easy:
-        return GameConstants.easyCardCount ~/ 2;
-      case GameDifficulty.medium:
-        return GameConstants.mediumCardCount ~/ 2;
-      case GameDifficulty.hard:
-        return GameConstants.hardCardCount ~/ 2;
+      case GameDifficulty.level1:
+        return GameConstants.level1CardCount ~/ 2;
+      case GameDifficulty.level2:
+        return GameConstants.level2CardCount ~/ 2;
+      case GameDifficulty.level3:
+        return GameConstants.level3CardCount ~/ 2;
+      case GameDifficulty.level4:
+        return GameConstants.level4CardCount ~/ 2;
+      case GameDifficulty.level5:
+        return GameConstants.level5CardCount ~/ 2;
     }
   }
 
   /// 난이도에 따른 시간 제한 반환
   static int getTimeLimit(GameDifficulty difficulty) {
     switch (difficulty) {
-      case GameDifficulty.easy:
-        return GameConstants.easyTimeLimit;
-      case GameDifficulty.medium:
-        return GameConstants.mediumTimeLimit;
-      case GameDifficulty.hard:
-        return GameConstants.hardTimeLimit;
+      case GameDifficulty.level1:
+        return GameConstants.level1TimeLimit;
+      case GameDifficulty.level2:
+        return GameConstants.level2TimeLimit;
+      case GameDifficulty.level3:
+        return GameConstants.level3TimeLimit;
+      case GameDifficulty.level4:
+        return GameConstants.level4TimeLimit;
+      case GameDifficulty.level5:
+        return GameConstants.level5TimeLimit;
     }
   }
 
