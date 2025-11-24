@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/collection_manager.dart';
@@ -15,22 +16,26 @@ class CollectionScreen extends StatefulWidget {
 }
 
 class _CollectionScreenState extends State<CollectionScreen>
-    with WidgetsBindingObserver {
+    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
   final CollectionManager _collectionManager = CollectionManager();
   final SoundManager _soundManager = SoundManager();
   final HomeCharacterManager _homeCharacterManager = HomeCharacterManager();
   List<CollectionItem> _collection = [];
   bool _isLoading = true;
+  TabController? _tabController;
 
   @override
   void initState() {
     super.initState();
+    // TabController는 initState에서 초기화
+    _tabController = TabController(length: 5, vsync: this); // 5개 레벨
     WidgetsBinding.instance.addObserver(this);
     _loadCollection();
   }
 
   @override
   void dispose() {
+    _tabController?.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -56,22 +61,49 @@ class _CollectionScreenState extends State<CollectionScreen>
 
   Future<void> _loadCollection() async {
     try {
-      await _collectionManager.initializeCollection();
-      setState(() {
-        _collection = _collectionManager.collection;
-        _isLoading = false;
-      });
+      await _collectionManager.initializeCollection().timeout(
+        const Duration(seconds: 10),
+        onTimeout: () {
+          print('컬렉션 로드 타임아웃');
+          throw TimeoutException('컬렉션 로드 타임아웃');
+        },
+      );
+      if (mounted) {
+        setState(() {
+          _collection = _collectionManager.collection;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('컬렉션 로드 실패: $e');
-      setState(() {
-        _collection = [];
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _collection = _collectionManager.collection.isNotEmpty
+              ? _collectionManager.collection
+              : [];
+          _isLoading = false;
+        });
+      }
     }
   }
 
   @override
   Widget build(BuildContext context) {
+    // TabController가 초기화되지 않았으면 로딩 화면 표시
+    if (_tabController == null) {
+      return Scaffold(
+        backgroundColor: const Color(0xFFF0F8FF),
+        appBar: AppBar(
+          title: Text(AppLocalizations.of(context)!.collectionTitle),
+          backgroundColor: Colors.white,
+          elevation: 0,
+          foregroundColor: Colors.black87,
+          centerTitle: true,
+        ),
+        body: const Center(child: CircularProgressIndicator()),
+      );
+    }
+
     return Scaffold(
       backgroundColor: const Color(0xFFF0F8FF), // 연한 파스텔 하늘색
       appBar: AppBar(
@@ -80,25 +112,80 @@ class _CollectionScreenState extends State<CollectionScreen>
         elevation: 0,
         foregroundColor: Colors.black87,
         centerTitle: true,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(60),
+          child: Container(
+            color: Colors.white,
+            child: TabBar(
+              controller: _tabController!,
+              isScrollable: true, // 가로 스크롤 가능
+              tabAlignment: TabAlignment.start,
+              labelColor: Colors.black87,
+              unselectedLabelColor: Colors.grey,
+              indicatorColor: const Color(0xFF4A90E2),
+              indicatorWeight: 3,
+              labelStyle: const TextStyle(
+                fontSize: 15,
+                fontWeight: FontWeight.bold,
+              ),
+              unselectedLabelStyle: const TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.normal,
+              ),
+              tabs: [
+                Tab(text: AppLocalizations.of(context)!.level1),
+                Tab(text: AppLocalizations.of(context)!.level2),
+                Tab(text: AppLocalizations.of(context)!.level3),
+                Tab(text: AppLocalizations.of(context)!.level4),
+                Tab(text: AppLocalizations.of(context)!.level5),
+              ],
+            ),
+          ),
+        ),
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : Column(
+          : TabBarView(
+              controller: _tabController!,
               children: [
-                // 컬렉션 통계
-                _buildCollectionStats(),
-
-                // 컬렉션 그리드
-                Expanded(
-                  child: _buildCollectionGrid(),
-                ),
+                // 레벨별 탭
+                _buildTabContent(GameDifficulty.level1),
+                _buildTabContent(GameDifficulty.level2),
+                _buildTabContent(GameDifficulty.level3),
+                _buildTabContent(GameDifficulty.level4),
+                _buildTabContent(GameDifficulty.level5),
               ],
             ),
     );
   }
 
-  /// 컬렉션 통계 위젯
-  Widget _buildCollectionStats() {
+  /// 탭 컨텐츠 빌드
+  Widget _buildTabContent(GameDifficulty difficulty) {
+    // 난이도별로 필터링
+    final filteredCollection = _collection
+        .where((item) => item.difficulty == difficulty)
+        .toList();
+
+    return Column(
+      children: [
+        // 난이도별 완료율 표시
+        _buildDifficultyStats(difficulty),
+
+        // 컬렉션 그리드
+        Expanded(
+          child: _buildFilteredCollectionGrid(filteredCollection),
+        ),
+      ],
+    );
+  }
+
+  /// 난이도별 완료율 위젯
+  Widget _buildDifficultyStats(GameDifficulty difficulty) {
+    final totalCount = difficulty == GameDifficulty.level5 ? 15 : 10;
+    final unlockedCount =
+        _collectionManager.getUnlockedCountByDifficulty(difficulty);
+    final completionRate = (unlockedCount / totalCount) * 100;
+
     return Container(
       width: double.infinity,
       margin: const EdgeInsets.all(16),
@@ -117,54 +204,33 @@ class _CollectionScreenState extends State<CollectionScreen>
       child: Column(
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.center,
             children: [
-              _buildStatItem(
-                AppLocalizations.of(context)!.total,
-                '${_collectionManager.unlockedCount}/${_collectionManager.totalCount}',
-                const Color(0xFF4A90E2),
-              ),
-              _buildStatItem(
-                AppLocalizations.of(context)!.level1,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level1)}/10',
-                const Color(0xFF4CAF50), // 초록색
-              ),
-              _buildStatItem(
-                AppLocalizations.of(context)!.level2,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level2)}/10',
-                const Color(0xFF2196F3), // 파란색
-              ),
-              _buildStatItem(
-                AppLocalizations.of(context)!.level3,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level3)}/10',
-                const Color(0xFFFF9800), // 주황색
-              ),
-              _buildStatItem(
-                AppLocalizations.of(context)!.level4,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level4)}/10',
-                const Color(0xFF9C27B0), // 보라색
-              ),
-              _buildStatItem(
-                AppLocalizations.of(context)!.level5,
-                '${_collectionManager.getUnlockedCountByDifficulty(GameDifficulty.level5)}/15',
-                const Color(0xFFE91E63), // 핑크색
+              Text(
+                '$unlockedCount/$totalCount',
+                style: TextStyle(
+                  fontSize: 24,
+                  color: _getDifficultyColor(difficulty),
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ],
           ),
           const SizedBox(height: 16),
           LinearProgressIndicator(
-            value: _collectionManager.unlockedCount /
-                _collectionManager.totalCount,
+            value: unlockedCount / totalCount,
             backgroundColor: const Color(0xFFE6F3FF),
-            valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF4A90E2)),
+            valueColor: AlwaysStoppedAnimation<Color>(
+              _getDifficultyColor(difficulty),
+            ),
             minHeight: 8,
           ),
           const SizedBox(height: 8),
           Text(
-            '${AppLocalizations.of(context)!.completionRate}: ${((_collectionManager.unlockedCount / _collectionManager.totalCount) * 100).toStringAsFixed(1)}%',
-            style: const TextStyle(
+            '${AppLocalizations.of(context)!.completionRate}: ${completionRate.round()}%',
+            style: TextStyle(
               fontSize: 14,
-              color: Color(0xFF4A90E2),
+              color: _getDifficultyColor(difficulty),
               fontWeight: FontWeight.bold,
             ),
           ),
@@ -173,33 +239,22 @@ class _CollectionScreenState extends State<CollectionScreen>
     );
   }
 
-  /// 통계 아이템 위젯
-  Widget _buildStatItem(String label, String value, Color color) {
-    return Column(
-      children: [
-        Text(
-          label,
-          style: TextStyle(
-            fontSize: 12,
-            color: color,
-            fontWeight: FontWeight.bold,
-          ),
-        ),
-        const SizedBox(height: 4),
-        Text(
-          value,
-          style: TextStyle(
+  /// 필터링된 컬렉션 그리드 위젯
+  Widget _buildFilteredCollectionGrid(List<CollectionItem> items) {
+    if (items.isEmpty) {
+      return Center(
+        child: Text(
+          Localizations.localeOf(context).languageCode == 'ko'
+              ? '컬렉션이 없습니다'
+              : 'No collection items',
+          style: const TextStyle(
             fontSize: 16,
-            color: color,
-            fontWeight: FontWeight.bold,
+            color: Colors.grey,
           ),
         ),
-      ],
-    );
-  }
+      );
+    }
 
-  /// 컬렉션 그리드 위젯
-  Widget _buildCollectionGrid() {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
       child: GridView.builder(
@@ -209,14 +264,17 @@ class _CollectionScreenState extends State<CollectionScreen>
           mainAxisSpacing: 8,
           childAspectRatio: 1,
         ),
-        itemCount: _collection.length,
+        itemCount: items.length,
         itemBuilder: (context, index) {
-          final item = _collection[index];
-          return _buildCollectionCard(item, index);
+          final item = items[index];
+          // 원본 인덱스를 찾기 위해
+          final originalIndex = _collection.indexOf(item);
+          return _buildCollectionCard(item, originalIndex);
         },
       ),
     );
   }
+
 
   /// 컬렉션 카드 위젯
   Widget _buildCollectionCard(CollectionItem item, int index) {
@@ -497,9 +555,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(
                         content: Text(
-                          Localizations.localeOf(context).languageCode == 'ko'
-                              ? '홈 화면에 배치되었습니다!'
-                              : 'Set as home character!',
+                          AppLocalizations.of(context)!.setAsHomeSuccess,
                         ),
                         duration: const Duration(seconds: 2),
                         backgroundColor: const Color(0xFF4CAF50),
@@ -509,9 +565,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                 },
                 icon: const Icon(Icons.home, size: 20),
                 label: Text(
-                  Localizations.localeOf(context).languageCode == 'ko'
-                      ? '홈에 배치하기'
-                      : 'Set as Home',
+                  AppLocalizations.of(context)!.setAsHome,
                   style: const TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

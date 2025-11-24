@@ -805,6 +805,18 @@ abstract class AppLocalizations {
   /// In ko, this message translates to:
   /// **'번'**
   String get movesUnit;
+
+  /// No description provided for @setAsHome.
+  ///
+  /// In ko, this message translates to:
+  /// **'홈으로 꺼내두기'**
+  String get setAsHome;
+
+  /// No description provided for @setAsHomeSuccess.
+  ///
+  /// In ko, this message translates to:
+  /// **'홈 화면에 배치되었습니다!'**
+  String get setAsHomeSuccess;
 }
 
 class _AppLocalizationsDelegate

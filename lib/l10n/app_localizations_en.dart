@@ -369,4 +369,10 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get movesUnit => 'moves';
+
+  @override
+  String get setAsHome => 'Take Out to Home';
+
+  @override
+  String get setAsHomeSuccess => 'Set as home character!';
 }

@@ -136,5 +136,7 @@
   "redrawCapybara": "Redraw Capybara",
   
   "scoreUnit": "pts",
-  "movesUnit": "moves"
+  "movesUnit": "moves",
+  "setAsHome": "Take Out to Home",
+  "setAsHomeSuccess": "Set as home character!"
 }

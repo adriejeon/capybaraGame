@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
 import '../../utils/constants.dart';
 import 'game_screen.dart';
@@ -21,16 +22,21 @@ class HomeScreen extends StatefulWidget {
 }
 
 class _HomeScreenState extends State<HomeScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final AdmobHandler _adMobHandler = AdmobHandler();
   final HomeCharacterManager _homeCharacterManager = HomeCharacterManager();
   double? _lastBannerWidth;
   int _currentLevelIndex = 0; // 현재 선택된 레벨 인덱스 (0~4)
   AnimationController? _bounceController;
   Animation<double>? _bounceAnimation;
+  AnimationController? _shakeController; // 탭 시 흔들림 애니메이션
+  Animation<double>? _shakeAnimation;
   int _currentMessageIndex = 0;
   Timer? _messageTimer; // 말풍선 변경 타이머
   String _lastCharacterId = ''; // 마지막 캐릭터 ID 추적
+  bool _showingTapMessage = false; // 탭 메시지 표시 여부
+  DateTime? _lastTapTime; // 마지막 탭 시간 (햅틱 중복 방지)
+  Timer? _tapMessageResetTimer; // 탭 메시지 리셋 타이머
 
   // 레벨 목록
   final List<GameDifficulty> _levels = [
@@ -52,7 +58,47 @@ class _HomeScreenState extends State<HomeScreen>
     '여유를 가져봐!',
     '힐링 타임이야 ✨',
     '함께 놀아줘서 고마워~',
-    '오늘은 어떤 카드를?',
+    '가만히 있으면 기분이 좋아져',
+    '편안한 하루가 되길 바래',
+    '틀려도 돼, 괜찮아~',
+    '천천히 다시 해보자',
+    '급할 거 없어. 우리에게 시간은 많아.',
+    '너는 정말 대단해!',
+    '너는 카드 짝 맞추기의 달인이야',
+    '게임하다 잠들어도 괜찮아~',
+    '내 짝꿍은 어디 숨었을까?',
+    '우리 게임 은근 재밌다구~',
+    '승부보다는 편안하게 즐기자~',
+    '오늘도 고생했어.',
+    '바쁜 날이었지? 나랑 같이 쉬자~',
+    '힘들면 언제나 나한테 기대',
+    '난 언제나 네 편이야.',
+    '사랑해 사랑해',
+    '오늘도 사랑해',
+    '나랑 놀자',
+    '오늘은 아무것도 안해도 괜찮은 날이야',
+    '가끔은 멈춰 서도 돼~',
+    '네가 있어서 행복해',
+    '네가 와서 너무 행복해',
+    '숨 한번 크게 쉬어볼까? 후~~',
+    '나한테는 네가 가장 소중해',
+    '행복은 가까이에 있대 🍀',
+    '걱정은 잠시 내려놓자.',
+    '네가 너무 보고싶었어.',
+    '나랑 같이 놀자',
+    '인생은 훌랄라~',
+    '맛있는게 제일 좋아',
+    '자도 자도 졸려',
+    '기분이 어떄? 아임 파인 애플',
+    '나를 잊지마',
+    '나 잊으면 안돼',
+    '절대 나 잊으면 안돼, 알겠지?',
+    '네가 좋으면 나도 좋아 ^ㅇ^',
+    '웃으면 복이 온대',
+    '행복해서 웃는게 아니야, 웃어서 행복한거야.',
+    '너를 항상 웃게 해주고 싶어',
+    '너를 항상 행복하게 해줄게',
+    '너는 내 전부야.'
   ];
 
   // 카피바라 메시지 목록 (영어)
@@ -66,7 +112,75 @@ class _HomeScreenState extends State<HomeScreen>
     'Take it slow!',
     'Healing time ✨',
     'Thanks for playing~',
-    'Which card today?',
+    'Staying still makes you feel better',
+    'Hope you have a peaceful day',
+    'It\'s okay to make mistakes~',
+    'Let\'s try again slowly',
+    'No rush. We have plenty of time.',
+    'You\'re amazing!',
+    'You\'re a master at matching cards',
+    'It\'s okay to fall asleep while playing~',
+    'Where did my pair hide?',
+    'Our game is surprisingly fun~',
+    'Let\'s enjoy it comfortably rather than competing~',
+    'You worked hard today.',
+    'It was a busy day, right? Let\'s rest together~',
+    'Lean on me whenever it\'s tough',
+    'I\'m always on your side.',
+    'I love you, I love you',
+    'I love you today too',
+    'Let\'s play together',
+    'Today is a day when it\'s okay to do nothing',
+    'Sometimes it\'s okay to stop~',
+    'I\'m happy because you\'re here',
+    'I\'m so happy you came',
+    'Let\'s take a deep breath? Hoo~~',
+    'You\'re the most precious to me',
+    'Happiness is close by 🍀',
+    'Let\'s put our worries aside for a moment.',
+    'I missed you so much.',
+    'Let\'s play together',
+    'Life is hooray~',
+    'I love delicious food the most',
+    'I\'m sleepy even after sleeping',
+    'How are you feeling? I\'m fine, thank you',
+    'Don\'t forget me',
+    'You can\'t forget me',
+    'You must never forget me, okay?',
+    'If you\'re happy, I\'m happy too ^ㅇ^',
+    'Laughing brings good fortune',
+    'It\'s not that we laugh because we\'re happy, we\'re happy because we laugh.',
+    'I want to always make you smile',
+    'I\'ll always make you happy',
+    'You are my everything.',
+  ];
+
+  // 탭 전용 대사 목록 (한국어)
+  final List<String> _tapMessagesKo = [
+    '왜 눌러? 간지러워~',
+    '아잉 간지러워~',
+    '간질간질해!',
+    '까르륵 히히히',
+    '이긍이긍',
+    '꺄르르륵!',
+    '아~ 간질간질!',
+    '히히 그만~',
+    '으흐흐 간지러워',
+    '꺄~ 간지러워요!',
+  ];
+
+  // 탭 전용 대사 목록 (영어)
+  final List<String> _tapMessagesEn = [
+    'Why are you poking me? It tickles~',
+    'Ah, it tickles~',
+    'So ticklish!',
+    'Hehe giggles',
+    'Squirm squirm',
+    'Kyahaha!',
+    'Ah~ tickly tickly!',
+    'Hehe stop~',
+    'Ehehe it tickles',
+    'Kya~ that tickles!',
   ];
 
   @override
@@ -107,7 +221,36 @@ class _HomeScreenState extends State<HomeScreen>
     // 애니메이션 시작
     _bounceController!.repeat(reverse: true);
 
-    // 메시지 자동 변경 타이머 시작 (10초마다)
+    // 흔들림 애니메이션 초기화 (탭 시 사용)
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: -12.0)
+            .chain(CurveTween(curve: Curves.easeOut)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -12.0, end: 12.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 12.0, end: -8.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 25,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -8.0, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeIn)),
+        weight: 25,
+      ),
+    ]).animate(_shakeController!);
+
+    // 메시지 자동 변경 타이머 시작 (40초마다)
     _startMessageTimer();
   }
 
@@ -115,7 +258,9 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _bounceController?.dispose();
+    _shakeController?.dispose();
     _messageTimer?.cancel();
+    _tapMessageResetTimer?.cancel();
     super.dispose();
   }
 
@@ -144,13 +289,19 @@ class _HomeScreenState extends State<HomeScreen>
   /// 말풍선 메시지 변경 타이머 시작
   void _startMessageTimer() {
     _messageTimer?.cancel();
-    _messageTimer = Timer.periodic(const Duration(seconds: 10), (timer) {
+    _messageTimer = Timer.periodic(const Duration(seconds: 40), (timer) {
       if (mounted) {
+        final random = Random();
+        final messages = Localizations.localeOf(context).languageCode == 'ko'
+            ? _messagesKo
+            : _messagesEn;
         setState(() {
-          _currentMessageIndex = (_currentMessageIndex + 1) %
-              (Localizations.localeOf(context).languageCode == 'ko'
-                  ? _messagesKo.length
-                  : _messagesEn.length);
+          // 현재 메시지와 다른 랜덤 메시지 선택
+          int newIndex;
+          do {
+            newIndex = random.nextInt(messages.length);
+          } while (newIndex == _currentMessageIndex && messages.length > 1);
+          _currentMessageIndex = newIndex;
         });
       }
     });
@@ -167,6 +318,52 @@ class _HomeScreenState extends State<HomeScreen>
         _currentMessageIndex = random.nextInt(messages.length);
       });
     }
+  }
+
+  /// 카피바라 터치 처리 (연속 터치 지원)
+  void _onCapybaraTouch() {
+    final now = DateTime.now();
+    
+    // 햅틱 피드백 (200ms 이상 간격으로만 실행)
+    if (_lastTapTime == null || 
+        now.difference(_lastTapTime!).inMilliseconds > 200) {
+      HapticFeedback.mediumImpact();
+      _lastTapTime = now;
+    }
+
+    // 흔들림 애니메이션 실행 (이미 실행 중이면 리셋 후 재실행)
+    _shakeController?.reset();
+    _shakeController?.forward();
+
+    // 탭 메시지가 표시되지 않았다면 표시
+    if (!_showingTapMessage) {
+      final random = Random();
+      final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+      final tapMessages = isKorean ? _tapMessagesKo : _tapMessagesEn;
+      final randomIndex = random.nextInt(tapMessages.length);
+      
+      setState(() {
+        _showingTapMessage = true;
+        _currentMessageIndex = randomIndex;
+      });
+    }
+
+    // 기존 타이머 취소
+    _tapMessageResetTimer?.cancel();
+    
+    // 2초 후 일반 메시지로 복귀 (마지막 터치로부터)
+    _tapMessageResetTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        final random = Random();
+        final messages = Localizations.localeOf(context).languageCode == 'ko'
+            ? _messagesKo
+            : _messagesEn;
+        setState(() {
+          _showingTapMessage = false;
+          _currentMessageIndex = random.nextInt(messages.length);
+        });
+      }
+    });
   }
 
   @override
@@ -215,9 +412,9 @@ class _HomeScreenState extends State<HomeScreen>
               Expanded(
                 child: Stack(
                   children: [
-                    // 배너 광고 (하단에서 40px 위)
+                    // 배너 광고 (하단에서 20px 위)
                     Positioned(
-                      bottom: 40,
+                      bottom: 20,
                       left: 0,
                       right: 0,
                       child: _buildBannerAd(),
@@ -235,7 +432,7 @@ class _HomeScreenState extends State<HomeScreen>
                           mainAxisAlignment: MainAxisAlignment.start,
                           children: [
                             // 위쪽 여백
-                            const SizedBox(height: 20),
+                            const SizedBox(height: 50),
                             // 레벨 선택 버튼
                             _buildLevelSelector(context),
                             // 간격
@@ -629,7 +826,9 @@ class _HomeScreenState extends State<HomeScreen>
     final characterWidth = (screenWidth * 0.5).clamp(180.0, 300.0);
 
     return GestureDetector(
-      onTap: () => _openCollection(context),
+      onTapDown: (_) => _onCapybaraTouch(),
+      onPanDown: (_) => _onCapybaraTouch(),
+      onPanUpdate: (_) => _onCapybaraTouch(),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -686,34 +885,34 @@ class _HomeScreenState extends State<HomeScreen>
                       ),
                     ],
                   ),
-                  child: Row(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      const Text(
-                        '💭',
-                        style: TextStyle(fontSize: 18),
-                      ),
-                      const SizedBox(width: 10),
-                      Flexible(
-                        child: Text(
-                          isKorean
-                              ? _messagesKo[_currentMessageIndex]
-                              : _messagesEn[_currentMessageIndex],
-                          style: const TextStyle(
-                            fontSize: 15,
-                            color: Color(0xFF6B5D4F),
-                            fontWeight: FontWeight.w700,
-                            letterSpacing: 0.3,
-                          ),
-                          textAlign: TextAlign.center,
-                        ),
-                      ),
-                    ],
+                  child: Text(
+                    () {
+                      if (_showingTapMessage) {
+                        final tapMessages = isKorean ? _tapMessagesKo : _tapMessagesEn;
+                        final index = _currentMessageIndex >= tapMessages.length
+                            ? 0
+                            : _currentMessageIndex;
+                        return tapMessages[index];
+                      } else {
+                        final messages = isKorean ? _messagesKo : _messagesEn;
+                        final index = _currentMessageIndex >= messages.length
+                            ? 0
+                            : _currentMessageIndex;
+                        return messages[index];
+                      }
+                    }(),
+                    style: const TextStyle(
+                      fontSize: 15,
+                      color: Color(0xFF6B5D4F),
+                      fontWeight: FontWeight.w700,
+                      letterSpacing: 0.3,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
                 ),
-                // 말풍선 꼬리 (아래쪽 중앙)
+                // 말풍선 꼬리 (아래쪽 중앙, 말풍선 본체와 겹치게 배치)
                 Positioned(
-                  bottom: -2,
+                  bottom: 2,
                   child: CustomPaint(
                     size: const Size(24, 12),
                     painter: _SpeechBubbleTailPainter(),
@@ -723,12 +922,18 @@ class _HomeScreenState extends State<HomeScreen>
             ),
           ),
           const SizedBox(height: 16),
-          // 카피바라 이미지 (바운스 애니메이션 - 항상 적용)
+          // 카피바라 이미지 (바운스 + 흔들림 애니메이션)
           AnimatedBuilder(
-            animation: _bounceAnimation ?? const AlwaysStoppedAnimation(0),
+            animation: Listenable.merge([
+              _bounceAnimation ?? const AlwaysStoppedAnimation(0),
+              _shakeAnimation ?? const AlwaysStoppedAnimation(0),
+            ]),
             builder: (context, child) {
               return Transform.translate(
-                offset: Offset(0, _bounceAnimation?.value ?? 0),
+                offset: Offset(
+                  _shakeAnimation?.value ?? 0,
+                  _bounceAnimation?.value ?? 0,
+                ),
                 child: child,
               );
             },
@@ -757,27 +962,6 @@ class _HomeScreenState extends State<HomeScreen>
                     },
                   );
                 },
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // 안내 텍스트 (작게)
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-            decoration: BoxDecoration(
-              color: Colors.white.withOpacity(0.8),
-              borderRadius: BorderRadius.circular(15),
-              border: Border.all(
-                color: const Color(0xFF4A90E2).withOpacity(0.3),
-                width: 1,
-              ),
-            ),
-            child: Text(
-              isKorean ? '탭해서 캐릭터 변경' : 'Tap to change',
-              style: const TextStyle(
-                fontSize: 11,
-                color: Color(0xFF4A90E2),
-                fontWeight: FontWeight.w600,
               ),
             ),
           ),
@@ -832,8 +1016,18 @@ class _SpeechBubbleTailPainter extends CustomPainter {
     // 꼬리 채우기
     canvas.drawPath(path, paint);
 
-    // 꼬리 테두리
-    canvas.drawPath(path, borderPaint);
+    // 꼬리 테두리 (위쪽 가장자리 제외 - 말풍선 본체와 이어지는 부분)
+    // 왼쪽 가장자리만 그리기
+    final leftBorderPath = Path();
+    leftBorderPath.moveTo(size.width / 2 - 10, 0);
+    leftBorderPath.lineTo(size.width / 2, size.height);
+    canvas.drawPath(leftBorderPath, borderPaint);
+
+    // 오른쪽 가장자리만 그리기
+    final rightBorderPath = Path();
+    rightBorderPath.moveTo(size.width / 2 + 10, 0);
+    rightBorderPath.lineTo(size.width / 2, size.height);
+    canvas.drawPath(rightBorderPath, borderPaint);
   }
 
   @override

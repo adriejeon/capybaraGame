@@ -136,5 +136,7 @@
   "redrawCapybara": "카피바라 다시 뽑기",
   
   "scoreUnit": "점",
-  "movesUnit": "번"
+  "movesUnit": "번",
+  "setAsHome": "홈으로 꺼내두기",
+  "setAsHomeSuccess": "홈 화면에 배치되었습니다!"
 }

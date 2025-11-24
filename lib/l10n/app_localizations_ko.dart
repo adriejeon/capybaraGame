@@ -365,4 +365,10 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get movesUnit => '번';
+
+  @override
+  String get setAsHome => '홈으로 꺼내두기';
+
+  @override
+  String get setAsHomeSuccess => '홈 화면에 배치되었습니다!';
 }

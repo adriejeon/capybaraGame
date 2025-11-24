@@ -240,37 +240,37 @@ class CollectionManager {
 
     switch (difficulty) {
       case GameDifficulty.level1:
-        // easy1-20 중 10개 사용
+        // 아기 단계 - easy1-10 사용
         for (int i = 1; i <= 10; i++) {
           cards.add('assets/capybara/collection/easy$i.jpg');
         }
         break;
       case GameDifficulty.level2:
-        // normal1-15 중 10개 사용
+        // 어린이 단계 - basic1-10 사용
         for (int i = 1; i <= 10; i++) {
-          cards.add('assets/capybara/collection/normal$i.jpg');
+          cards.add('assets/capybara/collection/basic$i.jpg');
         }
         break;
       case GameDifficulty.level3:
-        // normal1-15 중 나머지 5개 + 추가 5개 사용
-        for (int i = 6; i <= 15; i++) {
+        // 청소년 단계 - normal1-10 사용
+        for (int i = 1; i <= 10; i++) {
           cards.add('assets/capybara/collection/normal$i.jpg');
         }
         break;
       case GameDifficulty.level4:
-        // easy11-20 사용
-        for (int i = 11; i <= 20; i++) {
-          cards.add('assets/capybara/collection/easy$i.jpg');
+        // 어른 단계 - advanced1-10 사용
+        for (int i = 1; i <= 10; i++) {
+          cards.add('assets/capybara/collection/advanced$i.jpg');
         }
         break;
       case GameDifficulty.level5:
-        // hard1-10 + easy의 일부 사용
+        // 신의 경지 - hard1-10 사용 + 추가 5개
         for (int i = 1; i <= 10; i++) {
           cards.add('assets/capybara/collection/hard$i.jpg');
         }
-        // 추가 5개는 normal의 일부 재사용
-        for (int i = 1; i <= 5; i++) {
-          cards.add('assets/capybara/collection/normal$i.jpg');
+        // 추가 5개는 easy의 일부 사용
+        for (int i = 11; i <= 15; i++) {
+          cards.add('assets/capybara/collection/easy$i.jpg');
         }
         break;
     }
