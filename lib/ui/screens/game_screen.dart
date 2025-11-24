@@ -13,6 +13,7 @@ import '../../data/game_counter.dart';
 import '../../ads/admob_handler.dart';
 import 'collection_screen.dart';
 import '../../services/share_service.dart';
+import '../../services/coin_manager.dart';
 
 /// 실제 게임 화면
 class GameScreen extends StatefulWidget {
@@ -49,6 +50,7 @@ class _GameScreenState extends State<GameScreen>
   bool _isShowingHint = false; // 카드 힌트 표시 중인지 확인
   bool _hasReceivedReward = false; // 보상형 광고에서 보상을 받았는지 추적
   CollectionResult? _currentRewardResult; // 현재 뽑은 카피바라 결과 저장
+  int _currentCoinReward = 0; // 현재 게임에서 받은 코인 보상
 
   @override
   void initState() {
@@ -636,6 +638,28 @@ class _GameScreenState extends State<GameScreen>
 
   /// 캐릭터 보상 지급
   void _giveCharacterReward() async {
+    // 코인 보상 지급 (레벨에 따라 다른 금액)
+    int coinReward = 0;
+    switch (widget.difficulty) {
+      case GameDifficulty.level1:
+        coinReward = 10;
+        break;
+      case GameDifficulty.level2:
+        coinReward = 20;
+        break;
+      case GameDifficulty.level3:
+        coinReward = 30;
+        break;
+      case GameDifficulty.level4:
+        coinReward = 40;
+        break;
+      case GameDifficulty.level5:
+        coinReward = 50;
+        break;
+    }
+    await CoinManager.addCoins(coinReward);
+    _currentCoinReward = coinReward; // 코인 보상 저장
+    
     // 컬렉션에 새 카드 추가
     await _collectionManager.initializeCollection();
     final result = await _collectionManager.addNewCard(widget.difficulty);
@@ -644,11 +668,11 @@ class _GameScreenState extends State<GameScreen>
     _currentRewardResult = result;
 
     // 카드 뽑기 다이얼로그 표시
-    _showCardDrawDialog(result);
+    _showCardDrawDialog(result, coinReward);
   }
 
   /// 카드 뽑기 다이얼로그 표시 (애니메이션 포함)
-  void _showCardDrawDialog(CollectionResult result) {
+  void _showCardDrawDialog(CollectionResult result, int coinReward) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -656,14 +680,14 @@ class _GameScreenState extends State<GameScreen>
         result: result,
         onComplete: () {
           Navigator.of(context).pop(); // 카드 뽑기 다이얼로그 닫기
-          _showFinalResultDialog(result); // 최종 결과 다이얼로그 표시
+          _showFinalResultDialog(result, coinReward); // 최종 결과 다이얼로그 표시
         },
       ),
     );
   }
 
   /// 최종 결과 다이얼로그 표시
-  void _showFinalResultDialog(CollectionResult result) {
+  void _showFinalResultDialog(CollectionResult result, int coinReward) {
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -681,6 +705,62 @@ class _GameScreenState extends State<GameScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
+              // 코인 보상 표시
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                decoration: BoxDecoration(
+                  gradient: const LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      Color(0xFFFFD700),
+                      Color(0xFFFFA500),
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(15),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.orange.withOpacity(0.3),
+                      blurRadius: 8,
+                      offset: const Offset(0, 3),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/coin.png',
+                      width: 30,
+                      height: 30,
+                      errorBuilder: (context, error, stackTrace) {
+                        return const Icon(
+                          Icons.monetization_on,
+                          color: Colors.white,
+                          size: 30,
+                        );
+                      },
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      '+$coinReward',
+                      style: const TextStyle(
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            offset: Offset(1, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
               // 카드 이미지
               Container(
                 width: 120,
@@ -797,30 +877,63 @@ class _GameScreenState extends State<GameScreen>
             const SizedBox(height: 8),
           ],
           // 카피바라 다시 뽑기 버튼 (항상 표시)
-          SizedBox(
-            width: double.infinity,
-            child: OutlinedButton.icon(
-              onPressed: () {
-                Navigator.of(context).pop(); // 다이얼로그 닫기
-                _redrawCapybaraWithRewardedAd();
-              },
-              icon: const Icon(Icons.refresh, size: 20),
-              label: Text(
-                AppLocalizations.of(context)!.redrawCapybara,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
+          Stack(
+            clipBehavior: Clip.none,
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: OutlinedButton.icon(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // 다이얼로그 닫기
+                    _redrawCapybaraWithRewardedAd();
+                  },
+                  icon: const Icon(Icons.refresh, size: 20),
+                  label: Text(
+                    AppLocalizations.of(context)!.redrawCapybara,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: OutlinedButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
+                    side: const BorderSide(
+                      color: Color(0xFF4A90E2),
+                      width: 2,
+                    ),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
                 ),
               ),
-              style: OutlinedButton.styleFrom(
-                foregroundColor: const Color(0xFF4A90E2),
-                side: const BorderSide(
-                  color: Color(0xFF4A90E2),
-                  width: 2,
+              Positioned(
+                top: -6,
+                right: 12,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFF4A90E2),
+                    borderRadius: BorderRadius.circular(12),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.15),
+                        blurRadius: 4,
+                        offset: const Offset(0, 2),
+                      ),
+                    ],
+                  ),
+                  child: const Text(
+                    'AD',
+                    style: TextStyle(
+                      fontSize: 10,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                      letterSpacing: 0.5,
+                    ),
+                  ),
                 ),
-                padding: const EdgeInsets.symmetric(vertical: 16),
               ),
-            ),
+            ],
           ),
           const SizedBox(height: 8),
           // 친구에게 자랑하기 버튼 (테두리만 있는 스타일)
@@ -1196,7 +1309,7 @@ class _GameScreenState extends State<GameScreen>
             // 보상을 받지 않았으면 이전 결과 팝업 다시 표시
             print('보상을 받지 않았으므로 이전 결과 팝업 복원');
             if (previousResult != null) {
-              _showFinalResultDialog(previousResult);
+              _showFinalResultDialog(previousResult, _currentCoinReward);
             }
           }
         }
@@ -1205,7 +1318,7 @@ class _GameScreenState extends State<GameScreen>
         print('보상형 광고 표시 실패 - 이전 결과 팝업 복원');
         // 광고 표시 실패 시에도 이전 결과 팝업 다시 표시
         if (mounted && previousResult != null) {
-          _showFinalResultDialog(previousResult);
+          _showFinalResultDialog(previousResult, _currentCoinReward);
         }
       },
     );
@@ -1223,8 +1336,8 @@ class _GameScreenState extends State<GameScreen>
     // 현재 뽑은 결과 업데이트
     _currentRewardResult = newResult;
 
-    // 새 카드 뽑기 다이얼로그 표시
-    _showCardDrawDialog(newResult);
+    // 새 카드 뽑기 다이얼로그 표시 (코인은 이미 지급되었으므로 동일한 금액 표시)
+    _showCardDrawDialog(newResult, _currentCoinReward);
   }
 
   @override

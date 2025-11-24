@@ -285,7 +285,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get alreadyCollected => 'You already collected this capybara';
 
   @override
-  String get newCapybaraFound => 'You found a new capybara!';
+  String get newCapybaraFound => 'New capybara spotted!';
 
   @override
   String gameCompletionTime(Object time) {
@@ -359,7 +359,7 @@ class AppLocalizationsEn extends AppLocalizations {
   String get giveUp => 'Give Up';
 
   @override
-  String get watchAd => 'Watch Ad';
+  String get watchAd => 'View Ad';
 
   @override
   String get redrawCapybara => 'Redraw Capybara';

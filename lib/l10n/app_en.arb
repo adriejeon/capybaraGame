@@ -106,7 +106,7 @@
   "gameCompleted": "Completed!",
   "gameAllMatched": "Click the gift box!",
   "alreadyCollected": "You already collected this capybara",
-  "newCapybaraFound": "You found a new capybara!",
+  "newCapybaraFound": "New capybara spotted!",
   "gameCompletionTime": "Completion time: {time}",
   "gameFailure": "Game Failed!",
   "gameTimeUp": "Time's up!\nPlease try again!",
@@ -132,7 +132,7 @@
   "timeUpMessage": "Watch an ad to get 30 more seconds!",
   "timeUpSubMessage": "You can continue playing the game",
   "giveUp": "Give Up",
-  "watchAd": "Watch Ad",
+  "watchAd": "View Ad",
   "redrawCapybara": "Redraw Capybara",
   
   "scoreUnit": "pts",

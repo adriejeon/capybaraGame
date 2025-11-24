@@ -1,9 +1,13 @@
 import 'dart:async';
+import 'dart:io' show Platform;
 import 'dart:math';
+import 'dart:ui';
 
+import 'package:flutter/foundation.dart' show kIsWeb;
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'package:vibration/vibration.dart';
 import '../../utils/constants.dart';
 import 'game_screen.dart';
 import 'collection_screen.dart';
@@ -12,6 +16,7 @@ import '../../ads/admob_handler.dart';
 import '../../data/game_counter.dart';
 import '../../state/locale_state.dart';
 import '../../data/home_character_manager.dart';
+import '../../services/coin_manager.dart';
 
 /// 메인 홈 화면
 class HomeScreen extends StatefulWidget {
@@ -25,18 +30,46 @@ class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   final AdmobHandler _adMobHandler = AdmobHandler();
   final HomeCharacterManager _homeCharacterManager = HomeCharacterManager();
-  double? _lastBannerWidth;
   int _currentLevelIndex = 0; // 현재 선택된 레벨 인덱스 (0~4)
   AnimationController? _bounceController;
   Animation<double>? _bounceAnimation;
-  AnimationController? _shakeController; // 탭 시 흔들림 애니메이션
-  Animation<double>? _shakeAnimation;
   int _currentMessageIndex = 0;
   Timer? _messageTimer; // 말풍선 변경 타이머
   String _lastCharacterId = ''; // 마지막 캐릭터 ID 추적
   bool _showingTapMessage = false; // 탭 메시지 표시 여부
   DateTime? _lastTapTime; // 마지막 탭 시간 (햅틱 중복 방지)
   Timer? _tapMessageResetTimer; // 탭 메시지 리셋 타이머
+  int _currentCoins = 0; // 현재 코인
+
+  // 실시간 추종 드래그 상태
+  Offset _dragOffset = Offset.zero; // 현재 드래그 오프셋
+  Offset? _dragStartPosition; // 드래그 시작 위치
+  Offset? _lastDragPosition; // 이전 드래그 위치 (속도 계산용)
+  DateTime? _lastDragTime; // 이전 드래그 시간 (속도 계산용)
+  bool _isDragging = false; // 드래그 중인지 여부
+  Timer? _returnTimer; // 원위치 복귀 타이머
+
+  // 강도 기반 흔들림 상태
+  Offset _shakeOffset = Offset.zero; // 흔들림 오프셋
+  Timer? _shakeDecayTimer; // 흔들림 감쇠 타이머
+  double _shakeIntensity = 0.0; // 현재 흔들림 강도
+
+  static const List<int> _androidDunDunPattern = [
+    0, // 즉시 시작
+    90, // 첫 진동
+    70, // 짧은 휴식
+    160, // 두 번째 강한 진동
+    90, // 다음 휴식
+    200, // 마무리 롱 진동 (두둥)
+  ];
+  static const List<int> _androidDunDunIntensities = [
+    0,
+    200,
+    0,
+    255,
+    0,
+    220,
+  ];
 
   // 레벨 목록
   final List<GameDifficulty> _levels = [
@@ -192,6 +225,9 @@ class _HomeScreenState extends State<HomeScreen>
     // 현재 캐릭터 ID 저장
     _lastCharacterId = _homeCharacterManager.currentCharacterId;
 
+    // 코인 로드
+    _loadCoins();
+
     // 전면 광고 미리 로드 (즉시 로드)
     Future.delayed(const Duration(milliseconds: 0), () async {
       await _adMobHandler.loadInterstitialAd();
@@ -221,35 +257,6 @@ class _HomeScreenState extends State<HomeScreen>
     // 애니메이션 시작
     _bounceController!.repeat(reverse: true);
 
-    // 흔들림 애니메이션 초기화 (탭 시 사용)
-    _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 400),
-      vsync: this,
-    );
-
-    _shakeAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: -12.0)
-            .chain(CurveTween(curve: Curves.easeOut)),
-        weight: 25,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: -12.0, end: 12.0)
-            .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 25,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 12.0, end: -8.0)
-            .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 25,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: -8.0, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeIn)),
-        weight: 25,
-      ),
-    ]).animate(_shakeController!);
-
     // 메시지 자동 변경 타이머 시작 (40초마다)
     _startMessageTimer();
   }
@@ -258,9 +265,10 @@ class _HomeScreenState extends State<HomeScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _bounceController?.dispose();
-    _shakeController?.dispose();
     _messageTimer?.cancel();
     _tapMessageResetTimer?.cancel();
+    _returnTimer?.cancel();
+    _shakeDecayTimer?.cancel();
     super.dispose();
   }
 
@@ -271,6 +279,16 @@ class _HomeScreenState extends State<HomeScreen>
     // 앱이 다시 활성화되면 캐릭터 갱신 확인
     if (state == AppLifecycleState.resumed) {
       _checkCharacterUpdate();
+    }
+  }
+
+  /// 코인 로드
+  Future<void> _loadCoins() async {
+    final coins = await CoinManager.getCoins();
+    if (mounted) {
+      setState(() {
+        _currentCoins = coins;
+      });
     }
   }
 
@@ -320,38 +338,141 @@ class _HomeScreenState extends State<HomeScreen>
     }
   }
 
-  /// 카피바라 터치 처리 (연속 터치 지원)
-  void _onCapybaraTouch() {
+  /// 카피바라 드래그 시작 처리
+  void _onCapybaraDragStart(DragStartDetails details) {
+    _dragStartPosition = details.localPosition;
+    _lastDragPosition = details.localPosition;
+    _lastDragTime = DateTime.now();
+    _isDragging = true;
+    _returnTimer?.cancel();
+    _shakeDecayTimer?.cancel();
+
     final now = DateTime.now();
-    
-    // 햅틱 피드백 (200ms 이상 간격으로만 실행)
-    if (_lastTapTime == null || 
+    if (_lastTapTime == null ||
         now.difference(_lastTapTime!).inMilliseconds > 200) {
-      HapticFeedback.mediumImpact();
       _lastTapTime = now;
+      unawaited(_triggerHapticFeedback());
     }
 
-    // 흔들림 애니메이션 실행 (이미 실행 중이면 리셋 후 재실행)
-    _shakeController?.reset();
-    _shakeController?.forward();
-
-    // 탭 메시지가 표시되지 않았다면 표시
+    // 탭 메시지 표시
     if (!_showingTapMessage) {
       final random = Random();
       final isKorean = Localizations.localeOf(context).languageCode == 'ko';
       final tapMessages = isKorean ? _tapMessagesKo : _tapMessagesEn;
       final randomIndex = random.nextInt(tapMessages.length);
-      
+
       setState(() {
         _showingTapMessage = true;
         _currentMessageIndex = randomIndex;
       });
     }
 
-    // 기존 타이머 취소
     _tapMessageResetTimer?.cancel();
-    
-    // 2초 후 일반 메시지로 복귀 (마지막 터치로부터)
+  }
+
+  /// 카피바라 드래그 중 처리 (손가락 따라 이동 + 속도 기반 흔들림)
+  void _onCapybaraDragUpdate(DragUpdateDetails details) {
+    if (!_isDragging || _dragStartPosition == null) return;
+
+    final now = DateTime.now();
+
+    // 속도 계산 (픽셀/밀리초)
+    double velocity = 0.0;
+    if (_lastDragPosition != null && _lastDragTime != null) {
+      final dt = now.difference(_lastDragTime!).inMilliseconds;
+      if (dt > 0) {
+        final distance = (details.localPosition - _lastDragPosition!).distance;
+        velocity = distance / dt; // px/ms
+      }
+    }
+
+    setState(() {
+      // 드래그 거리 계산 (최대 이동 제한 적용)
+      final rawOffset = details.localPosition - _dragStartPosition!;
+      const maxDrag = 50.0; // 최대 드래그 거리 (약간 줄임)
+
+      _dragOffset = Offset(
+        rawOffset.dx.clamp(-maxDrag, maxDrag),
+        rawOffset.dy.clamp(-maxDrag, maxDrag),
+      );
+
+      // 속도 기반 흔들림 강도 계산 (0.5 이상이면 흔들림 시작)
+      if (velocity > 0.5) {
+        _shakeIntensity = (velocity * 15).clamp(0.0, 25.0); // 최대 25px 흔들림
+
+        // 랜덤 방향으로 흔들림 추가
+        final random = Random();
+        _shakeOffset = Offset(
+          (random.nextDouble() - 0.5) * _shakeIntensity,
+          (random.nextDouble() - 0.5) * _shakeIntensity * 0.7, // Y축은 약하게
+        );
+      }
+    });
+
+    _lastDragPosition = details.localPosition;
+    _lastDragTime = now;
+  }
+
+  /// 카피바라 드래그 종료 처리 (원위치 복귀 + 흔들림 감쇠)
+  void _onCapybaraDragEnd(DragEndDetails details) {
+    _isDragging = false;
+    _dragStartPosition = null;
+    _lastDragPosition = null;
+    _lastDragTime = null;
+
+    // 부드럽게 원위치로 복귀
+    _returnTimer?.cancel();
+    _returnTimer = Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        // 탄성 복귀 효과
+        _dragOffset = Offset(
+          _dragOffset.dx * 0.85,
+          _dragOffset.dy * 0.85,
+        );
+
+        // 거의 원위치에 도달하면 정확히 0으로 설정하고 타이머 정지
+        if (_dragOffset.distance < 0.5) {
+          _dragOffset = Offset.zero;
+          timer.cancel();
+        }
+      });
+    });
+
+    // 흔들림 감쇠 효과
+    _shakeDecayTimer?.cancel();
+    _shakeDecayTimer =
+        Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        // 흔들림 강도 감쇠
+        _shakeIntensity *= 0.90;
+
+        // 랜덤 감쇠하는 흔들림
+        if (_shakeIntensity > 0.5) {
+          final random = Random();
+          _shakeOffset = Offset(
+            (random.nextDouble() - 0.5) * _shakeIntensity,
+            (random.nextDouble() - 0.5) * _shakeIntensity * 0.7,
+          );
+        } else {
+          _shakeOffset = Offset.zero;
+          _shakeIntensity = 0.0;
+          timer.cancel();
+        }
+      });
+    });
+
+    // 메시지 복귀 타이머
+    _tapMessageResetTimer?.cancel();
     _tapMessageResetTimer = Timer(const Duration(seconds: 2), () {
       if (mounted) {
         final random = Random();
@@ -366,15 +487,64 @@ class _HomeScreenState extends State<HomeScreen>
     });
   }
 
-  @override
-  void didChangeDependencies() {
-    super.didChangeDependencies();
-    final currentWidth = MediaQuery.of(context).size.width;
-    if (_lastBannerWidth == null ||
-        (currentWidth - _lastBannerWidth!).abs() > 0.5) {
-      _lastBannerWidth = currentWidth;
-      unawaited(_adMobHandler.loadBannerAd(context));
+  /// 빠른 탭 처리 (드래그 없이 탭만 할 경우)
+  void _onCapybaraTap() {
+    final now = DateTime.now();
+    if (_lastTapTime == null ||
+        now.difference(_lastTapTime!).inMilliseconds > 200) {
+      _lastTapTime = now;
+      unawaited(_triggerHapticFeedback());
     }
+
+    // 탭 메시지 표시
+    if (!_showingTapMessage) {
+      final random = Random();
+      final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+      final tapMessages = isKorean ? _tapMessagesKo : _tapMessagesEn;
+      final randomIndex = random.nextInt(tapMessages.length);
+
+      setState(() {
+        _showingTapMessage = true;
+        _currentMessageIndex = randomIndex;
+      });
+    }
+
+    _tapMessageResetTimer?.cancel();
+    _tapMessageResetTimer = Timer(const Duration(seconds: 2), () {
+      if (mounted) {
+        final random = Random();
+        final messages = Localizations.localeOf(context).languageCode == 'ko'
+            ? _messagesKo
+            : _messagesEn;
+        setState(() {
+          _showingTapMessage = false;
+          _currentMessageIndex = random.nextInt(messages.length);
+        });
+      }
+    });
+  }
+
+  /// 플랫폼에 맞춰 두둥두둥 진동을 실행
+  Future<void> _triggerHapticFeedback() async {
+    if (!kIsWeb && Platform.isAndroid) {
+      final hasVibrator = await Vibration.hasVibrator() ?? false;
+      if (hasVibrator) {
+        final supportsCustom =
+            await Vibration.hasCustomVibrationsSupport() ?? false;
+        if (supportsCustom) {
+          await Vibration.vibrate(
+            pattern: _androidDunDunPattern,
+            intensities: _androidDunDunIntensities,
+          );
+        } else {
+          await Vibration.vibrate(duration: 180);
+        }
+        return;
+      }
+    }
+
+    // iOS 등에서는 기존 햅틱으로 대체
+    HapticFeedback.mediumImpact();
   }
 
   @override
@@ -393,16 +563,16 @@ class _HomeScreenState extends State<HomeScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // 상단 버튼 영역 (컬렉션 + 설정)
+              // 상단 영역 (코인 + 설정)
               Padding(
                 padding:
                     const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
                 child: Row(
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                  crossAxisAlignment: CrossAxisAlignment.center, // 세로 중앙 정렬
+                  crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 컬렉션 버튼 (왼쪽)
-                    _buildCollectionIconButton(context),
+                    // 코인 표시 (왼쪽)
+                    _buildCoinDisplay(context),
                     // 설정 버튼 (오른쪽)
                     _buildSettingsButton(context),
                   ],
@@ -410,40 +580,122 @@ class _HomeScreenState extends State<HomeScreen>
               ),
               // 나머지 콘텐츠
               Expanded(
-                child: Stack(
-                  children: [
-                    // 배너 광고 (하단에서 20px 위)
-                    Positioned(
-                      bottom: 20,
-                      left: 0,
-                      right: 0,
-                      child: _buildBannerAd(),
-                    ),
-                    // 메인 콘텐츠 - 레벨 선택 + 카피바라 캐릭터
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(
-                          left: 20.0,
-                          right: 20.0,
-                          top: 20.0,
-                          bottom: 20.0,
-                        ),
+                child: Padding(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 20.0,
+                    vertical: 20.0,
+                  ),
+                  child: Column(
+                    children: [
+                      const SizedBox(height: 24),
+                      _buildLevelSelector(context),
+                      const SizedBox(height: 32),
+                      Expanded(
                         child: Column(
-                          mainAxisAlignment: MainAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.end,
                           children: [
-                            // 위쪽 여백
-                            const SizedBox(height: 50),
-                            // 레벨 선택 버튼
-                            _buildLevelSelector(context),
-                            // 간격
-                            const Spacer(),
-                            // 홈 카피바라 캐릭터
                             _buildHomeCharacter(context),
-                            // 아래쪽 여백 (광고 위)
-                            const SizedBox(height: 100),
+                            const SizedBox(height: 56),
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+              ),
+              // 하단 버튼 영역 (미션 + 컬렉션 + 상점)
+              Padding(
+                padding: const EdgeInsets.only(
+                  left: 16,
+                  right: 16,
+                  bottom: 16,
+                  top: 8,
+                ),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildMissionButton(context),
+                    const SizedBox(width: 8),
+                    _buildCollectionButton(context),
+                    const SizedBox(width: 8),
+                    _buildShopButton(context),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 하단 버튼 공통 크기 계산 (폭 대비 높이 0.8 비율 유지)
+  Size _getSideButtonSize(BuildContext context) {
+    final screenWidth = MediaQuery.of(context).size.width;
+    final baseWidth = (screenWidth * 0.20).clamp(110.0, 170.0);
+    final height = (baseWidth * 0.82).clamp(90.0, 135.0);
+    return Size(baseWidth, height);
+  }
+
+  /// 코인 표시 위젯 (상단 왼쪽)
+  Widget _buildCoinDisplay(BuildContext context) {
+    final borderRadius = BorderRadius.circular(24);
+
+    return ClipRRect(
+      borderRadius: borderRadius,
+      child: BackdropFilter(
+        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+          decoration: BoxDecoration(
+            borderRadius: borderRadius,
+            border: Border.all(
+              color: Colors.white.withOpacity(0.85),
+              width: 2,
+            ),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [
+                Colors.white.withOpacity(0.35),
+                Colors.white.withOpacity(0.15),
+              ],
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.white.withOpacity(0.25),
+                blurRadius: 12,
+                offset: const Offset(0, 6),
+              ),
+            ],
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Image.asset(
+                'assets/images/coin.png',
+                width: 34,
+                height: 34,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.monetization_on,
+                    color: Colors.amber,
+                    size: 34,
+                  );
+                },
+              ),
+              const SizedBox(width: 10),
+              Text(
+                _currentCoins.toString(),
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.white,
+                  shadows: [
+                    Shadow(
+                      color: Colors.black26,
+                      offset: Offset(0, 1),
+                      blurRadius: 2,
                     ),
                   ],
                 ),
@@ -455,14 +707,57 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 컬렉션 아이콘 버튼 생성 (상단 왼쪽)
-  Widget _buildCollectionIconButton(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final screenHeight = MediaQuery.of(context).size.height;
-    // 화면 너비의 18% (최소 110px, 최대 170px) - 더 크게
-    final buttonWidth = (screenWidth * 0.18).clamp(110.0, 170.0);
-    // 화면 높이의 16% (최소 100px, 최대 150px) - 더 크게
-    final buttonHeight = (screenHeight * 0.16).clamp(100.0, 150.0);
+  /// 일일 미션 버튼 (왼쪽)
+  Widget _buildMissionButton(BuildContext context) {
+    final buttonSize = _getSideButtonSize(context);
+
+    return GestureDetector(
+      onTap: () {
+        // TODO: 일일 미션 화면 열기
+        print('일일 미션 버튼 클릭');
+      },
+      child: Consumer<LocaleState>(
+        builder: (context, localeState, child) {
+          final isEnglish = localeState.currentLocale.languageCode == 'en';
+          final imagePath = isEnglish
+              ? 'assets/images/mission-en.png'
+              : 'assets/images/mission.png';
+
+          return Container(
+            width: buttonSize.width,
+            height: buttonSize.height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.purple[100],
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(
+                      Icons.calendar_today,
+                      size: 40,
+                      color: Colors.purple,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 컬렉션 버튼 (오른쪽 위)
+  Widget _buildCollectionButton(BuildContext context) {
+    final buttonSize = _getSideButtonSize(context);
 
     return GestureDetector(
       onTap: () => _openCollection(context),
@@ -470,38 +765,82 @@ class _HomeScreenState extends State<HomeScreen>
         builder: (context, localeState, child) {
           final isEnglish = localeState.currentLocale.languageCode == 'en';
           final imagePath = isEnglish
-              ? 'assets/images/button-collection-en.png'
-              : 'assets/images/button-collection.png';
+              ? 'assets/images/collection-en.png'
+              : 'assets/images/collection.png';
 
-          // 이미지 크기에 맞게만 공간 차지하도록 제한
-          return ConstrainedBox(
-            constraints: BoxConstraints(
-              maxWidth: buttonWidth,
-              maxHeight: buttonHeight,
+          return Container(
+            width: buttonSize.width,
+            height: buttonSize.height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
             ),
-            child: Image.asset(
-              imagePath,
-              fit: BoxFit.contain, // contain으로 변경하여 잘림 방지
-              errorBuilder: (context, error, stackTrace) {
-                // 이미지 로드 실패 시 기본 컬렉션 아이콘 표시
-                return Container(
-                  width: buttonWidth,
-                  height: buttonHeight,
-                  decoration: BoxDecoration(
-                    color: Colors.white,
-                    borderRadius: BorderRadius.circular(14),
-                    border: Border.all(
-                      color: const Color(0xFFFF9800),
-                      width: 2,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.orange[100],
+                      borderRadius: BorderRadius.circular(15),
                     ),
-                  ),
-                  child: Icon(
-                    Icons.collections,
-                    color: const Color(0xFFFF9800),
-                    size: buttonWidth * 0.37,
-                  ),
-                );
-              },
+                    child: const Icon(
+                      Icons.collections,
+                      size: 40,
+                      color: Colors.orange,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 상점 버튼 (오른쪽 아래)
+  Widget _buildShopButton(BuildContext context) {
+    final buttonSize = _getSideButtonSize(context);
+
+    return GestureDetector(
+      onTap: () {
+        // TODO: 상점 화면 열기
+        print('상점 버튼 클릭');
+      },
+      child: Consumer<LocaleState>(
+        builder: (context, localeState, child) {
+          final isEnglish = localeState.currentLocale.languageCode == 'en';
+          final imagePath = isEnglish
+              ? 'assets/images/shop-en.png'
+              : 'assets/images/shop.png';
+
+          return Container(
+            width: buttonSize.width,
+            height: buttonSize.height,
+            decoration: BoxDecoration(
+              borderRadius: BorderRadius.circular(15),
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.green[100],
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(
+                      Icons.shopping_bag,
+                      size: 40,
+                      color: Colors.green,
+                    ),
+                  );
+                },
+              ),
             ),
           );
         },
@@ -811,8 +1150,9 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
 
-    // 컬렉션 화면에서 돌아온 후 캐릭터 갱신 확인
+    // 컬렉션 화면에서 돌아온 후 캐릭터 갱신 확인 및 코인 리로드
     await _checkCharacterUpdate();
+    await _loadCoins();
   }
 
   /// 홈 카피바라 캐릭터 위젯
@@ -826,118 +1166,120 @@ class _HomeScreenState extends State<HomeScreen>
     final characterWidth = (screenWidth * 0.5).clamp(180.0, 300.0);
 
     return GestureDetector(
-      onTapDown: (_) => _onCapybaraTouch(),
-      onPanDown: (_) => _onCapybaraTouch(),
-      onPanUpdate: (_) => _onCapybaraTouch(),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          // 말풍선
-          AnimatedSwitcher(
-            duration: const Duration(milliseconds: 500),
-            transitionBuilder: (Widget child, Animation<double> animation) {
-              return FadeTransition(
-                opacity: animation,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0, -0.3),
-                    end: Offset.zero,
-                  ).animate(animation),
-                  child: child,
-                ),
-              );
-            },
-            child: Stack(
-              key: ValueKey<int>(_currentMessageIndex),
-              clipBehavior: Clip.none,
-              alignment: Alignment.center,
-              children: [
-                // 말풍선 메인 박스
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-                  margin: const EdgeInsets.only(bottom: 8),
-                  decoration: BoxDecoration(
-                    gradient: const LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Color(0xFFFFF9E6),
-                        Color(0xFFFFF3D4),
+      onTap: _onCapybaraTap,
+      onPanStart: _onCapybaraDragStart,
+      onPanUpdate: _onCapybaraDragUpdate,
+      onPanEnd: _onCapybaraDragEnd,
+      child: AnimatedBuilder(
+        animation: _bounceAnimation ?? const AlwaysStoppedAnimation(0),
+        builder: (context, child) {
+          return Transform.translate(
+            offset: Offset(
+              _dragOffset.dx + _shakeOffset.dx, // 드래그 + 흔들림 X
+              (_bounceAnimation?.value ?? 0) +
+                  _dragOffset.dy +
+                  _shakeOffset.dy, // 바운스 + 드래그 + 흔들림 Y
+            ),
+            child: child,
+          );
+        },
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 말풍선
+            AnimatedSwitcher(
+              duration: const Duration(milliseconds: 500),
+              transitionBuilder: (Widget child, Animation<double> animation) {
+                return FadeTransition(
+                  opacity: animation,
+                  child: SlideTransition(
+                    position: Tween<Offset>(
+                      begin: const Offset(0, -0.3),
+                      end: Offset.zero,
+                    ).animate(animation),
+                    child: child,
+                  ),
+                );
+              },
+              child: Stack(
+                key: ValueKey<int>(_currentMessageIndex),
+                clipBehavior: Clip.none,
+                alignment: Alignment.center,
+                children: [
+                  // 말풍선 메인 박스
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 20, vertical: 12),
+                    margin: const EdgeInsets.only(bottom: 8),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Color(0xFFFFF9E6),
+                          Color(0xFFFFF3D4),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(
+                        color: const Color(0xFFFFD699),
+                        width: 2.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.orange.withOpacity(0.2),
+                          blurRadius: 15,
+                          offset: const Offset(0, 4),
+                          spreadRadius: 1,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.1),
+                          blurRadius: 8,
+                          offset: const Offset(0, 2),
+                        ),
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(25),
-                    border: Border.all(
-                      color: const Color(0xFFFFD699),
-                      width: 2.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.orange.withOpacity(0.2),
-                        blurRadius: 15,
-                        offset: const Offset(0, 4),
-                        spreadRadius: 1,
+                    child: Text(
+                      () {
+                        if (_showingTapMessage) {
+                          final tapMessages =
+                              isKorean ? _tapMessagesKo : _tapMessagesEn;
+                          final index =
+                              _currentMessageIndex >= tapMessages.length
+                                  ? 0
+                                  : _currentMessageIndex;
+                          return tapMessages[index];
+                        } else {
+                          final messages = isKorean ? _messagesKo : _messagesEn;
+                          final index = _currentMessageIndex >= messages.length
+                              ? 0
+                              : _currentMessageIndex;
+                          return messages[index];
+                        }
+                      }(),
+                      style: const TextStyle(
+                        fontSize: 15,
+                        color: Color(0xFF6B5D4F),
+                        fontWeight: FontWeight.w700,
+                        letterSpacing: 0.3,
                       ),
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.1),
-                        blurRadius: 8,
-                        offset: const Offset(0, 2),
-                      ),
-                    ],
-                  ),
-                  child: Text(
-                    () {
-                      if (_showingTapMessage) {
-                        final tapMessages = isKorean ? _tapMessagesKo : _tapMessagesEn;
-                        final index = _currentMessageIndex >= tapMessages.length
-                            ? 0
-                            : _currentMessageIndex;
-                        return tapMessages[index];
-                      } else {
-                        final messages = isKorean ? _messagesKo : _messagesEn;
-                        final index = _currentMessageIndex >= messages.length
-                            ? 0
-                            : _currentMessageIndex;
-                        return messages[index];
-                      }
-                    }(),
-                    style: const TextStyle(
-                      fontSize: 15,
-                      color: Color(0xFF6B5D4F),
-                      fontWeight: FontWeight.w700,
-                      letterSpacing: 0.3,
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
-                ),
-                // 말풍선 꼬리 (아래쪽 중앙, 말풍선 본체와 겹치게 배치)
-                Positioned(
-                  bottom: 2,
-                  child: CustomPaint(
-                    size: const Size(24, 12),
-                    painter: _SpeechBubbleTailPainter(),
+                  // 말풍선 꼬리 (아래쪽 중앙, 말풍선 본체와 겹치게 배치)
+                  Positioned(
+                    bottom: 2,
+                    child: CustomPaint(
+                      size: const Size(24, 12),
+                      painter: _SpeechBubbleTailPainter(),
+                    ),
                   ),
-                ),
-              ],
+                ],
+              ),
             ),
-          ),
-          const SizedBox(height: 16),
-          // 카피바라 이미지 (바운스 + 흔들림 애니메이션)
-          AnimatedBuilder(
-            animation: Listenable.merge([
-              _bounceAnimation ?? const AlwaysStoppedAnimation(0),
-              _shakeAnimation ?? const AlwaysStoppedAnimation(0),
-            ]),
-            builder: (context, child) {
-              return Transform.translate(
-                offset: Offset(
-                  _shakeAnimation?.value ?? 0,
-                  _bounceAnimation?.value ?? 0,
-                ),
-                child: child,
-              );
-            },
-            child: Container(
+            const SizedBox(height: 16),
+            // 카피바라 이미지 (Transform은 외부 AnimatedBuilder에서 처리됨)
+            Container(
               constraints: BoxConstraints(
                 maxHeight: characterHeight,
                 maxWidth: characterWidth,
@@ -964,8 +1306,8 @@ class _HomeScreenState extends State<HomeScreen>
                 },
               ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -976,15 +1318,6 @@ class _HomeScreenState extends State<HomeScreen>
       context: context,
       barrierDismissible: true,
       builder: (context) => const SoundSettingsDialog(),
-    );
-  }
-
-  /// 배너 광고 위젯 빌드 (안전하게)
-  Widget _buildBannerAd() {
-    // Key를 사용하여 위젯 인스턴스를 고유하게 유지
-    return KeyedSubtree(
-      key: const ValueKey('home_banner_ad'),
-      child: _adMobHandler.getBannerAd(),
     );
   }
 }

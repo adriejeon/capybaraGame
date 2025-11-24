@@ -281,7 +281,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get alreadyCollected => '이미 수집한 카피바라입니다';
 
   @override
-  String get newCapybaraFound => '새로운 카피바라를 발견했습니다!';
+  String get newCapybaraFound => '새로운 카피바라 등장!';
 
   @override
   String gameCompletionTime(Object time) {
@@ -355,7 +355,7 @@ class AppLocalizationsKo extends AppLocalizations {
   String get giveUp => '포기하기';
 
   @override
-  String get watchAd => '광고 보러가기';
+  String get watchAd => '광고 보기';
 
   @override
   String get redrawCapybara => '카피바라 다시 뽑기';

@@ -3,6 +3,8 @@
     <!-- 인터넷 권한 (광고용) -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
+    <!-- 진동 권한 -->
+    <uses-permission android:name="android.permission.VIBRATE" />
     
     <!-- 오디오 권한 -->
     <uses-permission android:name="android.permission.WAKE_LOCK" />

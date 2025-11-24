@@ -641,7 +641,7 @@ abstract class AppLocalizations {
   /// No description provided for @newCapybaraFound.
   ///
   /// In ko, this message translates to:
-  /// **'새로운 카피바라를 발견했습니다!'**
+  /// **'새로운 카피바라 등장!'**
   String get newCapybaraFound;
 
   /// No description provided for @gameCompletionTime.
@@ -785,7 +785,7 @@ abstract class AppLocalizations {
   /// No description provided for @watchAd.
   ///
   /// In ko, this message translates to:
-  /// **'광고 보러가기'**
+  /// **'광고 보기'**
   String get watchAd;
 
   /// No description provided for @redrawCapybara.
