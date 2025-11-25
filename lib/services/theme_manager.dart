@@ -77,7 +77,7 @@ class ThemeManager {
         id: 'default',
         name: '기본 테마',
         nameEn: 'Default Theme',
-        imagePath: '', // 기본 테마는 이미지 없음 (단색 배경)
+        imagePath: 'assets/images/main.jpg',
         price: 0,
         isPurchased: true,
         isDefault: true,
@@ -87,7 +87,7 @@ class ThemeManager {
         name: '해변 테마',
         nameEn: 'Beach Theme',
         imagePath: 'assets/theme/beach.jpg',
-        price: 100,
+        price: 1000,
         isPurchased: false,
       ),
       ThemeItem(
@@ -95,7 +95,7 @@ class ThemeManager {
         name: '도시 테마',
         nameEn: 'City Theme',
         imagePath: 'assets/theme/city.jpg',
-        price: 100,
+        price: 1000,
         isPurchased: false,
       ),
       ThemeItem(
@@ -103,7 +103,7 @@ class ThemeManager {
         name: '온천 테마',
         nameEn: 'Onsen Theme',
         imagePath: 'assets/theme/onsen.jpg',
-        price: 100,
+        price: 1000,
         isPurchased: false,
       ),
     ];
@@ -114,20 +114,44 @@ class ThemeManager {
     final prefs = await SharedPreferences.getInstance();
     final themesData = prefs.getString(_themesKey);
 
+    // 최신 기본 테마 정의
+    final defaultThemes = _createDefaultThemes();
+
     if (themesData != null) {
       try {
         final jsonList = jsonDecode(themesData) as List;
-        _themes = jsonList.map((json) {
+        final savedThemes = jsonList.map((json) {
           final Map<String, dynamic> safeJson = Map<String, dynamic>.from(json);
           return ThemeItem.fromJson(safeJson);
         }).toList();
+        
+        // 저장된 테마를 최신 정의와 병합 (구매 정보는 유지)
+        _themes = defaultThemes.map((defaultTheme) {
+          final savedTheme = savedThemes.firstWhere(
+            (t) => t.id == defaultTheme.id,
+            orElse: () => defaultTheme,
+          );
+          // 최신 정의를 사용하되, 구매 정보만 저장된 값 사용
+          return ThemeItem(
+            id: defaultTheme.id,
+            name: defaultTheme.name,
+            nameEn: defaultTheme.nameEn,
+            imagePath: defaultTheme.imagePath,
+            price: defaultTheme.price,
+            isPurchased: savedTheme.isPurchased,
+            isDefault: defaultTheme.isDefault,
+          );
+        }).toList();
+        
+        // 업데이트된 테마 정보 저장
+        await _saveThemes();
       } catch (e) {
         print('테마 데이터 파싱 실패, 기본 테마 생성: $e');
-        _themes = _createDefaultThemes();
+        _themes = defaultThemes;
         await _saveThemes();
       }
     } else {
-      _themes = _createDefaultThemes();
+      _themes = defaultThemes;
       await _saveThemes();
     }
 
