@@ -4,6 +4,7 @@ import 'package:flutter/foundation.dart';
 import 'dart:io';
 import 'dart:async';
 import '../utils/app_environment.dart';
+import '../services/daily_mission_service.dart';
 
 class AdmobHandler {
   // 싱글톤 구현
@@ -379,6 +380,8 @@ class AdmobHandler {
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         _isInterstitialAdLoaded = false;
+        // 데일리 미션: 광고 시청 업데이트
+        _updateAdMission();
         preloadNextAd(); // 다음 광고 미리 로드 (non-blocking)
       },
       onAdFailedToShowFullScreenContent: (ad, error) {
@@ -457,6 +460,8 @@ class AdmobHandler {
       onAdDismissedFullScreenContent: (ad) {
         ad.dispose();
         _isRewardedAdLoaded = false;
+        // 데일리 미션: 광고 시청 업데이트
+        _updateAdMission();
         onAdDismissed?.call();
         preloadNextRewardedAd(); // 다음 광고 미리 로드 (non-blocking)
       },
@@ -475,6 +480,12 @@ class AdmobHandler {
         onRewarded(reward);
       },
     );
+  }
+
+  // 데일리 미션 광고 시청 업데이트
+  void _updateAdMission() {
+    final missionService = DailyMissionService();
+    missionService.watchAd();
   }
 
   // 배너 광고 인스턴스 접근

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/constants.dart';
+import '../services/daily_mission_service.dart';
 
 /// 컬렉션 결과 모델
 class CollectionResult {
@@ -229,6 +230,11 @@ class CollectionManager {
     );
 
     await _saveCollection();
+    
+    // 데일리 미션: 새 캐릭터 수집 업데이트
+    final missionService = DailyMissionService();
+    await missionService.collectCharacter();
+    
     return CollectionResult(
         isNewCard: true,
         card: _collection[index]);

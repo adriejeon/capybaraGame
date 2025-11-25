@@ -817,6 +817,108 @@ abstract class AppLocalizations {
   /// In ko, this message translates to:
   /// **'홈 화면에 배치되었습니다!'**
   String get setAsHomeSuccess;
+
+  /// No description provided for @dailyMissions.
+  ///
+  /// In ko, this message translates to:
+  /// **'데일리 미션'**
+  String get dailyMissions;
+
+  /// No description provided for @missionCheckIn.
+  ///
+  /// In ko, this message translates to:
+  /// **'출석하기'**
+  String get missionCheckIn;
+
+  /// No description provided for @missionClaim.
+  ///
+  /// In ko, this message translates to:
+  /// **'보상 받기'**
+  String get missionClaim;
+
+  /// No description provided for @missionClaimed.
+  ///
+  /// In ko, this message translates to:
+  /// **'완료'**
+  String get missionClaimed;
+
+  /// No description provided for @missionInProgress.
+  ///
+  /// In ko, this message translates to:
+  /// **'진행중'**
+  String get missionInProgress;
+
+  /// No description provided for @missionCompleteReward.
+  ///
+  /// In ko, this message translates to:
+  /// **'미션 완료! {reward}코인 획득!'**
+  String missionCompleteReward(Object reward);
+
+  /// No description provided for @missionClaimSuccess.
+  ///
+  /// In ko, this message translates to:
+  /// **'보상을 받았습니다!'**
+  String get missionClaimSuccess;
+
+  /// No description provided for @shop.
+  ///
+  /// In ko, this message translates to:
+  /// **'상점'**
+  String get shop;
+
+  /// No description provided for @purchasedThemes.
+  ///
+  /// In ko, this message translates to:
+  /// **'구매한 테마'**
+  String get purchasedThemes;
+
+  /// No description provided for @themeApplied.
+  ///
+  /// In ko, this message translates to:
+  /// **'테마가 적용되었습니다'**
+  String get themeApplied;
+
+  /// No description provided for @themePurchase.
+  ///
+  /// In ko, this message translates to:
+  /// **'테마 구매'**
+  String get themePurchase;
+
+  /// No description provided for @purchase.
+  ///
+  /// In ko, this message translates to:
+  /// **'구매하기'**
+  String get purchase;
+
+  /// No description provided for @notEnoughCoins.
+  ///
+  /// In ko, this message translates to:
+  /// **'코인이 부족합니다'**
+  String get notEnoughCoins;
+
+  /// No description provided for @themePurchased.
+  ///
+  /// In ko, this message translates to:
+  /// **'테마를 구매하고 적용했습니다!'**
+  String get themePurchased;
+
+  /// No description provided for @purchased.
+  ///
+  /// In ko, this message translates to:
+  /// **'구매완료'**
+  String get purchased;
+
+  /// No description provided for @gameCompleteCoinReward.
+  ///
+  /// In ko, this message translates to:
+  /// **'게임을 완료하고 10코인을 얻었어요!'**
+  String get gameCompleteCoinReward;
+
+  /// No description provided for @ok.
+  ///
+  /// In ko, this message translates to:
+  /// **'확인'**
+  String get ok;
 }
 
 class _AppLocalizationsDelegate

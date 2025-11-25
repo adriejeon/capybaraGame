@@ -138,5 +138,24 @@
   "scoreUnit": "pts",
   "movesUnit": "moves",
   "setAsHome": "Take Out to Home",
-  "setAsHomeSuccess": "Set as home character!"
+  "setAsHomeSuccess": "Set as home character!",
+  
+  "dailyMissions": "Daily Missions",
+  "missionCheckIn": "Check In",
+  "missionClaim": "Claim Reward",
+  "missionClaimed": "Completed",
+  "missionInProgress": "In Progress",
+  "missionCompleteReward": "Mission Complete! Got {reward} coins!",
+  "missionClaimSuccess": "Reward claimed!",
+  "shop": "Shop",
+  "purchasedThemes": "Purchased Themes",
+  "themeApplied": "Theme applied",
+  "themePurchase": "Purchase Theme",
+  "purchase": "Purchase",
+  "notEnoughCoins": "Not enough coins",
+  "themePurchased": "Theme purchased and applied!",
+  "purchased": "Purchased",
+  
+  "gameCompleteCoinReward": "Game completed! You got 10 coins!",
+  "ok": "OK"
 }

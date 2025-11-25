@@ -138,5 +138,24 @@
   "scoreUnit": "점",
   "movesUnit": "번",
   "setAsHome": "홈으로 꺼내두기",
-  "setAsHomeSuccess": "홈 화면에 배치되었습니다!"
+  "setAsHomeSuccess": "홈 화면에 배치되었습니다!",
+  
+  "dailyMissions": "데일리 미션",
+  "missionCheckIn": "출석하기",
+  "missionClaim": "보상 받기",
+  "missionClaimed": "완료",
+  "missionInProgress": "진행중",
+  "missionCompleteReward": "미션 완료! {reward}코인 획득!",
+  "missionClaimSuccess": "보상을 받았습니다!",
+  "shop": "상점",
+  "purchasedThemes": "구매한 테마",
+  "themeApplied": "테마가 적용되었습니다",
+  "themePurchase": "테마 구매",
+  "purchase": "구매하기",
+  "notEnoughCoins": "코인이 부족합니다",
+  "themePurchased": "테마를 구매하고 적용했습니다!",
+  "purchased": "구매완료",
+  
+  "gameCompleteCoinReward": "게임을 완료하고 10코인을 얻었어요!",
+  "ok": "확인"
 }

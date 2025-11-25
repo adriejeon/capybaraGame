@@ -14,6 +14,7 @@ import '../../ads/admob_handler.dart';
 import 'collection_screen.dart';
 import '../../services/share_service.dart';
 import '../../services/coin_manager.dart';
+import '../../services/daily_mission_service.dart';
 
 /// 실제 게임 화면
 class GameScreen extends StatefulWidget {
@@ -35,6 +36,7 @@ class _GameScreenState extends State<GameScreen>
   final SoundManager _soundManager = SoundManager();
   final CollectionManager _collectionManager = CollectionManager();
   final AdmobHandler _adMobHandler = AdmobHandler();
+  final DailyMissionService _missionService = DailyMissionService();
 
   Timer? _gameTimer;
   Timer? _hintTimer;
@@ -51,6 +53,7 @@ class _GameScreenState extends State<GameScreen>
   bool _hasReceivedReward = false; // 보상형 광고에서 보상을 받았는지 추적
   CollectionResult? _currentRewardResult; // 현재 뽑은 카피바라 결과 저장
   int _currentCoinReward = 0; // 현재 게임에서 받은 코인 보상
+  String _pendingAction = ''; // 사용자가 선택한 액션 ('home' 또는 'restart')
 
   @override
   void initState() {
@@ -314,7 +317,7 @@ class _GameScreenState extends State<GameScreen>
     });
   }
 
-  void _endGame(bool isWin) {
+  void _endGame(bool isWin) async {
     _gameTimer?.cancel();
     _hintTimer?.cancel();
     _idleTimer?.cancel();
@@ -328,6 +331,12 @@ class _GameScreenState extends State<GameScreen>
       _score += _remainingTime * GameConstants.timeBonus;
       // 게임 완료 시 사운드 재생
       _soundManager.playGameCompleteSound();
+
+      // 게임 완료 보상: 10 코인 지급
+      await CoinManager.addCoins(10);
+
+      // 데일리 미션: 게임 완료 업데이트
+      await _missionService.completeGame();
 
       // 선물 박스 다이얼로그 표시 (카드는 아직 추가하지 않음)
       _showGiftBoxDialog();
@@ -492,47 +501,7 @@ class _GameScreenState extends State<GameScreen>
             ],
           ),
         ),
-        actions: [
-          Row(
-            children: [
-              Expanded(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop(); // 홈으로 돌아가기
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF4A90E2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: Text(
-                    AppLocalizations.of(context)!.gameHome,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-              const SizedBox(width: 8),
-              Expanded(
-                child: TextButton(
-                  onPressed: () {
-                    Navigator.of(context).pop();
-                    _restartGame();
-                  },
-                  style: TextButton.styleFrom(
-                    foregroundColor: const Color(0xFF4A90E2),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                  child: Text(
-                    AppLocalizations.of(context)!.playAgain,
-                    style: const TextStyle(
-                        fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ],
+        actions: const [],
       ),
     );
   }
@@ -638,27 +607,8 @@ class _GameScreenState extends State<GameScreen>
 
   /// 캐릭터 보상 지급
   void _giveCharacterReward() async {
-    // 코인 보상 지급 (레벨에 따라 다른 금액)
-    int coinReward = 0;
-    switch (widget.difficulty) {
-      case GameDifficulty.level1:
-        coinReward = 10;
-        break;
-      case GameDifficulty.level2:
-        coinReward = 20;
-        break;
-      case GameDifficulty.level3:
-        coinReward = 30;
-        break;
-      case GameDifficulty.level4:
-        coinReward = 40;
-        break;
-      case GameDifficulty.level5:
-        coinReward = 50;
-        break;
-    }
-    await CoinManager.addCoins(coinReward);
-    _currentCoinReward = coinReward; // 코인 보상 저장
+    // 게임 완료 보상은 10코인으로 고정 (이미 _endGame에서 지급됨)
+    _currentCoinReward = 10;
     
     // 컬렉션에 새 카드 추가
     await _collectionManager.initializeCollection();
@@ -668,7 +618,7 @@ class _GameScreenState extends State<GameScreen>
     _currentRewardResult = result;
 
     // 카드 뽑기 다이얼로그 표시
-    _showCardDrawDialog(result, coinReward);
+    _showCardDrawDialog(result, _currentCoinReward);
   }
 
   /// 카드 뽑기 다이얼로그 표시 (애니메이션 포함)
@@ -687,8 +637,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// 최종 결과 다이얼로그 표시
-  void _showFinalResultDialog(CollectionResult result, int coinReward) {
-    showDialog(
+  void _showFinalResultDialog(CollectionResult result, int coinReward) async {
+    final shouldShowCoinModal = await showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
@@ -705,62 +655,6 @@ class _GameScreenState extends State<GameScreen>
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 코인 보상 표시
-              Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                decoration: BoxDecoration(
-                  gradient: const LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFFFFD700),
-                      Color(0xFFFFA500),
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(15),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.orange.withOpacity(0.3),
-                      blurRadius: 8,
-                      offset: const Offset(0, 3),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Image.asset(
-                      'assets/images/coin.png',
-                      width: 30,
-                      height: 30,
-                      errorBuilder: (context, error, stackTrace) {
-                        return const Icon(
-                          Icons.monetization_on,
-                          color: Colors.white,
-                          size: 30,
-                        );
-                      },
-                    ),
-                    const SizedBox(width: 8),
-                    Text(
-                      '+$coinReward',
-                      style: const TextStyle(
-                        fontSize: 24,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black26,
-                            offset: Offset(1, 1),
-                            blurRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
               // 카드 이미지
               Container(
                 width: 120,
@@ -850,16 +744,11 @@ class _GameScreenState extends State<GameScreen>
             // 새로운 카드 획득 시 컬렉션 확인 버튼 표시
             SizedBox(
               width: double.infinity,
-              child: ElevatedButton(
-                onPressed: () {
-                  Navigator.of(context).pop(); // 다이얼로그 닫기
-                  Navigator.of(context).pushAndRemoveUntil(
-                    MaterialPageRoute(
-                      builder: (context) => const CollectionScreen(),
-                    ),
-                    (route) => route.isFirst, // 첫 번째 페이지(메인)까지만 유지
-                  );
-                },
+                child: ElevatedButton(
+                  onPressed: () {
+                    _pendingAction = 'collection';
+                    Navigator.of(context).pop(true); // 다이얼로그 닫기 (코인 모달 표시함)
+                  },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4A90E2),
                   foregroundColor: Colors.white,
@@ -884,7 +773,7 @@ class _GameScreenState extends State<GameScreen>
                 width: double.infinity,
                 child: OutlinedButton.icon(
                   onPressed: () {
-                    Navigator.of(context).pop(); // 다이얼로그 닫기
+                    Navigator.of(context).pop(false); // 다이얼로그 닫기 (코인 모달 표시 안함)
                     _redrawCapybaraWithRewardedAd();
                   },
                   icon: const Icon(Icons.refresh, size: 20),
@@ -997,8 +886,8 @@ class _GameScreenState extends State<GameScreen>
               Expanded(
                 child: TextButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    Navigator.of(context).pop(); // 홈으로 돌아가기
+                    _pendingAction = 'home';
+                    Navigator.of(context).pop(true); // 다이얼로그 닫기 (코인 모달 표시함)
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF4A90E2),
@@ -1015,8 +904,8 @@ class _GameScreenState extends State<GameScreen>
               Expanded(
                 child: TextButton(
                   onPressed: () {
-                    Navigator.of(context).pop();
-                    _restartGame();
+                    _pendingAction = 'restart';
+                    Navigator.of(context).pop(true); // 다이얼로그 닫기 (코인 모달 표시함)
                   },
                   style: TextButton.styleFrom(
                     foregroundColor: const Color(0xFF4A90E2),
@@ -1032,6 +921,120 @@ class _GameScreenState extends State<GameScreen>
             ],
           ),
         ],
+      ),
+    ).then((shouldShowCoinModal) {
+      // 다이얼로그가 닫힐 때 코인 획득 모달 표시
+      if (shouldShowCoinModal == true && mounted) {
+        _showCoinRewardModal();
+      }
+    });
+  }
+
+  /// 코인 획득 모달 표시
+  void _showCoinRewardModal() {
+    final localizations = AppLocalizations.of(context)!;
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFE8F4F8),
+                Color(0xFFD6EBF5),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: const Color(0xFF4A90E2),
+              width: 3,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 코인 이미지
+              Image.asset(
+                'assets/images/coin-2.png',
+                width: 120,
+                height: 120,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return Image.asset(
+                    'assets/images/coin.png',
+                    width: 120,
+                    height: 120,
+                    fit: BoxFit.contain,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Icon(
+                        Icons.monetization_on,
+                        size: 120,
+                        color: Colors.amber,
+                      );
+                    },
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+              // 텍스트
+              Text(
+                localizations.gameCompleteCoinReward,
+                style: const TextStyle(
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.black,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 30),
+              // 확인 버튼
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    Navigator.of(context).pop(); // 코인 모달 닫기
+                    // 사용자가 선택한 액션 실행
+                    if (_pendingAction == 'home') {
+                      Navigator.of(context).pop(); // 홈으로 돌아가기
+                    } else if (_pendingAction == 'restart') {
+                      _restartGame(); // 게임 재시작
+                    } else if (_pendingAction == 'collection') {
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (context) => const CollectionScreen(),
+                        ),
+                        (route) => route.isFirst, // 첫 번째 페이지(메인)까지만 유지
+                      );
+                    }
+                    _pendingAction = ''; // 액션 초기화
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                  ),
+                  child: Text(
+                    localizations.ok,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }

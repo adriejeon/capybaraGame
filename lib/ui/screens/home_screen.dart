@@ -11,12 +11,15 @@ import 'package:vibration/vibration.dart';
 import '../../utils/constants.dart';
 import 'game_screen.dart';
 import 'collection_screen.dart';
+import 'shop_screen.dart';
 import '../widgets/sound_settings_dialog.dart';
+import '../widgets/daily_mission_modal.dart';
 import '../../ads/admob_handler.dart';
 import '../../data/game_counter.dart';
 import '../../state/locale_state.dart';
 import '../../data/home_character_manager.dart';
 import '../../services/coin_manager.dart';
+import '../../services/theme_manager.dart';
 
 /// 메인 홈 화면
 class HomeScreen extends StatefulWidget {
@@ -30,7 +33,9 @@ class _HomeScreenState extends State<HomeScreen>
     with TickerProviderStateMixin, WidgetsBindingObserver {
   final AdmobHandler _adMobHandler = AdmobHandler();
   final HomeCharacterManager _homeCharacterManager = HomeCharacterManager();
+  final ThemeManager _themeManager = ThemeManager();
   int _currentLevelIndex = 0; // 현재 선택된 레벨 인덱스 (0~4)
+  String _currentThemeImagePath = ''; // 현재 테마 이미지 경로
   AnimationController? _bounceController;
   Animation<double>? _bounceAnimation;
   int _currentMessageIndex = 0;
@@ -225,8 +230,9 @@ class _HomeScreenState extends State<HomeScreen>
     // 현재 캐릭터 ID 저장
     _lastCharacterId = _homeCharacterManager.currentCharacterId;
 
-    // 코인 로드
+    // 코인 및 테마 로드
     _loadCoins();
+    _loadTheme();
 
     // 전면 광고 미리 로드 (즉시 로드)
     Future.delayed(const Duration(milliseconds: 0), () async {
@@ -288,6 +294,16 @@ class _HomeScreenState extends State<HomeScreen>
     if (mounted) {
       setState(() {
         _currentCoins = coins;
+      });
+    }
+  }
+
+  /// 테마 로드
+  Future<void> _loadTheme() async {
+    await _themeManager.initialize();
+    if (mounted) {
+      setState(() {
+        _currentThemeImagePath = _themeManager.currentTheme.imagePath;
       });
     }
   }
@@ -553,9 +569,13 @@ class _HomeScreenState extends State<HomeScreen>
       body: Container(
         width: double.infinity,
         height: double.infinity,
-        decoration: const BoxDecoration(
+        decoration: BoxDecoration(
           image: DecorationImage(
-            image: AssetImage('assets/images/main.jpg'),
+            image: AssetImage(
+              _currentThemeImagePath.isEmpty
+                  ? 'assets/images/main.jpg'
+                  : _currentThemeImagePath,
+            ),
             fit: BoxFit.cover,
             alignment: Alignment.bottomCenter, // 이미지를 하단에 맞춤
           ),
@@ -712,10 +732,7 @@ class _HomeScreenState extends State<HomeScreen>
     final buttonSize = _getSideButtonSize(context);
 
     return GestureDetector(
-      onTap: () {
-        // TODO: 일일 미션 화면 열기
-        print('일일 미션 버튼 클릭');
-      },
+      onTap: () => _openDailyMissions(context),
       child: Consumer<LocaleState>(
         builder: (context, localeState, child) {
           final isEnglish = localeState.currentLocale.languageCode == 'en';
@@ -805,10 +822,7 @@ class _HomeScreenState extends State<HomeScreen>
     final buttonSize = _getSideButtonSize(context);
 
     return GestureDetector(
-      onTap: () {
-        // TODO: 상점 화면 열기
-        print('상점 버튼 클릭');
-      },
+      onTap: () => _openShop(context),
       child: Consumer<LocaleState>(
         builder: (context, localeState, child) {
           final isEnglish = localeState.currentLocale.languageCode == 'en';
@@ -1132,13 +1146,16 @@ class _HomeScreenState extends State<HomeScreen>
   }
 
   /// 게임 화면으로 이동
-  void _navigateToGame(BuildContext context, GameDifficulty difficulty) {
-    Navigator.push(
+  void _navigateToGame(BuildContext context, GameDifficulty difficulty) async {
+    await Navigator.push(
       context,
       MaterialPageRoute(
         builder: (context) => GameScreen(difficulty: difficulty),
       ),
     );
+    
+    // 게임 화면에서 돌아온 후 코인 리로드
+    await _loadCoins();
   }
 
   /// 컬렉션 화면 열기
@@ -1152,6 +1169,31 @@ class _HomeScreenState extends State<HomeScreen>
 
     // 컬렉션 화면에서 돌아온 후 캐릭터 갱신 확인 및 코인 리로드
     await _checkCharacterUpdate();
+    await _loadCoins();
+  }
+
+  /// 상점 화면 열기
+  void _openShop(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const ShopScreen(),
+      ),
+    );
+
+    // 상점 화면에서 돌아온 후 테마 및 코인 리로드
+    await _loadTheme();
+    await _loadCoins();
+  }
+
+  /// 데일리 미션 모달 열기
+  void _openDailyMissions(BuildContext context) async {
+    await showDialog(
+      context: context,
+      builder: (context) => const DailyMissionModal(),
+    );
+    
+    // 미션 모달에서 돌아온 후 코인 리로드
     await _loadCoins();
   }
 

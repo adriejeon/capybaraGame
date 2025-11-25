@@ -375,4 +375,57 @@ class AppLocalizationsEn extends AppLocalizations {
 
   @override
   String get setAsHomeSuccess => 'Set as home character!';
+
+  @override
+  String get dailyMissions => 'Daily Missions';
+
+  @override
+  String get missionCheckIn => 'Check In';
+
+  @override
+  String get missionClaim => 'Claim Reward';
+
+  @override
+  String get missionClaimed => 'Completed';
+
+  @override
+  String get missionInProgress => 'In Progress';
+
+  @override
+  String missionCompleteReward(Object reward) {
+    return 'Mission Complete! Got $reward coins!';
+  }
+
+  @override
+  String get missionClaimSuccess => 'Reward claimed!';
+
+  @override
+  String get shop => 'Shop';
+
+  @override
+  String get purchasedThemes => 'Purchased Themes';
+
+  @override
+  String get themeApplied => 'Theme applied';
+
+  @override
+  String get themePurchase => 'Purchase Theme';
+
+  @override
+  String get purchase => 'Purchase';
+
+  @override
+  String get notEnoughCoins => 'Not enough coins';
+
+  @override
+  String get themePurchased => 'Theme purchased and applied!';
+
+  @override
+  String get purchased => 'Purchased';
+
+  @override
+  String get gameCompleteCoinReward => 'Game completed! You got 10 coins!';
+
+  @override
+  String get ok => 'OK';
 }

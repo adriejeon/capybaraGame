@@ -371,4 +371,57 @@ class AppLocalizationsKo extends AppLocalizations {
 
   @override
   String get setAsHomeSuccess => '홈 화면에 배치되었습니다!';
+
+  @override
+  String get dailyMissions => '데일리 미션';
+
+  @override
+  String get missionCheckIn => '출석하기';
+
+  @override
+  String get missionClaim => '보상 받기';
+
+  @override
+  String get missionClaimed => '완료';
+
+  @override
+  String get missionInProgress => '진행중';
+
+  @override
+  String missionCompleteReward(Object reward) {
+    return '미션 완료! $reward코인 획득!';
+  }
+
+  @override
+  String get missionClaimSuccess => '보상을 받았습니다!';
+
+  @override
+  String get shop => '상점';
+
+  @override
+  String get purchasedThemes => '구매한 테마';
+
+  @override
+  String get themeApplied => '테마가 적용되었습니다';
+
+  @override
+  String get themePurchase => '테마 구매';
+
+  @override
+  String get purchase => '구매하기';
+
+  @override
+  String get notEnoughCoins => '코인이 부족합니다';
+
+  @override
+  String get themePurchased => '테마를 구매하고 적용했습니다!';
+
+  @override
+  String get purchased => '구매완료';
+
+  @override
+  String get gameCompleteCoinReward => '게임을 완료하고 10코인을 얻었어요!';
+
+  @override
+  String get ok => '확인';
 }
