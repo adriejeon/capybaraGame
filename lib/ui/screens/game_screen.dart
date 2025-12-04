@@ -15,6 +15,7 @@ import 'collection_screen.dart';
 import '../../services/share_service.dart';
 import '../../services/coin_manager.dart';
 import '../../services/daily_mission_service.dart';
+import '../../services/game_service.dart';
 
 /// 실제 게임 화면
 class GameScreen extends StatefulWidget {
@@ -41,6 +42,9 @@ class _GameScreenState extends State<GameScreen>
   Timer? _gameTimer;
   Timer? _hintTimer;
   Timer? _idleTimer; // 사용자 비활성 상태 체크용 타이머
+  Timer? _initialHintTimer; // 초기 카드 힌트 타이머
+  Timer? _hintItemTimer; // 힌트 아이템 타이머
+  DateTime? _timerPausedAt; // 타이머가 일시정지된 시점
   int _remainingTime = 0;
   int _score = 0;
   int _moves = 0;
@@ -54,6 +58,9 @@ class _GameScreenState extends State<GameScreen>
   CollectionResult? _currentRewardResult; // 현재 뽑은 카피바라 결과 저장
   int _currentCoinReward = 0; // 현재 게임에서 받은 코인 보상
   String _pendingAction = ''; // 사용자가 선택한 액션 ('home' 또는 'restart')
+  bool _hasUsedRedraw = false; // 이번 게임에서 다시 뽑기를 사용했는지 추적
+  bool _hasWatchedHintAd = false; // 힌트 아이템 광고를 시청했는지 추적
+  bool _isWatchingAdForHint = false; // 힌트 아이템을 위한 광고 시청 중인지 추적
 
   @override
   void initState() {
@@ -61,6 +68,7 @@ class _GameScreenState extends State<GameScreen>
     WidgetsBinding.instance.addObserver(this);
     _initializeGame();
     _setupAnimations();
+    // 배너 광고는 _BannerAdContainer에서 관리하므로 여기서는 로드하지 않음
     // 전면 광고 미리 로드 (약간의 지연 후)
     Future.delayed(const Duration(milliseconds: 1000), () async {
       await _adMobHandler.loadInterstitialAd();
@@ -79,6 +87,8 @@ class _GameScreenState extends State<GameScreen>
     _gameTimer?.cancel();
     _hintTimer?.cancel();
     _idleTimer?.cancel();
+    _initialHintTimer?.cancel();
+    _hintItemTimer?.cancel();
     _flipAnimationController.dispose();
     super.dispose();
   }
@@ -107,6 +117,12 @@ class _GameScreenState extends State<GameScreen>
   }
 
   void _initializeGame() {
+    // 기존 타이머들 모두 취소 (충돌 방지)
+    _gameTimer?.cancel();
+    _hintTimer?.cancel();
+    _idleTimer?.cancel();
+    _initialHintTimer?.cancel();
+
     // 게임 보드 생성
     _gameBoard = CapybaraCardFactory.createGameBoard(widget.difficulty);
 
@@ -122,6 +138,8 @@ class _GameScreenState extends State<GameScreen>
     _selectedCards.clear();
     _gameState = GameState.playing;
     _isShowingHint = false;
+    _hasUsedRedraw = false; // 다시 뽑기 플래그 초기화
+    _hasWatchedHintAd = false; // 힌트 아이템 광고 플래그 초기화
 
     // 게임 시작 시 카드 힌트 표시
     _showInitialCardHint();
@@ -136,6 +154,7 @@ class _GameScreenState extends State<GameScreen>
 
   void _startTimer() {
     _gameTimer?.cancel();
+
     _gameTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
       if (_remainingTime > 0) {
         setState(() {
@@ -145,6 +164,22 @@ class _GameScreenState extends State<GameScreen>
         _endGame(false);
       }
     });
+  }
+
+  /// 타이머 일시정지 (힌트 모달, 광고 시청 등)
+  void _pauseTimer() {
+    if (_gameTimer != null && _gameTimer!.isActive) {
+      _gameTimer?.cancel();
+      _timerPausedAt = DateTime.now(); // 일시정지 시점 기록 (플래그용)
+    }
+  }
+
+  /// 타이머 재개
+  void _resumeTimer() {
+    if (_gameState == GameState.playing && _timerPausedAt != null) {
+      _timerPausedAt = null; // 일시정지 플래그 초기화
+      _startTimer(); // 남은 시간 그대로 타이머 재시작
+    }
   }
 
   /// 사용자 비활성 상태 체크 타이머 시작
@@ -170,6 +205,9 @@ class _GameScreenState extends State<GameScreen>
 
   /// 게임 시작 시 모든 카드 힌트 표시
   void _showInitialCardHint() {
+    // 이전 초기 힌트 타이머가 있으면 취소
+    _initialHintTimer?.cancel();
+
     setState(() {
       _isShowingHint = true;
       // 모든 카드를 앞면으로 뒤집기
@@ -179,7 +217,7 @@ class _GameScreenState extends State<GameScreen>
     });
 
     // 3초 후 모든 카드를 뒷면으로 뒤집기
-    Timer(const Duration(milliseconds: 3000), () {
+    _initialHintTimer = Timer(const Duration(milliseconds: 3000), () {
       if (mounted) {
         setState(() {
           _isShowingHint = false;
@@ -338,6 +376,9 @@ class _GameScreenState extends State<GameScreen>
       // 데일리 미션: 게임 완료 업데이트
       await _missionService.completeGame();
 
+      // 리더보드에 점수 제출
+      await GameService.submitScore(_score);
+
       // 선물 박스 다이얼로그 표시 (카드는 아직 추가하지 않음)
       _showGiftBoxDialog();
     } else {
@@ -361,147 +402,12 @@ class _GameScreenState extends State<GameScreen>
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.white,
-        title: Text(
-          AppLocalizations.of(context)!.gameComplete,
-          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
-        ),
-        content: SizedBox(
-          width: MediaQuery.of(context).size.width * 0.8,
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                AppLocalizations.of(context)!.gameCompleteMessage,
-                style: const TextStyle(fontSize: 18),
-              ),
-              const SizedBox(height: 20),
-              // 선물 박스 이미지
-              Center(
-                child: GestureDetector(
-                  onTap: () => _openGiftBox(context),
-                  child: AnimatedContainer(
-                    duration: const Duration(milliseconds: 200),
-                    width: 120,
-                    height: 120,
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(15),
-                      border: Border.all(
-                        color: const Color(0xFFFFD700), // 골드 색상
-                        width: 3,
-                      ),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: [
-                          Colors.white.withOpacity(0.2),
-                          Colors.transparent,
-                        ],
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.2),
-                          blurRadius: 15,
-                          offset: const Offset(0, 8),
-                          spreadRadius: 2,
-                        ),
-                        BoxShadow(
-                          color: const Color(0xFFFFD700).withOpacity(0.3),
-                          blurRadius: 20,
-                          offset: const Offset(0, 0),
-                          spreadRadius: 0,
-                        ),
-                      ],
-                    ),
-                    child: Material(
-                      color: Colors.transparent,
-                      child: InkWell(
-                        onTap: () => _openGiftBox(context),
-                        borderRadius: BorderRadius.circular(12),
-                        splashColor: const Color(0xFFFFD700).withOpacity(0.3),
-                        highlightColor:
-                            const Color(0xFFFFD700).withOpacity(0.1),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Image.asset(
-                            'assets/capybara/collection/gift_box.jpg',
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                color: Colors.grey[200],
-                                child: const Icon(
-                                  Icons.card_giftcard,
-                                  color: Colors.grey,
-                                  size: 50,
-                                ),
-                              );
-                            },
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-              const SizedBox(height: 16),
-              Container(
-                padding: const EdgeInsets.all(12),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFFFF8E1),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFFFD700), width: 1),
-                ),
-                child: Row(
-                  children: [
-                    const Icon(
-                      Icons.touch_app,
-                      color: Color(0xFFB8860B),
-                      size: 20,
-                    ),
-                    const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        AppLocalizations.of(context)!.gameAllMatched,
-                        style: const TextStyle(
-                          fontSize: 14,
-                          color: Color(0xFFB8860B),
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              const SizedBox(height: 20),
-              Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(16),
-                decoration: BoxDecoration(
-                  color: const Color(0xFFF8F9FA),
-                  borderRadius: BorderRadius.circular(10),
-                  border: Border.all(color: const Color(0xFFE6F3FF)),
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text('${AppLocalizations.of(context)!.gameScore}: $_score${AppLocalizations.of(context)!.scoreUnit}',
-                        style: const TextStyle(fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Text('${AppLocalizations.of(context)!.moves}: $_moves${AppLocalizations.of(context)!.movesUnit}',
-                        style: const TextStyle(fontSize: 16)),
-                    const SizedBox(height: 8),
-                    Text(
-                        '${AppLocalizations.of(context)!.gameTime}: ${GameHelpers.formatTime(_remainingTime)}',
-                        style: const TextStyle(fontSize: 16)),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-        actions: const [],
+      builder: (context) => _GiftBoxDialog(
+        score: _score,
+        moves: _moves,
+        remainingTime: _remainingTime,
+        difficulty: widget.difficulty,
+        onOpenGiftBox: () => _openGiftBox(context),
       ),
     );
   }
@@ -539,10 +445,12 @@ class _GameScreenState extends State<GameScreen>
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    Text('${AppLocalizations.of(context)!.score}: $_score${AppLocalizations.of(context)!.scoreUnit}',
+                    Text(
+                        '${AppLocalizations.of(context)!.score}: $_score${AppLocalizations.of(context)!.scoreUnit}',
                         style: const TextStyle(fontSize: 16)),
                     const SizedBox(height: 8),
-                    Text('${AppLocalizations.of(context)!.moves}: $_moves${AppLocalizations.of(context)!.movesUnit}',
+                    Text(
+                        '${AppLocalizations.of(context)!.moves}: $_moves${AppLocalizations.of(context)!.movesUnit}',
                         style: const TextStyle(fontSize: 16)),
                   ],
                 ),
@@ -609,11 +517,11 @@ class _GameScreenState extends State<GameScreen>
   void _giveCharacterReward() async {
     // 게임 완료 보상은 10코인으로 고정 (이미 _endGame에서 지급됨)
     _currentCoinReward = 10;
-    
+
     // 컬렉션에 새 카드 추가
     await _collectionManager.initializeCollection();
     final result = await _collectionManager.addNewCard(widget.difficulty);
-    
+
     // 현재 뽑은 결과 저장 (다시 뽑기 기능용)
     _currentRewardResult = result;
 
@@ -637,8 +545,8 @@ class _GameScreenState extends State<GameScreen>
   }
 
   /// 최종 결과 다이얼로그 표시
-  void _showFinalResultDialog(CollectionResult result, int coinReward) async {
-    final shouldShowCoinModal = await showDialog<bool>(
+  void _showFinalResultDialog(CollectionResult result, int coinReward) {
+    showDialog<bool>(
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
@@ -744,11 +652,11 @@ class _GameScreenState extends State<GameScreen>
             // 새로운 카드 획득 시 컬렉션 확인 버튼 표시
             SizedBox(
               width: double.infinity,
-                child: ElevatedButton(
-                  onPressed: () {
-                    _pendingAction = 'collection';
-                    Navigator.of(context).pop(true); // 다이얼로그 닫기 (코인 모달 표시함)
-                  },
+              child: ElevatedButton(
+                onPressed: () {
+                  _pendingAction = 'collection';
+                  Navigator.of(context).pop(true); // 다이얼로그 닫기 (코인 모달 표시함)
+                },
                 style: ElevatedButton.styleFrom(
                   backgroundColor: const Color(0xFF4A90E2),
                   foregroundColor: Colors.white,
@@ -765,66 +673,68 @@ class _GameScreenState extends State<GameScreen>
             ),
             const SizedBox(height: 8),
           ],
-          // 카피바라 다시 뽑기 버튼 (항상 표시)
-          Stack(
-            clipBehavior: Clip.none,
-            children: [
-              SizedBox(
-                width: double.infinity,
-                child: OutlinedButton.icon(
-                  onPressed: () {
-                    Navigator.of(context).pop(false); // 다이얼로그 닫기 (코인 모달 표시 안함)
-                    _redrawCapybaraWithRewardedAd();
-                  },
-                  icon: const Icon(Icons.refresh, size: 20),
-                  label: Text(
-                    AppLocalizations.of(context)!.redrawCapybara,
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: const Color(0xFF4A90E2),
-                    side: const BorderSide(
-                      color: Color(0xFF4A90E2),
-                      width: 2,
-                    ),
-                    padding: const EdgeInsets.symmetric(vertical: 16),
-                  ),
-                ),
-              ),
-              Positioned(
-                top: -6,
-                right: 12,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFF4A90E2),
-                    borderRadius: BorderRadius.circular(12),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.15),
-                        blurRadius: 4,
-                        offset: const Offset(0, 2),
+          // 카피바라 다시 뽑기 버튼 (게임당 1번만 사용 가능)
+          if (!_hasUsedRedraw) ...[
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () {
+                      // 다이얼로그는 광고가 실제로 표시될 때 닫도록 변경
+                      _redrawCapybaraWithRewardedAd();
+                    },
+                    icon: const Icon(Icons.refresh, size: 20),
+                    label: Text(
+                      AppLocalizations.of(context)!.redrawCapybara,
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
                       ),
-                    ],
-                  ),
-                  child: const Text(
-                    'AD',
-                    style: TextStyle(
-                      fontSize: 10,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                      letterSpacing: 0.5,
+                    ),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: const Color(0xFF4A90E2),
+                      side: const BorderSide(
+                        color: Color(0xFF4A90E2),
+                        width: 2,
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 16),
                     ),
                   ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
+                Positioned(
+                  top: -6,
+                  right: 12,
+                  child: Container(
+                    padding:
+                        const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF4A90E2),
+                      borderRadius: BorderRadius.circular(12),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.15),
+                          blurRadius: 4,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
+                    ),
+                    child: const Text(
+                      'AD',
+                      style: TextStyle(
+                        fontSize: 10,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        letterSpacing: 0.5,
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+          ],
           // 친구에게 자랑하기 버튼 (테두리만 있는 스타일)
           SizedBox(
             width: double.infinity,
@@ -848,17 +758,20 @@ class _GameScreenState extends State<GameScreen>
                     difficultyText = 'level5';
                     break;
                 }
-                
+
                 // 게임 완료 시간 계산 (초기 시간 - 남은 시간)
                 final initialTime = GameHelpers.getTimeLimit(widget.difficulty);
                 final completedTime = initialTime - _remainingTime;
-                
+
                 await ShareService.shareGameScore(
                   score: _score,
                   difficulty: difficultyText,
                   gameTime: completedTime,
                   context: context,
                 );
+
+                // 데일리 미션: 친구에게 공유하기 업데이트
+                await _missionService.shareToFriend();
               },
               icon: const Icon(Icons.share, size: 20),
               label: Text(
@@ -933,7 +846,7 @@ class _GameScreenState extends State<GameScreen>
   /// 코인 획득 모달 표시
   void _showCoinRewardModal() {
     final localizations = AppLocalizations.of(context)!;
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -1125,7 +1038,8 @@ class _GameScreenState extends State<GameScreen>
                 },
                 style: TextButton.styleFrom(
                   foregroundColor: Colors.grey,
-                  padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
                 ),
                 child: Text(
                   AppLocalizations.of(context)!.giveUp,
@@ -1145,7 +1059,8 @@ class _GameScreenState extends State<GameScreen>
                   style: ElevatedButton.styleFrom(
                     backgroundColor: const Color(0xFF4A90E2),
                     foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                    padding: const EdgeInsets.symmetric(
+                        horizontal: 24, vertical: 12),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(10),
                     ),
@@ -1169,10 +1084,10 @@ class _GameScreenState extends State<GameScreen>
   /// 광고 시청 후 시간 연장 (보상형 광고 사용)
   void _watchAdForTimeExtension() async {
     print('시간 연장을 위한 보상형 광고 시청 시작');
-    
+
     // 보상 받음 플래그 초기화
     _hasReceivedReward = false;
-    
+
     // 보상형 광고가 준비되지 않았으면 강제로 로드
     if (!_adMobHandler.isRewardedAdLoaded) {
       print('보상형 광고 준비 안됨 - 강제 로드 시작 (시간 연장)');
@@ -1270,11 +1185,11 @@ class _GameScreenState extends State<GameScreen>
       _remainingTime = 30; // 30초 추가
       _gameState = GameState.playing;
     });
-    
+
     // 타이머 재시작
     _startTimer();
     _startIdleTimer();
-    
+
     print('게임 시간 30초 연장 완료');
   }
 
@@ -1282,6 +1197,12 @@ class _GameScreenState extends State<GameScreen>
   void _redrawCapybaraWithRewardedAd() async {
     if (_currentRewardResult == null || _currentRewardResult!.card == null) {
       print('뽑을 카피바라 정보가 없습니다.');
+      return;
+    }
+
+    // 이미 다시 뽑기를 사용했으면 리턴
+    if (_hasUsedRedraw) {
+      print('이미 이번 게임에서 다시 뽑기를 사용했습니다.');
       return;
     }
 
@@ -1293,7 +1214,25 @@ class _GameScreenState extends State<GameScreen>
 
     // 보상형 광고가 준비되지 않았으면 로드
     if (!_adMobHandler.isRewardedAdLoaded) {
+      print('보상형 광고 준비 안됨 - 강제 로드 시작 (카피바라 다시 뽑기)');
       await _adMobHandler.loadRewardedAd();
+      // 2초 후 다시 시도 (광고가 완전히 로드될 때까지 대기)
+      await Future.delayed(const Duration(seconds: 2));
+
+      // 2초 후에도 광고가 로드되지 않았으면 에러 처리
+      if (!_adMobHandler.isRewardedAdLoaded) {
+        print('보상형 광고 로드 실패 - 이전 결과 팝업 복원');
+        if (mounted && previousResult != null) {
+          // 다이얼로그가 이미 닫혔을 수 있으므로 다시 표시
+          _showFinalResultDialog(previousResult, _currentCoinReward);
+        }
+        return;
+      }
+    }
+
+    // 현재 표시된 다이얼로그 닫기 (광고 표시 전에)
+    if (Navigator.of(context).canPop()) {
+      Navigator.of(context).pop(false);
     }
 
     // 보상형 광고 표시
@@ -1301,6 +1240,7 @@ class _GameScreenState extends State<GameScreen>
       onRewarded: (reward) {
         print('보상 획득: ${reward.type}, ${reward.amount}');
         _hasReceivedReward = true;
+        _hasUsedRedraw = true; // 다시 뽑기 사용 플래그 설정
       },
       onAdDismissed: () {
         if (mounted) {
@@ -1335,12 +1275,317 @@ class _GameScreenState extends State<GameScreen>
     // 새 카드 뽑기
     await _collectionManager.initializeCollection();
     final newResult = await _collectionManager.addNewCard(widget.difficulty);
-    
+
     // 현재 뽑은 결과 업데이트
     _currentRewardResult = newResult;
 
     // 새 카드 뽑기 다이얼로그 표시 (코인은 이미 지급되었으므로 동일한 금액 표시)
     _showCardDrawDialog(newResult, _currentCoinReward);
+  }
+
+  /// 힌트 아이템 버튼 클릭
+  void _onHintItemButtonTapped() {
+    _showHintItemModal();
+  }
+
+  /// 힌트 아이템 모달 표시
+  void _showHintItemModal() {
+    final localizations = AppLocalizations.of(context)!;
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    // 게임 타이머 일시정지
+    _pauseTimer();
+
+    showDialog(
+      context: context,
+      barrierDismissible: true,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                Color(0xFFE8F4F8),
+                Color(0xFFD6EBF5),
+              ],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(
+              color: const Color(0xFF4A90E2),
+              width: 3,
+            ),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 타이틀
+              Text(
+                isKorean ? '아이템 사용' : 'Use Item',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A90E2),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 아이콘 이미지
+              Image.asset(
+                'assets/images/glasses2.png',
+                width: 100,
+                height: 100,
+                fit: BoxFit.contain,
+                errorBuilder: (context, error, stackTrace) {
+                  return const Icon(
+                    Icons.remove_red_eye,
+                    size: 100,
+                    color: Color(0xFF4A90E2),
+                  );
+                },
+              ),
+              const SizedBox(height: 24),
+
+              // 설명 텍스트
+              Text(
+                isKorean
+                    ? '광고 보고 전체 카드 앞면 2초간 보기'
+                    : 'Watch ad to see all cards for 2 seconds',
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.w500,
+                  color: Colors.black87,
+                ),
+                textAlign: TextAlign.center,
+              ),
+              const SizedBox(height: 30),
+
+              // 광고 보기 버튼 or 힌트 사용 버튼
+              SizedBox(
+                width: double.infinity,
+                child: _hasWatchedHintAd
+                    ? ElevatedButton(
+                        onPressed: () {
+                          Navigator.of(context).pop();
+                          _useHintItem();
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4CAF50),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          elevation: 0,
+                        ),
+                        child: Text(
+                          isKorean
+                              ? '2초간 모든 카드 앞면 보기'
+                              : 'Show All Cards for 2 Seconds',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      )
+                    : ElevatedButton.icon(
+                        onPressed: () {
+                          // 모달은 닫지 않고, 광고 시청 후에 닫도록 함
+                          _watchAdForHintItem();
+                        },
+                        icon: const Icon(Icons.play_circle_outline, size: 24),
+                        label: Text(
+                          isKorean ? '광고 보기' : 'Watch Ad',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: const Color(0xFF4A90E2),
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(vertical: 16),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(20),
+                          ),
+                          elevation: 0,
+                        ),
+                      ),
+              ),
+              const SizedBox(height: 12),
+
+              // 닫기 버튼
+              SizedBox(
+                width: double.infinity,
+                child: TextButton(
+                  onPressed: () => Navigator.of(context).pop(),
+                  style: TextButton.styleFrom(
+                    foregroundColor: Colors.grey[600],
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
+                  child: Text(
+                    localizations.close,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    ).then((_) {
+      // 모달이 닫히면 게임 타이머 재개 (광고 시청 중이 아닐 때만)
+      if (mounted &&
+          _gameState == GameState.playing &&
+          _timerPausedAt != null &&
+          !_isWatchingAdForHint) {
+        _resumeTimer();
+      }
+    });
+  }
+
+  /// 힌트 아이템용 광고 시청
+  void _watchAdForHintItem() async {
+    print('힌트 아이템을 위한 보상형 광고 시청 시작');
+
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    // 광고 시청 중 플래그 설정
+    _isWatchingAdForHint = true;
+
+    // 광고 시청 중에도 게임 타이머 일시정지 (이미 일시정지되어 있으면 그대로 유지)
+    if (_timerPausedAt == null) {
+      _pauseTimer();
+    }
+
+    // 모달 닫기 (광고 시청 시작)
+    Navigator.of(context).pop();
+
+    // 보상 받음 플래그 초기화
+    _hasReceivedReward = false;
+
+    // 보상형 광고가 준비되지 않았으면 강제로 로드
+    if (!_adMobHandler.isRewardedAdLoaded) {
+      print('보상형 광고 준비 안됨 - 강제 로드 시작 (힌트 아이템)');
+      await _adMobHandler.loadRewardedAd();
+      // 2초 후 다시 시도
+      await Future.delayed(const Duration(seconds: 2));
+
+      if (!_adMobHandler.isRewardedAdLoaded) {
+        print('보상형 광고 로드 실패 - 힌트 아이템 사용 불가');
+        if (mounted) {
+          // 광고 시청 완료 플래그 해제
+          _isWatchingAdForHint = false;
+          // 타이머 재개
+          if (_gameState == GameState.playing) {
+            _resumeTimer();
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isKorean ? '광고를 불러올 수 없습니다.' : 'Failed to load ad.',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: Colors.grey[900]!.withOpacity(0.8),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+        return;
+      }
+    }
+
+    // 보상형 광고 표시
+    await _adMobHandler.showRewardedAd(
+      onRewarded: (reward) {
+        print('보상 획득: ${reward.type}, ${reward.amount}');
+        _hasReceivedReward = true;
+      },
+      onAdDismissed: () {
+        print('보상형 광고 닫힘 (힌트 아이템)');
+        if (mounted) {
+          // 광고 시청 완료 플래그 해제
+          _isWatchingAdForHint = false;
+
+          if (_hasReceivedReward) {
+            // 보상을 받았으면 힌트 아이템 사용 가능 상태로 변경
+            print('보상을 받았으므로 힌트 아이템 사용 가능');
+            setState(() {
+              _hasWatchedHintAd = true;
+            });
+            // 모달 다시 표시 (타이머는 이미 일시정지 상태이므로 재개하지 않음)
+            _showHintItemModal();
+          } else {
+            print('보상을 받지 않았으므로 힌트 아이템 사용 불가');
+            // 보상을 받지 않았으면 타이머 재개
+            if (_gameState == GameState.playing) {
+              _resumeTimer();
+            }
+          }
+        }
+      },
+      onAdFailedToShow: (ad) {
+        print('보상형 광고 표시 실패 - 힌트 아이템 사용 불가');
+        if (mounted) {
+          // 광고 시청 완료 플래그 해제
+          _isWatchingAdForHint = false;
+          // 타이머 재개
+          if (_gameState == GameState.playing) {
+            _resumeTimer();
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isKorean ? '광고를 표시할 수 없습니다.' : 'Failed to show ad.',
+                style:
+                    const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              ),
+              backgroundColor: Colors.grey[900]!.withOpacity(0.8),
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+      },
+    );
+  }
+
+  /// 힌트 아이템 사용 (2초간 모든 카드 앞면 보기)
+  void _useHintItem() {
+    // 이전 힌트 타이머가 있으면 취소
+    _hintItemTimer?.cancel();
+
+    setState(() {
+      _isShowingHint = true;
+      // 모든 카드를 앞면으로 뒤집기 (매칭된 카드 제외)
+      for (final card in _gameBoard.cards) {
+        if (!card.isMatched && !card.isFlipped) {
+          card.flip();
+        }
+      }
+    });
+
+    // 정확히 2초 후 모든 카드를 뒷면으로 뒤집기
+    _hintItemTimer = Timer(const Duration(milliseconds: 2000), () {
+      if (mounted) {
+        setState(() {
+          _isShowingHint = false;
+          // 모든 카드를 뒷면으로 뒤집기 (매칭된 카드 제외)
+          for (final card in _gameBoard.cards) {
+            if (!card.isMatched && card.isFlipped) {
+              card.flip();
+            }
+          }
+          // 힌트 아이템 사용 완료 후 플래그 초기화
+          _hasWatchedHintAd = false;
+        });
+      }
+    });
   }
 
   @override
@@ -1364,10 +1609,23 @@ class _GameScreenState extends State<GameScreen>
           // 게임 정보 바
           _buildGameInfoBar(),
 
-          // 게임 보드 (스크롤 가능)
+          // 게임 보드 + 힌트 버튼 (스크롤 가능)
           Expanded(
-            child: _buildGameBoard(),
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  // 게임 보드
+                  _buildGameBoard(),
+
+                  // 힌트 버튼 (카드 영역과 16px 간격)
+                  _buildHintButton(),
+                ],
+              ),
+            ),
           ),
+
+          // 광고 배너 (하단 고정)
+          const _BannerAdContainer(),
         ],
       ),
     );
@@ -1375,7 +1633,7 @@ class _GameScreenState extends State<GameScreen>
 
   Widget _buildGameInfoBar() {
     return Container(
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
       color: _isShowingHint
           ? const Color(0xFFFFF8E1) // 힌트 표시 중일 때는 주황색
           : const Color(0xFFE6F3FF), // 연한 파스텔 하늘색
@@ -1383,35 +1641,32 @@ class _GameScreenState extends State<GameScreen>
         mainAxisAlignment: MainAxisAlignment.spaceAround,
         children: [
           _buildInfoItem(AppLocalizations.of(context)!.time,
-              GameHelpers.formatTime(_remainingTime), Icons.timer),
-          _buildInfoItem(
-              AppLocalizations.of(context)!.score, '$_score', Icons.star),
-          _buildInfoItem(
-              AppLocalizations.of(context)!.moves, '$_moves', Icons.touch_app),
-          _buildInfoItem(AppLocalizations.of(context)!.combo, '$_comboCount',
-              Icons.local_fire_department),
+              GameHelpers.formatTime(_remainingTime)),
+          _buildInfoItem(AppLocalizations.of(context)!.score, '$_score'),
+          _buildInfoItem(AppLocalizations.of(context)!.moves, '$_moves'),
+          _buildInfoItem(AppLocalizations.of(context)!.combo, '$_comboCount'),
         ],
       ),
     );
   }
 
-  Widget _buildInfoItem(String label, String value, IconData icon) {
+  Widget _buildInfoItem(String label, String value) {
     return Column(
+      mainAxisSize: MainAxisSize.min,
       children: [
-        Icon(icon, color: const Color(0xFF4A90E2), size: 20), // 파스텔 하늘색
-        const SizedBox(height: 4),
         Text(
           label,
           style: const TextStyle(
-            fontSize: 12,
+            fontSize: 11,
             color: Color(0xFF4A90E2),
             fontWeight: FontWeight.bold,
           ),
         ),
+        const SizedBox(height: 2),
         Text(
           value,
           style: const TextStyle(
-            fontSize: 16,
+            fontSize: 15,
             color: Color(0xFF2C5F8B),
             fontWeight: FontWeight.bold,
           ),
@@ -1420,41 +1675,117 @@ class _GameScreenState extends State<GameScreen>
     );
   }
 
-  Widget _buildGameBoard() {
-    if (widget.difficulty == GameDifficulty.level1) {
-      // 레벨 1: 화면에 맞게 카드 크기 조정 및 중앙 정렬
-      return LayoutBuilder(
-        builder: (context, constraints) {
-          // 화면 크기에 맞게 카드 크기 계산
-          final availableWidth = constraints.maxWidth - 32; // 좌우 패딩 제외
-          final availableHeight = constraints.maxHeight - 80; // 하단 마진 80px 확보
+  /// 힌트 버튼 빌드 (화면 중앙, 카드 영역과 16px 간격)
+  Widget _buildHintButton() {
+    final screenWidth = MediaQuery.of(context).size.width;
 
-          // 2x4 그리드에 맞게 카드 크기 계산 (2개씩 4줄)
-          final cardWidth = (availableWidth - 8) / 2; // 8px 간격, 2개 카드
-          final cardHeight = (availableHeight - 24) / 4; // 24px 간격, 4개 카드
-          final cardSize = cardWidth < cardHeight ? cardWidth : cardHeight;
+    // 반응형 버튼 크기 (화면 크기에 비례)
+    final buttonSize = screenWidth * 0.12; // 화면 너비의 12% (10%에서 증가)
+    final minButtonSize = 45.0; // 최소 크기 (40에서 증가)
+    final maxButtonSize = 58.0; // 최대 크기 (50에서 증가)
+    final finalButtonSize = buttonSize.clamp(minButtonSize, maxButtonSize);
 
-          // 카드 크기를 조정 (0.9배)
-          final finalCardSize = cardSize * 0.9;
-
-          return Center(
-            child: Padding(
-              padding: const EdgeInsets.only(
-                left: 16,
-                right: 16,
-                top: 16,
-                bottom: 80, // 하단 마진 80px
+    return Container(
+      padding: const EdgeInsets.only(top: 0, bottom: 0),
+      color: Colors.transparent, // 배경 투명
+      child: Center(
+        child: GestureDetector(
+          onTap: _onHintItemButtonTapped,
+          child: Container(
+            width: finalButtonSize,
+            height: finalButtonSize,
+            decoration: BoxDecoration(
+              borderRadius:
+                  BorderRadius.circular(finalButtonSize * 0.24), // 12px 비율
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
+            ),
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(finalButtonSize * 0.24),
+              child: Image.asset(
+                'assets/images/glasses.png',
+                fit: BoxFit.contain,
+                width: finalButtonSize,
+                height: finalButtonSize,
+                errorBuilder: (context, error, stackTrace) {
+                  return Container(
+                    color: Colors.transparent,
+                    child: Icon(
+                      Icons.remove_red_eye,
+                      color: const Color(0xFF4A90E2),
+                      size: finalButtonSize * 0.56, // 28px 비율
+                    ),
+                  );
+                },
               ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGameBoard() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        // 전체 화면 높이를 가져오기
+        final screenHeight = MediaQuery.of(context).size.height;
+
+        // 카드 영역이 차지할 수 있는 최대 높이 (화면의 60% - 애드몹 광고 하단 마진 60px을 위한 공간 확보)
+        final maxCardAreaHeight = screenHeight * 0.62;
+
+        // 사용 가능한 화면 크기 계산 (패딩 제외)
+        final availableWidth = constraints.maxWidth - 32; // 좌우 패딩 16 * 2
+        final availableHeight = maxCardAreaHeight - 32; // 상하 패딩 16 * 2
+
+        // 그리드 간격을 고려한 실제 카드 영역 계산
+        final totalHorizontalSpacing = (_gameBoard.gridWidth - 1) * 8.0;
+        final totalVerticalSpacing = (_gameBoard.gridHeight - 1) * 8.0;
+
+        // 카드 크기 계산 (너비와 높이 기준)
+        final cardWidthByWidth =
+            (availableWidth - totalHorizontalSpacing) / _gameBoard.gridWidth;
+        final cardHeightByHeight =
+            (availableHeight - totalVerticalSpacing) / _gameBoard.gridHeight;
+
+        // 너비와 높이 중 작은 값을 선택하여 정사각형 유지 + 여유 공간 확보
+        final calculatedCardSize = (cardWidthByWidth < cardHeightByHeight
+                ? cardWidthByWidth
+                : cardHeightByHeight) *
+            0.98; // 0.98로 약간의 여유 공간
+
+        // 카드 크기 제한 (최소 50px, 최대 140px)
+        final cardSize = calculatedCardSize.clamp(40.0, 140.0);
+
+        // 실제 그리드 전체 크기 계산
+        final gridWidth =
+            cardSize * _gameBoard.gridWidth + totalHorizontalSpacing;
+        final gridHeight =
+            cardSize * _gameBoard.gridHeight + totalVerticalSpacing;
+
+        return ConstrainedBox(
+          constraints: BoxConstraints(
+            maxHeight: maxCardAreaHeight, // 최대 높이 제한
+          ),
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Center(
               child: SizedBox(
-                width: finalCardSize * 2 + 8, // 카드 2개 + 간격 8px
-                height: finalCardSize * 4 + 24, // 카드 4개 + 간격 24px
+                width: gridWidth,
+                height: gridHeight,
                 child: GridView.builder(
+                  shrinkWrap: true,
                   physics: const NeverScrollableScrollPhysics(),
                   gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
+                    crossAxisCount: _gameBoard.gridWidth,
                     crossAxisSpacing: 8,
                     mainAxisSpacing: 8,
-                    childAspectRatio: 1,
+                    childAspectRatio: 1, // 정사각형 비율
                   ),
                   itemCount: _gameBoard.cards.length,
                   itemBuilder: (context, index) {
@@ -1466,61 +1797,6 @@ class _GameScreenState extends State<GameScreen>
                     );
                   },
                 ),
-              ),
-            ),
-          );
-        },
-      );
-    }
-
-    // 보통/어려움 난이도: 화면에 맞게 카드 크기 조정
-    return LayoutBuilder(
-      builder: (context, constraints) {
-        // 화면 크기에 맞게 카드 크기 계산
-        final availableWidth = constraints.maxWidth - 32; // 좌우 패딩 제외
-        final availableHeight = constraints.maxHeight - 80; // 하단 마진 80px 확보
-
-        // 그리드 크기에 맞게 카드 크기 계산
-        final cardWidth = (availableWidth - ((_gameBoard.gridWidth - 1) * 8)) /
-            _gameBoard.gridWidth;
-        final cardHeight =
-            (availableHeight - ((_gameBoard.gridHeight - 1) * 8)) /
-                _gameBoard.gridHeight;
-        final cardSize = cardWidth < cardHeight ? cardWidth : cardHeight;
-
-        // 카드 크기를 조정 (0.9배)
-        final finalCardSize = cardSize * 0.9;
-
-        return Center(
-          child: Padding(
-            padding: const EdgeInsets.only(
-              left: 16,
-              right: 16,
-              top: 16,
-              bottom: 80, // 하단 마진 80px
-            ),
-            child: SizedBox(
-              width: finalCardSize * _gameBoard.gridWidth +
-                  ((_gameBoard.gridWidth - 1) * 8),
-              height: finalCardSize * _gameBoard.gridHeight +
-                  ((_gameBoard.gridHeight - 1) * 8),
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: _gameBoard.gridWidth,
-                  crossAxisSpacing: 8,
-                  mainAxisSpacing: 8,
-                  childAspectRatio: 1,
-                ),
-                itemCount: _gameBoard.cards.length,
-                itemBuilder: (context, index) {
-                  final card = _gameBoard.cards[index];
-                  return GameCardWidget(
-                    card: card,
-                    onTap: () => _onCardTapped(card),
-                    flipAnimation: _flipAnimationController,
-                  );
-                },
               ),
             ),
           ),
@@ -1563,9 +1839,11 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
     with TickerProviderStateMixin {
   late AnimationController _scaleController;
   late AnimationController _rotationController;
+  late AnimationController _shakeController;
   late AnimationController _fadeController;
   late Animation<double> _scaleAnimation;
   late Animation<double> _rotationAnimation;
+  late Animation<double> _shakeAnimation;
   late Animation<double> _fadeAnimation;
 
   bool _showCard = false;
@@ -1578,22 +1856,22 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
   }
 
   void _setupAnimations() {
-    // 스케일 애니메이션 (선물 박스 -> 카드)
+    // 스케일 애니메이션 (선물 박스 -> 카드) - 더 빠르고 급격하게
     _scaleController = AnimationController(
-      duration: const Duration(milliseconds: 800),
+      duration: const Duration(milliseconds: 400),
       vsync: this,
     );
     _scaleAnimation = Tween<double>(
       begin: 1.0,
-      end: 1.2,
+      end: 1.25,
     ).animate(CurvedAnimation(
       parent: _scaleController,
       curve: Curves.elasticOut,
     ));
 
-    // 회전 애니메이션
+    // 회전 애니메이션 - 더 빠르게
     _rotationController = AnimationController(
-      duration: const Duration(milliseconds: 1000),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     _rotationAnimation = Tween<double>(
@@ -1604,9 +1882,42 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
       curve: Curves.easeInOut,
     ));
 
-    // 페이드 애니메이션
+    // 덜컹덜컹 효과를 위한 shake 애니메이션
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: -0.12)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.12, end: 0.12)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.12, end: -0.08)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.08, end: 0.08)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.08, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+    ]).animate(_shakeController);
+
+    // 페이드 애니메이션 - 더 빠르게
     _fadeController = AnimationController(
-      duration: const Duration(milliseconds: 600),
+      duration: const Duration(milliseconds: 300),
       vsync: this,
     );
     _fadeAnimation = Tween<double>(
@@ -1619,23 +1930,25 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
   }
 
   void _startAnimation() async {
-    // 1. 선물 박스 스케일 애니메이션
+    // 1. 선물 박스 스케일 애니메이션과 shake 동시 시작
+    _shakeController.repeat(); // 반복적으로 덜컹덜컹
     await _scaleController.forward();
 
     // 2. 회전 애니메이션과 함께 카드로 변환
     _rotationController.forward();
 
-    // 0.5초 후 카드 표시
-    await Future.delayed(const Duration(milliseconds: 500));
+    // 0.2초 후 카드 표시 (더 빠르게)
+    await Future.delayed(const Duration(milliseconds: 200));
     setState(() {
       _showCard = true;
     });
+    _shakeController.stop(); // shake 중지
 
     // 3. 카드 페이드 인
     await _fadeController.forward();
 
-    // 2초 후 완료 콜백 호출
-    await Future.delayed(const Duration(milliseconds: 2000));
+    // 1.5초 후 완료 콜백 호출 (더 빠르게)
+    await Future.delayed(const Duration(milliseconds: 1500));
     widget.onComplete();
   }
 
@@ -1643,6 +1956,7 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
   void dispose() {
     _scaleController.dispose();
     _rotationController.dispose();
+    _shakeController.dispose();
     _fadeController.dispose();
     super.dispose();
   }
@@ -1673,78 +1987,83 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
                 animation: Listenable.merge([
                   _scaleController,
                   _rotationController,
+                  _shakeController,
                   _fadeController,
                 ]),
                 builder: (context, child) {
                   return Transform.scale(
                     scale: _scaleAnimation.value,
-                    child: Transform.rotate(
-                      angle: _rotationAnimation.value * 3.14159,
-                      child: Container(
-                        width: 150,
-                        height: 150,
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(15),
-                          border: Border.all(
-                            color: _showCard
-                                ? (widget.result.isNewCard
-                                    ? const Color(0xFF4A90E2)
-                                    : const Color(0xFFF0AD4E))
-                                : const Color(0xFFFFD700),
-                            width: 3,
-                          ),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 10,
-                              offset: const Offset(0, 5),
+                    child: Transform.translate(
+                      offset: Offset(_shakeAnimation.value * 20, 0),
+                      child: Transform.rotate(
+                        angle: _rotationAnimation.value * 3.14159 +
+                            _shakeAnimation.value * 0.3,
+                        child: Container(
+                          width: 150,
+                          height: 150,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: _showCard
+                                  ? (widget.result.isNewCard
+                                      ? const Color(0xFF4A90E2)
+                                      : const Color(0xFFF0AD4E))
+                                  : const Color(0xFFFFD700),
+                              width: 3,
                             ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: _showCard
-                              ? FadeTransition(
-                                  opacity: _fadeAnimation,
-                                  child: widget.result.card != null
-                                      ? Image.asset(
-                                          widget.result.card!.imagePath,
-                                          fit: BoxFit.cover,
-                                          errorBuilder:
-                                              (context, error, stackTrace) {
-                                            return Container(
-                                              color: Colors.grey[200],
-                                              child: const Icon(
-                                                Icons.image_not_supported,
-                                                color: Colors.grey,
-                                                size: 40,
-                                              ),
-                                            );
-                                          },
-                                        )
-                                      : Container(
-                                          color: Colors.grey[200],
-                                          child: const Icon(
-                                            Icons.image_not_supported,
-                                            color: Colors.grey,
-                                            size: 40,
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 10,
+                                offset: const Offset(0, 5),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: _showCard
+                                ? FadeTransition(
+                                    opacity: _fadeAnimation,
+                                    child: widget.result.card != null
+                                        ? Image.asset(
+                                            widget.result.card!.imagePath,
+                                            fit: BoxFit.cover,
+                                            errorBuilder:
+                                                (context, error, stackTrace) {
+                                              return Container(
+                                                color: Colors.grey[200],
+                                                child: const Icon(
+                                                  Icons.image_not_supported,
+                                                  color: Colors.grey,
+                                                  size: 40,
+                                                ),
+                                              );
+                                            },
+                                          )
+                                        : Container(
+                                            color: Colors.grey[200],
+                                            child: const Icon(
+                                              Icons.image_not_supported,
+                                              color: Colors.grey,
+                                              size: 40,
+                                            ),
                                           ),
+                                  )
+                                : Image.asset(
+                                    'assets/capybara/collection/gift_box.jpg',
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey[200],
+                                        child: const Icon(
+                                          Icons.card_giftcard,
+                                          color: Colors.grey,
+                                          size: 50,
                                         ),
-                                )
-                              : Image.asset(
-                                  'assets/capybara/collection/gift_box.jpg',
-                                  fit: BoxFit.cover,
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: Colors.grey[200],
-                                      child: const Icon(
-                                        Icons.card_giftcard,
-                                        color: Colors.grey,
-                                        size: 50,
-                                      ),
-                                    );
-                                  },
-                                ),
+                                      );
+                                    },
+                                  ),
+                          ),
                         ),
                       ),
                     ),
@@ -1771,6 +2090,291 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 선물 박스 다이얼로그 위젯 (덜컹덜컹 애니메이션 포함)
+class _GiftBoxDialog extends StatefulWidget {
+  final int score;
+  final int moves;
+  final int remainingTime;
+  final GameDifficulty difficulty;
+  final VoidCallback onOpenGiftBox;
+
+  const _GiftBoxDialog({
+    required this.score,
+    required this.moves,
+    required this.remainingTime,
+    required this.difficulty,
+    required this.onOpenGiftBox,
+  });
+
+  @override
+  State<_GiftBoxDialog> createState() => _GiftBoxDialogState();
+}
+
+class _GiftBoxDialogState extends State<_GiftBoxDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupShakeAnimation();
+    _startShakeAnimation();
+  }
+
+  void _setupShakeAnimation() {
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    // 덜컹덜컹 효과를 위한 애니메이션 (좌우로 흔들림) - 더 빠르고 강하게
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: -0.15)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.15, end: 0.15)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.15, end: -0.12)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.12, end: 0.12)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.12, end: -0.08)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.08, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+    ]).animate(_shakeController);
+  }
+
+  void _startShakeAnimation() async {
+    // 0.2초 대기 후 시작 (더 빠르게)
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    // 반복적으로 덜컹덜컹
+    while (mounted) {
+      await _shakeController.forward();
+      _shakeController.reset();
+      // 1초 대기 후 다시 애니메이션 (더 빠르게 반복)
+      await Future.delayed(const Duration(milliseconds: 1000));
+    }
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      backgroundColor: Colors.white,
+      title: Text(
+        AppLocalizations.of(context)!.gameComplete,
+        style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+      ),
+      content: SizedBox(
+        width: MediaQuery.of(context).size.width * 0.8,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              AppLocalizations.of(context)!.gameCompleteMessage,
+              style: const TextStyle(fontSize: 18),
+            ),
+            const SizedBox(height: 20),
+            // 선물 박스 이미지 (덜컹덜컹 애니메이션)
+            Center(
+              child: AnimatedBuilder(
+                animation: _shakeAnimation,
+                builder: (context, child) {
+                  return Transform.translate(
+                    offset: Offset(_shakeAnimation.value * 15, 0),
+                    child: Transform.rotate(
+                      angle: _shakeAnimation.value * 0.5,
+                      child: GestureDetector(
+                        onTap: widget.onOpenGiftBox,
+                        child: Container(
+                          width: 120,
+                          height: 120,
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(15),
+                            border: Border.all(
+                              color: const Color(0xFFFFD700), // 골드 색상
+                              width: 3,
+                            ),
+                            gradient: LinearGradient(
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                              colors: [
+                                Colors.white.withOpacity(0.2),
+                                Colors.transparent,
+                              ],
+                            ),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.2),
+                                blurRadius: 15,
+                                offset: const Offset(0, 8),
+                                spreadRadius: 2,
+                              ),
+                              BoxShadow(
+                                color: const Color(0xFFFFD700).withOpacity(0.3),
+                                blurRadius: 20,
+                                offset: const Offset(0, 0),
+                                spreadRadius: 0,
+                              ),
+                            ],
+                          ),
+                          child: Material(
+                            color: Colors.transparent,
+                            child: InkWell(
+                              onTap: widget.onOpenGiftBox,
+                              borderRadius: BorderRadius.circular(12),
+                              splashColor:
+                                  const Color(0xFFFFD700).withOpacity(0.3),
+                              highlightColor:
+                                  const Color(0xFFFFD700).withOpacity(0.1),
+                              child: ClipRRect(
+                                borderRadius: BorderRadius.circular(12),
+                                child: Image.asset(
+                                  'assets/capybara/collection/gift_box.jpg',
+                                  fit: BoxFit.cover,
+                                  errorBuilder: (context, error, stackTrace) {
+                                    return Container(
+                                      color: Colors.grey[200],
+                                      child: const Icon(
+                                        Icons.card_giftcard,
+                                        color: Colors.grey,
+                                        size: 50,
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            const SizedBox(height: 16),
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFFFD700), width: 1),
+              ),
+              child: Row(
+                children: [
+                  const Icon(
+                    Icons.touch_app,
+                    color: Color(0xFFB8860B),
+                    size: 20,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      AppLocalizations.of(context)!.gameAllMatched,
+                      style: const TextStyle(
+                        fontSize: 14,
+                        color: Color(0xFFB8860B),
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF8F9FA),
+                borderRadius: BorderRadius.circular(10),
+                border: Border.all(color: const Color(0xFFE6F3FF)),
+              ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                      '${AppLocalizations.of(context)!.gameScore}: ${widget.score}${AppLocalizations.of(context)!.scoreUnit}',
+                      style: const TextStyle(fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Text(
+                      '${AppLocalizations.of(context)!.moves}: ${widget.moves}${AppLocalizations.of(context)!.movesUnit}',
+                      style: const TextStyle(fontSize: 16)),
+                  const SizedBox(height: 8),
+                  Text(
+                      '${AppLocalizations.of(context)!.gameTime}: ${GameHelpers.formatTime(widget.remainingTime)}',
+                      style: const TextStyle(fontSize: 16)),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+      actions: const [],
+    );
+  }
+}
+
+/// 배너 광고 컨테이너 (한 번만 생성되어 재사용됨)
+class _BannerAdContainer extends StatefulWidget {
+  const _BannerAdContainer();
+
+  @override
+  State<_BannerAdContainer> createState() => _BannerAdContainerState();
+}
+
+class _BannerAdContainerState extends State<_BannerAdContainer> {
+  final AdmobHandler _adMobHandler = AdmobHandler();
+
+  @override
+  void initState() {
+    super.initState();
+    // 위젯이 생성된 후 배너 광고 로드
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _adMobHandler.loadBannerAd(context);
+      }
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      margin: const EdgeInsets.only(
+        bottom: 40, // 하단 마진 40px
+      ),
+      child: _adMobHandler.getBannerAd(),
     );
   }
 }

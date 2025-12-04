@@ -30,10 +30,10 @@ class GameConstants {
 
   // 게임 시간
   static const int level1TimeLimit = 15; // 15초
-  static const int level2TimeLimit = 30; // 30초
-  static const int level3TimeLimit = 45; // 45초
-  static const int level4TimeLimit = 70; // 70초
-  static const int level5TimeLimit = 120; // 2분
+  static const int level2TimeLimit = 25; // 25초
+  static const int level3TimeLimit = 40; // 40초
+  static const int level4TimeLimit = 60; // 60초
+  static const int level5TimeLimit = 100; // 100초
 
   // 점수 계산
   static const int baseScore = 100;

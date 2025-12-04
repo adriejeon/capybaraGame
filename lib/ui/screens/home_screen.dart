@@ -20,6 +20,7 @@ import '../../state/locale_state.dart';
 import '../../data/home_character_manager.dart';
 import '../../services/coin_manager.dart';
 import '../../services/theme_manager.dart';
+import '../../services/game_service.dart';
 
 /// 메인 홈 화면
 class HomeScreen extends StatefulWidget {
@@ -137,6 +138,17 @@ class _HomeScreenState extends State<HomeScreen>
     '너를 항상 웃게 해주고 싶어',
     '너를 항상 행복하게 해줄게',
     '너는 내 전부야.'
+        '게임이 막히면 안경을 써봐!',
+    '나는 언제나 네 편이야.',
+    '농장으로 돌아가고 싶어 ㅠㅠ',
+    '해변에 놀러가고 싶어 ㅠㅠ',
+    '축구 한 판 할까?',
+    '나는 맑은 날이 좋아~',
+    '늦잠 자는게 제일 좋아~',
+    '여행 가고 싶어~',
+    '넌 너무 귀여워~ 꼭 나처럼!',
+    '캐릭터를 모으고 히든 스토리를 열어봐!',
+    '내 히든 스토리가 궁금하지 않아?',
   ];
 
   // 카피바라 메시지 목록 (영어)
@@ -191,6 +203,17 @@ class _HomeScreenState extends State<HomeScreen>
     'I want to always make you smile',
     'I\'ll always make you happy',
     'You are my everything.',
+    'If you get stuck on a game, try putting on your glasses!',
+    'I\'m always on your side.',
+    'I miss the farm',
+    'I want to go to the beach',
+    'How about a game of soccer?',
+    'I love sunny days!',
+    'Sleeping in is the best!',
+    'I want to go traveling!',
+    'You\'re so cute, just like me!',
+    'You got a friend in me~',
+    'Curious about the hidden story?',
   ];
 
   // 탭 전용 대사 목록 (한국어)
@@ -607,15 +630,15 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                   child: Column(
                     children: [
-                      const SizedBox(height: 24),
+                      const SizedBox(height: 12),
                       _buildLevelSelector(context),
-                      const SizedBox(height: 32),
+                      const SizedBox(height: 48),
                       Expanded(
                         child: Column(
                           mainAxisAlignment: MainAxisAlignment.end,
                           children: [
                             _buildHomeCharacter(context),
-                            const SizedBox(height: 56),
+                            const SizedBox(height: 20),
                           ],
                         ),
                       ),
@@ -623,7 +646,7 @@ class _HomeScreenState extends State<HomeScreen>
                   ),
                 ),
               ),
-              // 하단 버튼 영역 (미션 + 컬렉션 + 상점)
+              // 하단 버튼 영역 (미션 + 컬렉션 + 상점 + 리더보드)
               Padding(
                 padding: const EdgeInsets.only(
                   left: 16,
@@ -631,15 +654,21 @@ class _HomeScreenState extends State<HomeScreen>
                   bottom: 16,
                   top: 8,
                 ),
-                child: Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    _buildMissionButton(context),
-                    const SizedBox(width: 8),
-                    _buildCollectionButton(context),
-                    const SizedBox(width: 8),
-                    _buildShopButton(context),
-                  ],
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    return Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        _buildMissionButton(context, constraints.maxWidth),
+                        const SizedBox(width: 8),
+                        _buildCollectionButton(context, constraints.maxWidth),
+                        const SizedBox(width: 8),
+                        _buildShopButton(context, constraints.maxWidth),
+                        const SizedBox(width: 8),
+                        _buildLeaderboardButton(context, constraints.maxWidth),
+                      ],
+                    );
+                  },
                 ),
               ),
             ],
@@ -649,12 +678,12 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 하단 버튼 공통 크기 계산 (폭 대비 높이 0.8 비율 유지)
-  Size _getSideButtonSize(BuildContext context) {
-    final screenWidth = MediaQuery.of(context).size.width;
-    final baseWidth = (screenWidth * 0.20).clamp(110.0, 170.0);
-    final height = (baseWidth * 0.82).clamp(90.0, 135.0);
-    return Size(baseWidth, height);
+  /// 하단 버튼 크기 계산 (화면 너비 기준 퍼센트)
+  Size _getBottomButtonSize(double availableWidth) {
+    // 3개 간격 8px씩 = 24px 총 제외
+    final buttonWidth = (availableWidth - 24) / 4;
+    final buttonHeight = buttonWidth * 1.17; // 높이 = 너비 × 1.17 (200:234 비율)
+    return Size(buttonWidth, buttonHeight);
   }
 
   /// 코인 표시 위젯 (상단 왼쪽)
@@ -727,9 +756,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 일일 미션 버튼 (왼쪽)
-  Widget _buildMissionButton(BuildContext context) {
-    final buttonSize = _getSideButtonSize(context);
+  /// 일일 미션 버튼
+  Widget _buildMissionButton(BuildContext context, double availableWidth) {
+    final buttonSize = _getBottomButtonSize(availableWidth);
 
     return GestureDetector(
       onTap: () => _openDailyMissions(context),
@@ -743,14 +772,11 @@ class _HomeScreenState extends State<HomeScreen>
           return Container(
             width: buttonSize.width,
             height: buttonSize.height,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(15),
               child: Image.asset(
                 imagePath,
-                fit: BoxFit.contain,
+                fit: BoxFit.fill,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
@@ -772,9 +798,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 컬렉션 버튼 (오른쪽 위)
-  Widget _buildCollectionButton(BuildContext context) {
-    final buttonSize = _getSideButtonSize(context);
+  /// 컬렉션 버튼
+  Widget _buildCollectionButton(BuildContext context, double availableWidth) {
+    final buttonSize = _getBottomButtonSize(availableWidth);
 
     return GestureDetector(
       onTap: () => _openCollection(context),
@@ -788,14 +814,11 @@ class _HomeScreenState extends State<HomeScreen>
           return Container(
             width: buttonSize.width,
             height: buttonSize.height,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(15),
               child: Image.asset(
                 imagePath,
-                fit: BoxFit.contain,
+                fit: BoxFit.fill,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
@@ -817,9 +840,9 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 상점 버튼 (오른쪽 아래)
-  Widget _buildShopButton(BuildContext context) {
-    final buttonSize = _getSideButtonSize(context);
+  /// 상점 버튼
+  Widget _buildShopButton(BuildContext context, double availableWidth) {
+    final buttonSize = _getBottomButtonSize(availableWidth);
 
     return GestureDetector(
       onTap: () => _openShop(context),
@@ -833,14 +856,11 @@ class _HomeScreenState extends State<HomeScreen>
           return Container(
             width: buttonSize.width,
             height: buttonSize.height,
-            decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(15),
-            ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(15),
               child: Image.asset(
                 imagePath,
-                fit: BoxFit.contain,
+                fit: BoxFit.fill,
                 errorBuilder: (context, error, stackTrace) {
                   return Container(
                     decoration: BoxDecoration(
@@ -851,6 +871,49 @@ class _HomeScreenState extends State<HomeScreen>
                       Icons.shopping_bag,
                       size: 40,
                       color: Colors.green,
+                    ),
+                  );
+                },
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 리더보드 버튼
+  Widget _buildLeaderboardButton(BuildContext context, double availableWidth) {
+    final buttonSize = _getBottomButtonSize(availableWidth);
+
+    return GestureDetector(
+      onTap: () => _openLeaderboard(context),
+      child: Consumer<LocaleState>(
+        builder: (context, localeState, child) {
+          final isEnglish = localeState.currentLocale.languageCode == 'en';
+          final imagePath = isEnglish
+              ? 'assets/images/ranking-en.png'
+              : 'assets/images/ranking.png';
+
+          return Container(
+            width: buttonSize.width,
+            height: buttonSize.height,
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(15),
+              child: Image.asset(
+                imagePath,
+                fit: BoxFit.fill,
+                errorBuilder: (context, error, stackTrace) {
+                  // 이미지 로드 실패 시 기본 아이콘 표시
+                  return Container(
+                    decoration: BoxDecoration(
+                      color: Colors.blue[100],
+                      borderRadius: BorderRadius.circular(15),
+                    ),
+                    child: const Icon(
+                      Icons.leaderboard,
+                      size: 40,
+                      color: Colors.blue,
                     ),
                   );
                 },
@@ -1153,7 +1216,7 @@ class _HomeScreenState extends State<HomeScreen>
         builder: (context) => GameScreen(difficulty: difficulty),
       ),
     );
-    
+
     // 게임 화면에서 돌아온 후 코인 리로드
     await _loadCoins();
   }
@@ -1192,9 +1255,82 @@ class _HomeScreenState extends State<HomeScreen>
       context: context,
       builder: (context) => const DailyMissionModal(),
     );
-    
+
     // 미션 모달에서 돌아온 후 코인 리로드
     await _loadCoins();
+  }
+
+  /// 리더보드 열기
+  void _openLeaderboard(BuildContext context) async {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    try {
+      // 게임 서비스를 통해 리더보드 표시
+      await GameService.showLeaderboard();
+      print('[HomeScreen] 리더보드 표시 완료 ✓');
+    } catch (e) {
+      // 오류 발생 시 사용자에게 안내
+      print('[HomeScreen] 리더보드 표시 오류: $e');
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text(
+              isKorean ? 'Game Center 로그인 필요' : 'Game Center Login Required',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            content: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  isKorean
+                      ? '리더보드를 사용하려면 Game Center에 로그인해야 합니다.'
+                      : 'You need to sign in to Game Center to use the leaderboard.',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[100],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        isKorean ? '📱 로그인 방법:' : '📱 How to sign in:',
+                        style: const TextStyle(
+                          fontWeight: FontWeight.bold,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isKorean
+                            ? '1. iPhone 설정 앱 열기\n2. 아래로 스크롤하여 "Game Center" 선택\n3. Apple ID로 로그인\n4. 앱으로 돌아와서 다시 시도'
+                            : '1. Open iPhone Settings\n2. Scroll down and tap "Game Center"\n3. Sign in with your Apple ID\n4. Return to the app and try again',
+                        style: const TextStyle(fontSize: 13),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text(
+                  isKorean ? '확인' : 'OK',
+                  style: const TextStyle(fontSize: 16),
+                ),
+              ),
+            ],
+          ),
+        );
+      }
+    }
   }
 
   /// 홈 카피바라 캐릭터 위젯

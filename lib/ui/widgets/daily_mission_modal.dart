@@ -50,7 +50,7 @@ class _DailyMissionModalState extends State<DailyMissionModal> {
               localizations.missionClaimSuccess,
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.grey[900]!.withOpacity(0.8),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -74,7 +74,7 @@ class _DailyMissionModalState extends State<DailyMissionModal> {
               localizations.missionCompleteReward(mission.coinReward),
               style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
             ),
-            backgroundColor: Colors.green,
+            backgroundColor: Colors.grey[900]!.withOpacity(0.8),
             duration: const Duration(seconds: 2),
           ),
         );
@@ -383,6 +383,8 @@ class _DailyMissionModalState extends State<DailyMissionModal> {
         return Icons.pets;
       case DailyMissionType.watchAd:
         return Icons.play_circle_outline;
+      case DailyMissionType.shareToFriend:
+        return Icons.share;
     }
   }
 

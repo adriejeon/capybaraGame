@@ -63,6 +63,10 @@
         <meta-data
             android:name="com.kakao.sdk.AppKey"
             android:value="kakao941590ef92057f63649c0c5b886f918c"/>
+        <!-- Google Play Games 서비스 -->
+        <meta-data
+            android:name="com.google.android.gms.games.APP_ID"
+            android:value="@string/app_id" />
     </application>
     <!-- Required to query activities that can process text, see:
          https://developer.android.com/training/package-visibility and

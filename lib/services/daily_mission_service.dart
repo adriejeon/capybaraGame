@@ -7,6 +7,8 @@ import 'coin_manager.dart';
 class DailyMissionService {
   static const String _missionsKey = 'daily_missions';
   static const String _lastResetDateKey = 'daily_missions_last_reset';
+  static const String _missionVersionKey = 'daily_missions_version';
+  static const int _currentMissionVersion = 2; // 새 미션 추가 시 증가
 
   static final DailyMissionService _instance = DailyMissionService._internal();
   factory DailyMissionService() => _instance;
@@ -24,7 +26,17 @@ class DailyMissionService {
   /// 미션 로드
   Future<void> _loadMissions() async {
     final prefs = await SharedPreferences.getInstance();
+    final savedVersion = prefs.getInt(_missionVersionKey) ?? 1;
     final missionsJson = prefs.getString(_missionsKey);
+
+    // 버전이 다르면 미션 리셋
+    if (savedVersion != _currentMissionVersion) {
+      print('미션 버전 업데이트: $savedVersion -> $_currentMissionVersion');
+      _missions = DailyMission.createDefaultMissions();
+      await prefs.setInt(_missionVersionKey, _currentMissionVersion);
+      await _saveMissions();
+      return;
+    }
 
     if (missionsJson != null) {
       try {
@@ -32,6 +44,9 @@ class DailyMissionService {
         _missions = jsonList
             .map((json) => DailyMission.fromJson(Map<String, dynamic>.from(json)))
             .toList();
+        
+        // 누락된 미션 체크 및 추가
+        await _addMissingMissions();
       } catch (e) {
         print('데일리 미션 로드 실패: $e');
         _missions = DailyMission.createDefaultMissions();
@@ -39,6 +54,26 @@ class DailyMissionService {
       }
     } else {
       _missions = DailyMission.createDefaultMissions();
+      await prefs.setInt(_missionVersionKey, _currentMissionVersion);
+      await _saveMissions();
+    }
+  }
+
+  /// 누락된 미션 추가
+  Future<void> _addMissingMissions() async {
+    final defaultMissions = DailyMission.createDefaultMissions();
+    final existingTypes = _missions.map((m) => m.type).toSet();
+    
+    var added = false;
+    for (final defaultMission in defaultMissions) {
+      if (!existingTypes.contains(defaultMission.type)) {
+        print('누락된 미션 추가: ${defaultMission.titleKo}');
+        _missions.add(defaultMission);
+        added = true;
+      }
+    }
+    
+    if (added) {
       await _saveMissions();
     }
   }
@@ -77,6 +112,8 @@ class DailyMissionService {
   /// 미션 리셋
   Future<void> _resetMissions() async {
     _missions = DailyMission.createDefaultMissions();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_missionVersionKey, _currentMissionVersion);
     await _saveMissions();
     print('데일리 미션이 리셋되었습니다.');
   }
@@ -154,6 +191,11 @@ class DailyMissionService {
   /// 광고 시청 미션 진행
   Future<bool> watchAd() async {
     return await updateMissionProgress(DailyMissionType.watchAd);
+  }
+
+  /// 친구에게 공유 미션 진행
+  Future<bool> shareToFriend() async {
+    return await updateMissionProgress(DailyMissionType.shareToFriend);
   }
 
   /// 전체 미션 리스트 반환

@@ -4,6 +4,7 @@ enum DailyMissionType {
   playGames, // 게임 3판 완료
   collectCharacter, // 새로운 캐릭터 1종 수집
   watchAd, // 광고 1개 보기
+  shareToFriend, // 친구에게 카피바라 자랑하기
 }
 
 /// 데일리 미션 모델
@@ -143,6 +144,17 @@ class DailyMission {
         descriptionKo: '하루에 아무 광고나 1개를 시청하세요',
         descriptionEn: 'Watch any ad once a day',
         targetCount: 1,
+        currentCount: 0,
+        coinReward: 20,
+        isCompleted: false,
+      ),
+      DailyMission(
+        type: DailyMissionType.shareToFriend,
+        titleKo: '친구에게 카피바라 자랑하기',
+        titleEn: 'Share Capybara with Friends',
+        descriptionKo: '게임을 완료하고 친구에게 뽑은 카피바라를 2번 공유하세요.',
+        descriptionEn: 'Complete a game and share the drawn capybara with friends 2 times.',
+        targetCount: 2,
         currentCount: 0,
         coinReward: 20,
         isCompleted: false,

@@ -161,19 +161,17 @@ class _CollectionScreenState extends State<CollectionScreen>
 
   /// 탭 컨텐츠 빌드
   Widget _buildTabContent(GameDifficulty difficulty) {
-    // 난이도별로 필터링
-    final filteredCollection = _collection
-        .where((item) => item.difficulty == difficulty)
-        .toList();
+    // 난이도별 이야기 목록 가져오기
+    final stories = _collectionManager.getStoriesByDifficulty(difficulty);
 
     return Column(
       children: [
         // 난이도별 완료율 표시
         _buildDifficultyStats(difficulty),
 
-        // 컬렉션 그리드
+        // 이야기 그룹 리스트
         Expanded(
-          child: _buildFilteredCollectionGrid(filteredCollection),
+          child: _buildStoriesList(stories, difficulty),
         ),
       ],
     );
@@ -181,7 +179,19 @@ class _CollectionScreenState extends State<CollectionScreen>
 
   /// 난이도별 완료율 위젯
   Widget _buildDifficultyStats(GameDifficulty difficulty) {
-    final totalCount = difficulty == GameDifficulty.level5 ? 15 : 10;
+    // 각 난이도별 실제 카드 개수
+    int totalCount;
+    if (difficulty == GameDifficulty.level1) {
+      totalCount = 20; // 아기 단계: 20개 (에피소드 1: 10개 + 에피소드 2: 10개)
+    } else if (difficulty == GameDifficulty.level2) {
+      totalCount = 20; // 어린이 단계: 20개 (에피소드 1: 10개 + 에피소드 2: 10개)
+    } else if (difficulty == GameDifficulty.level3) {
+      totalCount = 20; // 청소년 단계: 20개 (에피소드 1: 10개 + 에피소드 2: 10개)
+    } else if (difficulty == GameDifficulty.level4) {
+      totalCount = 10; // 어른 단계: 10개
+    } else {
+      totalCount = 10; // 신의 경지: 10개
+    }
     final unlockedCount =
         _collectionManager.getUnlockedCountByDifficulty(difficulty);
     final completionRate = (unlockedCount / totalCount) * 100;
@@ -239,14 +249,14 @@ class _CollectionScreenState extends State<CollectionScreen>
     );
   }
 
-  /// 필터링된 컬렉션 그리드 위젯
-  Widget _buildFilteredCollectionGrid(List<CollectionItem> items) {
-    if (items.isEmpty) {
+  /// 이야기 리스트 위젯
+  Widget _buildStoriesList(List<Story> stories, GameDifficulty difficulty) {
+    if (stories.isEmpty) {
       return Center(
         child: Text(
           Localizations.localeOf(context).languageCode == 'ko'
-              ? '컬렉션이 없습니다'
-              : 'No collection items',
+              ? '이야기가 없습니다'
+              : 'No stories',
           style: const TextStyle(
             fontSize: 16,
             color: Colors.grey,
@@ -255,25 +265,262 @@ class _CollectionScreenState extends State<CollectionScreen>
       );
     }
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: GridView.builder(
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 5, // 한 줄에 5개
-          crossAxisSpacing: 8,
-          mainAxisSpacing: 8,
-          childAspectRatio: 1,
-        ),
-        itemCount: items.length,
-        itemBuilder: (context, index) {
-          final item = items[index];
-          // 원본 인덱스를 찾기 위해
-          final originalIndex = _collection.indexOf(item);
-          return _buildCollectionCard(item, originalIndex);
-        },
+    // 신의 경지 단계는 하나의 그룹으로 합쳐서 표시
+    if (difficulty == GameDifficulty.level5 && stories.isNotEmpty) {
+      return ListView(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+        children: [
+          _buildCombinedLevel5Group(stories, difficulty),
+        ],
+      );
+    }
+
+    return ListView.builder(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      itemCount: stories.length,
+      itemBuilder: (context, index) {
+        final story = stories[index];
+        return _buildStoryGroup(story, difficulty);
+      },
+    );
+  }
+
+  /// 신의 경지 단계 통합 그룹 위젯 (10개 카드 모두 표시)
+  Widget _buildCombinedLevel5Group(List<Story> stories, GameDifficulty difficulty) {
+    // 신의 경지는 story.id == 5만 사용 (정확히 10개)
+    final targetStory = stories.firstWhere(
+      (s) => s.id == 5,
+      orElse: () => stories.first,
+    );
+    final allCards = _collectionManager.getCardsByStoryId(targetStory.id);
+    
+    final totalUnlocked = _collectionManager.getUnlockedCountByDifficulty(difficulty);
+    final totalCount = 10; // 신의 경지는 항상 10개
+    final isAllUnlocked = totalUnlocked >= totalCount;
+    final locale = Localizations.localeOf(context);
+    final isKo = locale.languageCode == 'ko';
+    
+    // story.id == 5의 제목 사용
+    final firstStory = targetStory;
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 이야기 제목
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _getDifficultyColor(difficulty).withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  isKo ? firstStory.titleKo : firstStory.titleEn,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _getDifficultyColor(difficulty),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$totalUnlocked/$totalCount',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 카드 그리드 (10개 모두 표시)
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemCount: allCards.length,
+              itemBuilder: (context, index) {
+                final card = allCards[index];
+                final originalIndex = _collection.indexOf(card);
+                return _buildCollectionCard(card, originalIndex);
+              },
+            ),
+          ),
+          // 히든 스토리 보기 버튼
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isAllUnlocked ? () {
+                  // 신의 경지 단계는 story.id == 5를 전달
+                  _showStoryDetail(targetStory);
+                } : null,
+                child: Text(
+                  isKo ? '히든 스토리 보기' : 'View Hidden Story',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isAllUnlocked
+                      ? _getDifficultyColor(difficulty)
+                      : Colors.grey[300],
+                  foregroundColor: isAllUnlocked
+                      ? Colors.white
+                      : Colors.grey[600],
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  disabledBackgroundColor: Colors.grey[300],
+                  disabledForegroundColor: Colors.grey[600],
+                ),
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
+
+  /// 이야기 그룹 위젯
+  Widget _buildStoryGroup(Story story, GameDifficulty difficulty) {
+    final cards = _collectionManager.getCardsByStoryId(story.id);
+    final unlockedCount = _collectionManager.getUnlockedCardCountByStoryId(story.id);
+    final totalCount = cards.length;
+    
+    // 각 에피소드 그룹의 모든 카드를 모았는지 확인
+    final isAllUnlocked = unlockedCount == totalCount;
+    
+    final locale = Localizations.localeOf(context);
+    final isKo = locale.languageCode == 'ko';
+
+    return Container(
+      margin: const EdgeInsets.only(bottom: 20),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 이야기 제목
+          Container(
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: _getDifficultyColor(difficulty).withOpacity(0.1),
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(15),
+                topRight: Radius.circular(15),
+              ),
+            ),
+            child: Row(
+              children: [
+                Text(
+                  isKo ? story.titleKo : story.titleEn,
+                  style: TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.bold,
+                    color: _getDifficultyColor(difficulty),
+                  ),
+                ),
+                const Spacer(),
+                Text(
+                  '$unlockedCount/$totalCount',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // 카드 그리드
+          Padding(
+            padding: const EdgeInsets.all(16),
+            child: GridView.builder(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 5,
+                crossAxisSpacing: 8,
+                mainAxisSpacing: 8,
+                childAspectRatio: 1,
+              ),
+              itemCount: cards.length,
+              itemBuilder: (context, index) {
+                final card = cards[index];
+                final originalIndex = _collection.indexOf(card);
+                return _buildCollectionCard(card, originalIndex);
+              },
+            ),
+          ),
+          // 히든 스토리 보기 버튼
+          // 신의 경지 단계는 두 그룹 모두에 버튼 표시, 전체 15개를 모았을 때만 활성화
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+            child: SizedBox(
+              width: double.infinity,
+              child: ElevatedButton(
+                onPressed: isAllUnlocked ? () {
+                  _showStoryDetail(story);
+                } : null,
+                child: Text(
+                  isKo ? '히든 스토리 보기' : 'View Hidden Story',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: isAllUnlocked
+                      ? _getDifficultyColor(difficulty)
+                      : Colors.grey[300],
+                  foregroundColor: isAllUnlocked
+                      ? Colors.white
+                      : Colors.grey[600],
+                  padding: const EdgeInsets.symmetric(vertical: 12),
+                  disabledBackgroundColor: Colors.grey[300],
+                  disabledForegroundColor: Colors.grey[600],
+                ),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
 
 
   /// 컬렉션 카드 위젯
@@ -307,7 +554,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                 child: Image.asset(
                   item.isUnlocked
                       ? item.imagePath
-                      : 'assets/capybara/collection/collection.jpg',
+                      : 'assets/images/null-card.png',
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
@@ -431,7 +678,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                   child: Image.asset(
                     item.isUnlocked
                         ? item.imagePath
-                        : 'assets/capybara/collection/collection.jpg',
+                        : 'assets/images/null-card.png',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
@@ -558,7 +805,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                           AppLocalizations.of(context)!.setAsHomeSuccess,
                         ),
                         duration: const Duration(seconds: 2),
-                        backgroundColor: const Color(0xFF4CAF50),
+                        backgroundColor: Colors.grey[900]!.withOpacity(0.8),
                       ),
                     );
                   }
@@ -622,6 +869,541 @@ class _CollectionScreenState extends State<CollectionScreen>
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  /// 이야기 상세 정보 다이얼로그
+  void _showStoryDetail(Story story) {
+    final locale = Localizations.localeOf(context);
+    final isKo = locale.languageCode == 'ko';
+    
+    // 아기 단계(story.id == 1, 7), 어린이 단계(story.id == 2, 8), 청소년 단계(story.id == 3, 9), 어른 단계(story.id == 4), 신의 경지(story.id == 5)일 때는 웹툰 모달 표시
+    if (story.id == 1 || story.id == 7 || story.id == 2 || story.id == 8 || story.id == 3 || story.id == 9 || story.id == 4 || story.id == 5) {
+      _showStoryComicModal(story);
+      return;
+    }
+    
+    final cards = _collectionManager.getCardsByStoryId(story.id);
+
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(20),
+        ),
+        title: Row(
+          children: [
+            Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: _getDifficultyColor(story.difficulty),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: const Icon(
+                Icons.auto_stories,
+                color: Colors.white,
+                size: 24,
+              ),
+            ),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                isKo ? story.titleKo : story.titleEn,
+                style: TextStyle(
+                  fontSize: 20,
+                  fontWeight: FontWeight.bold,
+                  color: _getDifficultyColor(story.difficulty),
+                ),
+              ),
+            ),
+          ],
+        ),
+        content: SizedBox(
+          width: MediaQuery.of(context).size.width * 0.8,
+          child: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                // 이야기 설명
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: _getDifficultyColor(story.difficulty).withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    isKo ? story.descriptionKo : story.descriptionEn,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      height: 1.6,
+                      color: Colors.black87,
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // 수집한 카드들
+                Text(
+                  isKo ? '수집한 카드들' : 'Collected Cards',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                GridView.builder(
+                  shrinkWrap: true,
+                  physics: const NeverScrollableScrollPhysics(),
+                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                    crossAxisCount: 5,
+                    crossAxisSpacing: 8,
+                    mainAxisSpacing: 8,
+                    childAspectRatio: 1,
+                  ),
+                  itemCount: cards.length,
+                  itemBuilder: (context, index) {
+                    final card = cards[index];
+                    return Container(
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(
+                          color: card.isUnlocked
+                              ? _getDifficultyColor(story.difficulty)
+                              : Colors.grey[300]!,
+                          width: 2,
+                        ),
+                      ),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(6),
+                        child: Image.asset(
+                          card.isUnlocked
+                              ? card.imagePath
+                              : 'assets/images/null-card.png',
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              color: Colors.grey[200],
+                              child: const Icon(
+                                Icons.image_not_supported,
+                                color: Colors.grey,
+                              ),
+                            );
+                          },
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ],
+            ),
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(),
+            child: Text(
+              AppLocalizations.of(context)!.close,
+              style: TextStyle(
+                fontSize: 16,
+                color: _getDifficultyColor(story.difficulty),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 웹툰 이야기 모달 표시
+  void _showStoryComicModal(Story story) {
+    final locale = Localizations.localeOf(context);
+    final isKo = locale.languageCode == 'ko';
+
+    showDialog(
+      context: context,
+      barrierColor: Colors.black.withOpacity(0.8),
+      builder: (context) => _StoryComicModal(
+        story: story,
+        isKo: isKo,
+      ),
+    );
+  }
+}
+
+/// 웹툰 이야기 모달 위젯
+class _StoryComicModal extends StatefulWidget {
+  final Story story;
+  final bool isKo;
+
+  const _StoryComicModal({
+    required this.story,
+    required this.isKo,
+  });
+
+  @override
+  State<_StoryComicModal> createState() => _StoryComicModalState();
+}
+
+class _StoryComicModalState extends State<_StoryComicModal>
+    with SingleTickerProviderStateMixin {
+  late PageController _pageController;
+  late AnimationController _fadeController;
+  late Animation<double> _fadeAnimation;
+  int _currentPage = 0;
+
+  // 이미지 경로 리스트
+  List<String> get _imagePaths {
+    if (widget.story.id == 1) {
+      // 아기 단계 - 에피소드 1 (걸음마 연습)
+      if (widget.isKo) {
+        return [
+          'assets/toon/baby_story_1.png',
+          'assets/toon/baby_story_2.png',
+          'assets/toon/baby_story_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/baby_story_en_1.png',
+          'assets/toon/baby_story_en_2.png',
+          'assets/toon/baby_story_en_3.png',
+        ];
+      }
+    } else if (widget.story.id == 7) {
+      // 아기 단계 - 에피소드 2 (엄마처럼 하고 싶어!)
+      if (widget.isKo) {
+        return [
+          'assets/toon/baby_story_2_1.png',
+          'assets/toon/baby_story_2_2.png',
+          'assets/toon/baby_story_2_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/baby_story_2_en_1.png',
+          'assets/toon/baby_story_2_en_2.png',
+          'assets/toon/baby_story_2_en_3.png',
+        ];
+      }
+    } else if (widget.story.id == 2) {
+      // 어린이 단계 - 에피소드 1 (친구가 좋아)
+      if (widget.isKo) {
+        return [
+          'assets/toon/child_story_1.png',
+          'assets/toon/child_story_2.png',
+          'assets/toon/child_story_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/child_story_en_1.png',
+          'assets/toon/child_story_en_2.png',
+          'assets/toon/child_story_en_3.png',
+        ];
+      }
+    } else if (widget.story.id == 8) {
+      // 어린이 단계 - 에피소드 2 (첫 이별)
+      if (widget.isKo) {
+        return [
+          'assets/toon/child_story_2_1.png',
+          'assets/toon/child_story_2_2.png',
+          'assets/toon/child_story_2_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/child_story_2_en_1.png',
+          'assets/toon/child_story_2_en_2.png',
+          'assets/toon/child_story_2_en_3.png',
+        ];
+      }
+    } else if (widget.story.id == 3) {
+      // 청소년 단계 - 에피소드 1 (첫 사랑)
+      if (widget.isKo) {
+        return [
+          'assets/toon/teen_story_1.png',
+          'assets/toon/teen_story_2.png',
+          'assets/toon/teen_story_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/teen_story_en_1.png',
+          'assets/toon/teen_story_en_2.png',
+          'assets/toon/teen_story_en_3.png',
+        ];
+      }
+    } else if (widget.story.id == 9) {
+      // 청소년 단계 - 에피소드 2 (나만의 감성)
+      if (widget.isKo) {
+        return [
+          'assets/toon/teen_story_2_1.png',
+          'assets/toon/teen_story_2_2.png',
+          'assets/toon/teen_story_2_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/teen_story_2_en_1.png',
+          'assets/toon/teen_story_2_en_2.png',
+          'assets/toon/teen_story_2_en_3.png',
+        ];
+      }
+    } else if (widget.story.id == 4) {
+      // 어른 단계
+      if (widget.isKo) {
+        return [
+          'assets/toon/adult_story_1.png',
+          'assets/toon/adult_story_2.png',
+          'assets/toon/adult_story_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/adult_story_en_1.png',
+          'assets/toon/adult_story_en_2.png',
+          'assets/toon/adult_story_en_3.png',
+        ];
+      }
+    } else if (widget.story.id == 5) {
+      // 신의 경지 단계
+      if (widget.isKo) {
+        return [
+          'assets/toon/god_story_1.png',
+          'assets/toon/god_story_2.png',
+          'assets/toon/god_story_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/god_story_en_1.png',
+          'assets/toon/god_story_en_2.png',
+          'assets/toon/god_story_en_3.png',
+        ];
+      }
+    } else {
+      // 기본값 (아기 단계)
+      if (widget.isKo) {
+        return [
+          'assets/toon/baby_story_1.png',
+          'assets/toon/baby_story_2.png',
+          'assets/toon/baby_story_3.png',
+        ];
+      } else {
+        return [
+          'assets/toon/baby_story_en_1.png',
+          'assets/toon/baby_story_en_2.png',
+          'assets/toon/baby_story_en_3.png',
+        ];
+      }
+    }
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _pageController = PageController();
+    _fadeController = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    _fadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _fadeController,
+      curve: Curves.easeIn,
+    ));
+    _fadeController.forward();
+  }
+
+  @override
+  void dispose() {
+    _pageController.dispose();
+    _fadeController.dispose();
+    super.dispose();
+  }
+
+  void _onPageChanged(int index) {
+    setState(() {
+      _currentPage = index;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return FadeTransition(
+      opacity: _fadeAnimation,
+      child: Dialog(
+        backgroundColor: Colors.transparent,
+        insetPadding: EdgeInsets.zero,
+        child: Container(
+          width: MediaQuery.of(context).size.width,
+          height: MediaQuery.of(context).size.height,
+          color: Colors.black,
+          child: SafeArea(
+            child: Column(
+              children: [
+                // 헤더
+                Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          widget.isKo
+                              ? widget.story.titleKo
+                              : widget.story.titleEn,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                      // 페이지 인디케이터
+                      Text(
+                        '${_currentPage + 1}/${_imagePaths.length}',
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      // 닫기 버튼
+                      IconButton(
+                        icon: const Icon(
+                          Icons.close,
+                          color: Colors.white,
+                        ),
+                        onPressed: () => Navigator.of(context).pop(),
+                      ),
+                    ],
+                  ),
+                ),
+                // 웹툰 이미지 뷰어
+                Expanded(
+                  child: PageView.builder(
+                    controller: _pageController,
+                    onPageChanged: _onPageChanged,
+                    itemCount: _imagePaths.length,
+                    itemBuilder: (context, index) {
+                      return GestureDetector(
+                        onTap: () {
+                          // 탭으로도 다음 페이지 이동 가능
+                          if (index < _imagePaths.length - 1) {
+                            _pageController.nextPage(
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeInOut,
+                            );
+                          }
+                        },
+                        child: Container(
+                          margin: const EdgeInsets.symmetric(horizontal: 8),
+                          child: Image.asset(
+                            _imagePaths[index],
+                            fit: BoxFit.contain,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.image_not_supported,
+                                      color: Colors.white54,
+                                      size: 50,
+                                    ),
+                                    const SizedBox(height: 16),
+                                    Text(
+                                      widget.isKo
+                                          ? '이미지를 불러올 수 없습니다'
+                                          : 'Failed to load image',
+                                      style: const TextStyle(
+                                        color: Colors.white54,
+                                        fontSize: 16,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                // 하단 네비게이션
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      // 이전 버튼
+                      ElevatedButton.icon(
+                        onPressed: _currentPage > 0
+                            ? () {
+                                _pageController.previousPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
+                            : null,
+                        icon: const Icon(Icons.arrow_back),
+                        label: Text(
+                          widget.isKo ? '이전' : 'Previous',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.white.withOpacity(0.0),
+                          disabledForegroundColor: Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                      // 페이지 인디케이터 점
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: List.generate(
+                          _imagePaths.length,
+                          (index) => Container(
+                            margin: const EdgeInsets.symmetric(horizontal: 4),
+                            width: 8,
+                            height: 8,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              color: _currentPage == index
+                                  ? Colors.white
+                                  : Colors.white.withOpacity(0.3),
+                            ),
+                          ),
+                        ),
+                      ),
+                      // 다음 버튼
+                      ElevatedButton.icon(
+                        onPressed: _currentPage < _imagePaths.length - 1
+                            ? () {
+                                _pageController.nextPage(
+                                  duration: const Duration(milliseconds: 300),
+                                  curve: Curves.easeInOut,
+                                );
+                              }
+                            : null,
+                        icon: const Icon(Icons.arrow_forward),
+                        label: Text(
+                          widget.isKo ? '다음' : 'Next',
+                        ),
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.white.withOpacity(0.2),
+                          foregroundColor: Colors.white,
+                          disabledBackgroundColor: Colors.white.withOpacity(0.0),
+                          disabledForegroundColor: Colors.white.withOpacity(0.3),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }

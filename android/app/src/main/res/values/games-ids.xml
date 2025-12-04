@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Google Play Games Services App ID -->
+    <!-- Google Play Console > Play Games Services > 설정에서 확인 -->
+    <!-- 실제 앱 ID로 교체하세요 -->
+    
+    <!-- Leaderboard IDs -->
+    <!-- Google Play Console > Play Games Services > 리더보드에서 생성 후 ID 복사 -->
+    <!-- 현재는 모든 레벨이 같은 리더보드 사용 (실제 ID 적용됨) -->
+    <string name="leaderboard_level1" translatable="false">CgkI6rHltasIEAIQAQ</string>
+    <string name="leaderboard_level2" translatable="false">CgkI6rHltasIEAIQAQ</string>
+    <string name="leaderboard_level3" translatable="false">CgkI6rHltasIEAIQAQ</string>
+    <string name="leaderboard_level4" translatable="false">CgkI6rHltasIEAIQAQ</string>
+    <string name="leaderboard_level5" translatable="false">CgkI6rHltasIEAIQAQ</string>
+    
+    <!-- Achievement IDs (나중에 추가 가능) -->
+    <!-- <string name="achievement_first_win" translatable="false">CgkI...</string> -->
+</resources>
+

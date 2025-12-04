@@ -1,4 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <string name="app_name">카피바라 찾기</string>
+    <!-- Google Play Games APP ID -->
+    <!-- Google Play Console에서 생성한 실제 APP ID로 교체해야 합니다 (12자리 숫자) -->
+    <string name="app_id">286533441770</string>
 </resources>

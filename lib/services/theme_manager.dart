@@ -62,7 +62,7 @@ class ThemeItem {
 class ThemeManager {
   static const String _themesKey = 'purchased_themes';
   static const String _currentThemeKey = 'current_theme';
-  
+
   static final ThemeManager _instance = ThemeManager._internal();
   factory ThemeManager() => _instance;
   ThemeManager._internal();
@@ -106,6 +106,22 @@ class ThemeManager {
         price: 1000,
         isPurchased: false,
       ),
+      ThemeItem(
+        id: 'soccer',
+        name: '축구 테마',
+        nameEn: 'Soccer Theme',
+        imagePath: 'assets/theme/soccor.jpg',
+        price: 1200,
+        isPurchased: false,
+      ),
+      ThemeItem(
+        id: 'farm',
+        name: '농장 테마',
+        nameEn: 'Farm Theme',
+        imagePath: 'assets/theme/farm.jpg',
+        price: 1200,
+        isPurchased: false,
+      ),
     ];
   }
 
@@ -124,7 +140,7 @@ class ThemeManager {
           final Map<String, dynamic> safeJson = Map<String, dynamic>.from(json);
           return ThemeItem.fromJson(safeJson);
         }).toList();
-        
+
         // 저장된 테마를 최신 정의와 병합 (구매 정보는 유지)
         _themes = defaultThemes.map((defaultTheme) {
           final savedTheme = savedThemes.firstWhere(
@@ -142,7 +158,7 @@ class ThemeManager {
             isDefault: defaultTheme.isDefault,
           );
         }).toList();
-        
+
         // 업데이트된 테마 정보 저장
         await _saveThemes();
       } catch (e) {
@@ -227,4 +243,3 @@ class ThemeManager {
     await initialize();
   }
 }
-

@@ -55,6 +55,7 @@ class AdmobHandler {
   bool _isInterstitialAdLoaded = false;
   RewardedAd? _rewardedAd;
   bool _isRewardedAdLoaded = false;
+  bool _isInitialized = false; // 초기화 완료 여부
 
   // 지원되는 플랫폼인지 확인
   bool get _isSupported {
@@ -152,10 +153,16 @@ class AdmobHandler {
       return;
     }
 
+    // 이미 초기화되었으면 스킵
+    if (_isInitialized) {
+      print('AdMob: 이미 초기화됨 - 스킵');
+      return;
+    }
+
     try {
       print('AdMob: 초기화 시작...');
 
-      // MobileAds 초기화
+      // MobileAds 초기화 (이미 초기화되었으면 즉시 완료)
       await MobileAds.instance.initialize();
       print('AdMob: MobileAds 초기화 완료');
 
@@ -169,10 +176,13 @@ class AdmobHandler {
         ),
       );
       print('AdMob: RequestConfiguration 설정 완료');
+      _isInitialized = true;
+      print('AdMob: 초기화 완료 - 광고 로드 가능');
     } catch (e) {
       debugPrint('AdMob 초기화 실패: $e');
       isAdEnabled = false;
-      print('AdMob: 광고 비활성화됨');
+      _isInitialized = false;
+      print('AdMob: 광고 비활성화됨 - 초기화 실패: $e');
     }
   }
 
@@ -188,44 +198,39 @@ class AdmobHandler {
 
   // 배너 광고 위젯
   Widget getBannerAd() {
-    final placeholderHeight =
-        _currentBannerHeight ?? _bannerAd?.size.height.toDouble() ?? 50;
-
+    // 광고가 비활성화되었거나 로드되지 않았으면 아무것도 표시하지 않음
     if (!isAdEnabled) {
-      return _buildBannerPlaceholder(
-        height: placeholderHeight,
-        message: '광고 비활성화',
-      );
+      return const SizedBox.shrink();
     }
 
+    // 광고가 로드되지 않았으면 아무것도 표시하지 않음 (회색 영역 제거)
     if (_bannerAd == null) {
-      return _buildBannerPlaceholder(
-        height: placeholderHeight,
-        message: '광고 로딩 중...',
-      );
+      return const SizedBox.shrink();
     }
 
-    // 이미 위젯 트리에 있는 경우 플레이스홀더 반환
+    // 이미 위젯 트리에 있는 경우 아무것도 표시하지 않음
+    // 같은 BannerAd 인스턴스는 하나의 AdWidget에만 사용 가능
+    // 이는 AdMob SDK의 제약사항입니다
     if (_isBannerAdInWidgetTree) {
-      return _buildBannerPlaceholder(
-        height: placeholderHeight,
-        message: '광고 표시 중...',
-      );
+      return const SizedBox.shrink();
     }
 
     final bannerHeight = _bannerAd!.size.height.toDouble();
 
+    // 위젯 트리에 없는 경우에만 새로운 위젯 생성
     // 새로운 위젯 인스턴스를 생성하여 위젯 트리 충돌 방지
     // 고유한 키를 사용하여 위젯이 재사용되지 않도록 함
     return _BannerAdWidget(
-      key: const ValueKey('banner_ad_widget'), // 고정된 키 사용
+      key: ValueKey('banner_ad_${DateTime.now().millisecondsSinceEpoch}'), // 고유한 키 사용
       bannerAd: _bannerAd!,
       height: bannerHeight,
       width: _bannerAd!.size.width.toDouble(),
       onWidgetCreated: () {
+        // 위젯이 실제로 트리에 추가되었을 때 플래그 설정
         _isBannerAdInWidgetTree = true;
       },
       onWidgetDisposed: () {
+        // dispose 시 즉시 플래그 리셋
         _isBannerAdInWidgetTree = false;
       },
     );
@@ -253,7 +258,18 @@ class AdmobHandler {
 
   // 배너 광고 로드
   Future<void> loadBannerAd(BuildContext context) async {
+    if (!_isInitialized) {
+      print('AdMob: 초기화되지 않음 - 배너 광고 로드 시도 중...');
+      // 초기화되지 않았으면 초기화 시도
+      await initialize();
+      if (!_isInitialized) {
+        print('AdMob: 초기화 실패 - 배너 광고 로드 건너뜀');
+        return;
+      }
+    }
+    
     if (!isAdEnabled || !_isSupported || _isBannerLoading) {
+      print('AdMob: 배너 광고 로드 조건 불만족 - isAdEnabled: $isAdEnabled, _isSupported: $_isSupported, _isBannerLoading: $_isBannerLoading');
       return;
     }
 
@@ -281,12 +297,22 @@ class AdmobHandler {
 
       final adUnitId = await _bannerAdUnitId;
       print('AdMob: 배너 광고 로드 시작 - ID: $adUnitId');
+      
+      if (adUnitId.isEmpty) {
+        print('AdMob: 배너 광고 ID가 비어있음 - 로드 중단');
+        _isBannerLoading = false;
+        return;
+      }
 
       // 이전 광고가 위젯 트리에 있으면 먼저 제거
       if (_bannerAd != null) {
         _isBannerAdInWidgetTree = false;
+        await Future.delayed(const Duration(milliseconds: 100)); // 약간의 지연
         await _bannerAd?.dispose();
+        _bannerAd = null;
+        await Future.delayed(const Duration(milliseconds: 100)); // dispose 완료 대기
       }
+      
       _bannerAd = BannerAd(
         size: adaptiveSize,
         adUnitId: adUnitId,
@@ -306,6 +332,16 @@ class AdmobHandler {
             _isBannerLoading = false;
             _isBannerAdInWidgetTree = false;
             _notifyBannerStateChanged(); // 상태 변경 알림
+            
+            // 로드 실패 시 3초 후 재시도 (최대 1회)
+            if (error.code == 2) { // 네트워크 오류
+              print('AdMob: 3초 후 배너 광고 재시도');
+              Future.delayed(const Duration(seconds: 3), () {
+                if (!_isBannerLoading && _bannerAd == null) {
+                  _retryLoadBannerAd(context, adaptiveSize, adUnitId);
+                }
+              });
+            }
           },
         ),
         request: const AdRequest(),
@@ -322,30 +358,105 @@ class AdmobHandler {
     }
   }
 
+  // 배너 광고 재시도 로드 (내부 메서드)
+  Future<void> _retryLoadBannerAd(
+    BuildContext context,
+    AdSize adSize,
+    String adUnitId,
+  ) async {
+    if (_isBannerLoading || _bannerAd != null) {
+      return;
+    }
+
+    _isBannerLoading = true;
+    print('AdMob: 배너 광고 재시도 로드 시작');
+
+    try {
+      _bannerAd = BannerAd(
+        size: adSize,
+        adUnitId: adUnitId,
+        listener: BannerAdListener(
+          onAdLoaded: (ad) {
+            print('AdMob: 배너 광고 재시도 로드 완료');
+            _isBannerLoading = false;
+            _isBannerAdInWidgetTree = false;
+            _notifyBannerStateChanged();
+          },
+          onAdFailedToLoad: (ad, error) {
+            print('AdMob: 배너 광고 재시도 로드 실패: $error');
+            ad.dispose();
+            _bannerAd = null;
+            _isBannerLoading = false;
+            _isBannerAdInWidgetTree = false;
+            _notifyBannerStateChanged();
+          },
+        ),
+        request: const AdRequest(),
+      );
+
+      _bannerAd?.load();
+    } catch (e) {
+      debugPrint('배너 광고 재시도 로드 중 오류: $e');
+      _bannerAd = null;
+      _isBannerLoading = false;
+      _isBannerAdInWidgetTree = false;
+      _notifyBannerStateChanged();
+    }
+  }
+
   // 전면 광고 로드
   Future<void> loadInterstitialAd() async {
-    if (!isAdEnabled) return;
+    if (!_isInitialized) {
+      print('AdMob: 초기화되지 않음 - 전면 광고 로드 시도 중...');
+      // 초기화되지 않았으면 초기화 시도
+      await initialize();
+      if (!_isInitialized) {
+        print('AdMob: 초기화 실패 - 전면 광고 로드 건너뜀');
+        return;
+      }
+    }
+    
+    if (!isAdEnabled) {
+      print('AdMob: 광고 비활성화됨 - 전면 광고 로드 건너뜀');
+      return;
+    }
 
-    final adUnitId = await _interstitialAdUnitId;
-    final completer = Completer<void>();
+    try {
+      final adUnitId = await _interstitialAdUnitId;
+      print('AdMob: 전면 광고 로드 시작 - ID: $adUnitId');
+      
+      if (adUnitId.isEmpty) {
+        print('AdMob: 전면 광고 ID가 비어있음 - 로드 중단');
+        return;
+      }
+      
+      final completer = Completer<void>();
 
-    await InterstitialAd.load(
-      adUnitId: adUnitId,
-      request: const AdRequest(),
-      adLoadCallback: InterstitialAdLoadCallback(
-        onAdLoaded: (ad) {
-          _interstitialAd = ad;
-          _isInterstitialAdLoaded = true;
-          completer.complete();
-        },
-        onAdFailedToLoad: (error) {
-          _isInterstitialAdLoaded = false;
-          completer.completeError(error);
-        },
-      ),
-    );
+      await InterstitialAd.load(
+        adUnitId: adUnitId,
+        request: const AdRequest(),
+        adLoadCallback: InterstitialAdLoadCallback(
+          onAdLoaded: (ad) {
+            _interstitialAd = ad;
+            _isInterstitialAdLoaded = true;
+            print('AdMob: 전면 광고 로드 완료');
+            completer.complete();
+          },
+          onAdFailedToLoad: (error) {
+            _isInterstitialAdLoaded = false;
+            print('AdMob: 전면 광고 로드 실패 - Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}');
+            debugPrint('전면 광고 로드 실패 상세: $error');
+            completer.completeError(error);
+          },
+        ),
+      );
 
-    return completer.future;
+      return completer.future;
+    } catch (e) {
+      print('AdMob: 전면 광고 로드 중 예외 발생: $e');
+      debugPrint('전면 광고 로드 예외 상세: $e');
+      rethrow;
+    }
   }
 
   // 다음 광고 미리 로드 (대기하지 않음)
@@ -372,7 +483,22 @@ class AdmobHandler {
 
   // 전면 광고 표시
   Future<void> showInterstitialAd() async {
-    if (!isAdEnabled || !_isInterstitialAdLoaded) {
+    if (!_isInitialized) {
+      print('AdMob: 초기화되지 않음 - 전면 광고 표시 건너뜀');
+      // 초기화되지 않았으면 초기화 시도
+      await initialize();
+      if (!_isInitialized) {
+        return;
+      }
+    }
+    
+    if (!isAdEnabled) {
+      print('AdMob: 광고 비활성화됨 - 전면 광고 표시 건너뜀');
+      return;
+    }
+    
+    if (!_isInterstitialAdLoaded) {
+      print('AdMob: 전면 광고가 로드되지 않음 - 표시 건너뜀');
       return;
     }
 
@@ -396,30 +522,58 @@ class AdmobHandler {
 
   // 보상형 광고 로드
   Future<void> loadRewardedAd() async {
-    if (!isAdEnabled) return;
+    if (!_isInitialized) {
+      print('AdMob: 초기화되지 않음 - 보상형 광고 로드 시도 중...');
+      // 초기화되지 않았으면 초기화 시도
+      await initialize();
+      if (!_isInitialized) {
+        print('AdMob: 초기화 실패 - 보상형 광고 로드 건너뜀');
+        return;
+      }
+    }
+    
+    if (!isAdEnabled) {
+      print('AdMob: 광고 비활성화됨 - 보상형 광고 로드 건너뜀');
+      return;
+    }
+    
+    print('AdMob: 보상형 광고 로드 시작...');
+    try {
+      final adUnitId = await _rewardedAdUnitId;
+      print('AdMob: 보상형 광고 ID: $adUnitId');
+      
+      if (adUnitId.isEmpty) {
+        print('AdMob: 보상형 광고 ID가 비어있음 - 로드 중단');
+        return;
+      }
+      
+      final completer = Completer<void>();
 
-    final adUnitId = await _rewardedAdUnitId;
-    final completer = Completer<void>();
+      await RewardedAd.load(
+        adUnitId: adUnitId,
+        request: const AdRequest(),
+        rewardedAdLoadCallback: RewardedAdLoadCallback(
+          onAdLoaded: (ad) {
+            _rewardedAd = ad;
+            _isRewardedAdLoaded = true;
+            print('AdMob: 보상형 광고 로드 완료');
+            completer.complete();
+          },
+          onAdFailedToLoad: (error) {
+            _isRewardedAdLoaded = false;
+            print('AdMob: 보상형 광고 로드 실패 - Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}');
+            debugPrint('보상형 광고 로드 실패 상세: $error');
+            completer.completeError(error);
+          },
+        ),
+      );
 
-    await RewardedAd.load(
-      adUnitId: adUnitId,
-      request: const AdRequest(),
-      rewardedAdLoadCallback: RewardedAdLoadCallback(
-        onAdLoaded: (ad) {
-          _rewardedAd = ad;
-          _isRewardedAdLoaded = true;
-          print('AdMob: 보상형 광고 로드 완료');
-          completer.complete();
-        },
-        onAdFailedToLoad: (error) {
-          _isRewardedAdLoaded = false;
-          print('AdMob: 보상형 광고 로드 실패: $error');
-          completer.completeError(error);
-        },
-      ),
-    );
-
-    return completer.future;
+      return completer.future;
+    } catch (e) {
+      print('AdMob: 보상형 광고 로드 중 예외 발생: $e');
+      debugPrint('보상형 광고 로드 예외 상세: $e');
+      rethrow;
+    }
   }
 
   // 다음 보상형 광고 미리 로드 (대기하지 않음)
@@ -451,7 +605,21 @@ class AdmobHandler {
     Function()? onAdDismissed,
     Function(Ad)? onAdFailedToShow,
   }) async {
-    if (!isAdEnabled || !_isRewardedAdLoaded) {
+    if (!_isInitialized) {
+      print('AdMob: 초기화되지 않음 - 보상형 광고 표시 건너뜀');
+      // 초기화되지 않았으면 초기화 시도
+      await initialize();
+      if (!_isInitialized) {
+        return;
+      }
+    }
+    
+    if (!isAdEnabled) {
+      print('AdMob: 광고 비활성화됨 - 보상형 광고 표시 건너뜀');
+      return;
+    }
+    
+    if (!_isRewardedAdLoaded) {
       print('AdMob: 보상형 광고가 로드되지 않았습니다.');
       return;
     }
@@ -536,18 +704,15 @@ class _BannerAdWidgetState extends State<_BannerAdWidget> {
   @override
   void initState() {
     super.initState();
-    // 위젯이 생성되었음을 알림
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted && !_isDisposed) {
-        widget.onWidgetCreated();
-      }
-    });
+    // 위젯이 생성되었음을 즉시 알림
+    // initState에서 호출하여 위젯이 트리에 추가되는 것을 확실히 표시
+    widget.onWidgetCreated();
   }
 
   @override
   void dispose() {
     _isDisposed = true;
-    // 위젯이 dispose되었음을 알림
+    // 위젯이 dispose되었음을 즉시 알림
     widget.onWidgetDisposed();
     super.dispose();
   }

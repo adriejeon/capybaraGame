@@ -10,6 +10,7 @@ import 'ads/admob_handler.dart';
 import 'state/locale_state.dart';
 import 'l10n/app_localizations.dart';
 import 'data/home_character_manager.dart';
+import 'services/game_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -38,6 +39,9 @@ void main() async {
 
   // HomeCharacterManager 초기화
   await HomeCharacterManager().initialize();
+
+  // 게임 서비스 (리더보드) 로그인
+  await GameService.signIn();
 
   runApp(CapybaraGameApp(localeState: localeState));
 }
