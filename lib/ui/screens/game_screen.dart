@@ -874,13 +874,13 @@ class _GameScreenState extends State<GameScreen>
             children: [
               // 코인 이미지
               Image.asset(
-                'assets/images/coin-2.png',
+                'assets/images/coin-2.webp',
                 width: 120,
                 height: 120,
                 fit: BoxFit.contain,
                 errorBuilder: (context, error, stackTrace) {
                   return Image.asset(
-                    'assets/images/coin.png',
+                    'assets/images/coin.webp',
                     width: 120,
                     height: 120,
                     fit: BoxFit.contain,
@@ -992,7 +992,7 @@ class _GameScreenState extends State<GameScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset(
-                'assets/images/gameover.png',
+                'assets/images/gameover.webp',
                 width: 120,
                 height: 120,
                 fit: BoxFit.contain,
@@ -1334,7 +1334,7 @@ class _GameScreenState extends State<GameScreen>
 
               // 아이콘 이미지
               Image.asset(
-                'assets/images/glasses2.png',
+                'assets/images/glasses2.webp',
                 width: 100,
                 height: 100,
                 fit: BoxFit.contain,
@@ -1708,7 +1708,7 @@ class _GameScreenState extends State<GameScreen>
             child: ClipRRect(
               borderRadius: BorderRadius.circular(finalButtonSize * 0.24),
               child: Image.asset(
-                'assets/images/glasses.png',
+                'assets/images/glasses.webp',
                 fit: BoxFit.contain,
                 width: finalButtonSize,
                 height: finalButtonSize,
@@ -2050,7 +2050,7 @@ class _CardDrawDialogState extends State<_CardDrawDialog>
                                           ),
                                   )
                                 : Image.asset(
-                                    'assets/capybara/collection/gift_box.jpg',
+                                    'assets/capybara/collection/gift_box.webp',
                                     fit: BoxFit.cover,
                                     errorBuilder: (context, error, stackTrace) {
                                       return Container(
@@ -2260,7 +2260,7 @@ class _GiftBoxDialogState extends State<_GiftBoxDialog>
                               child: ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: Image.asset(
-                                  'assets/capybara/collection/gift_box.jpg',
+                                  'assets/capybara/collection/gift_box.webp',
                                   fit: BoxFit.cover,
                                   errorBuilder: (context, error, stackTrace) {
                                     return Container(

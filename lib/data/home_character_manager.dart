@@ -35,7 +35,7 @@ class HomeCharacterManager {
   }
 
   /// 컬렉션 이미지 경로를 홈 캐릭터 ID로 변환
-  /// 예: 'assets/capybara/collection/easy1.jpg' -> 'easy1'
+  /// 예: 'assets/capybara/collection/easy1.webp' -> 'easy1'
   String convertCollectionPathToCharacterId(String collectionImagePath) {
     // 파일명 추출 (예: 'easy1.jpg')
     final fileName = collectionImagePath.split('/').last;
@@ -49,7 +49,7 @@ class HomeCharacterManager {
 
   /// 홈 캐릭터 이미지 경로 반환
   String _getHomeCharacterPath(String characterId) {
-    return 'assets/home_capybara/$characterId.png';
+    return 'assets/home_capybara/$characterId.webp';
   }
 
   /// 홈 캐릭터 초기화 (디버깅용)

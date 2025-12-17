@@ -115,7 +115,7 @@ class _ShopScreenState extends State<ShopScreen>
               child: Row(
                 children: [
                   Image.asset(
-                    'assets/images/coin-2.png',
+                    'assets/images/coin-2.webp',
                     width: 24,
                     height: 24,
                     errorBuilder: (context, error, stackTrace) {
@@ -395,7 +395,7 @@ class _ShopScreenState extends State<ShopScreen>
                         Row(
                           children: [
                             Image.asset(
-                              'assets/images/coin-2.png',
+                              'assets/images/coin-2.webp',
                               width: 18,
                               height: 18,
                               errorBuilder: (context, error, stackTrace) {
@@ -528,7 +528,7 @@ class _ShopScreenState extends State<ShopScreen>
               mainAxisAlignment: MainAxisAlignment.center,
               children: [
                 Image.asset(
-                  'assets/images/coin-2.png',
+                  'assets/images/coin-2.webp',
                   width: 24,
                   height: 24,
                   errorBuilder: (context, error, stackTrace) {

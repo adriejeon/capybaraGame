@@ -596,7 +596,7 @@ class _HomeScreenState extends State<HomeScreen>
           image: DecorationImage(
             image: AssetImage(
               _currentThemeImagePath.isEmpty
-                  ? 'assets/images/main.jpg'
+                  ? 'assets/images/main.webp'
                   : _currentThemeImagePath,
             ),
             fit: BoxFit.cover,
@@ -722,7 +722,7 @@ class _HomeScreenState extends State<HomeScreen>
             mainAxisSize: MainAxisSize.min,
             children: [
               Image.asset(
-                'assets/images/coin.png',
+                'assets/images/coin.webp',
                 width: 34,
                 height: 34,
                 errorBuilder: (context, error, stackTrace) {
@@ -766,8 +766,8 @@ class _HomeScreenState extends State<HomeScreen>
         builder: (context, localeState, child) {
           final isEnglish = localeState.currentLocale.languageCode == 'en';
           final imagePath = isEnglish
-              ? 'assets/images/mission-en.png'
-              : 'assets/images/mission.png';
+              ? 'assets/images/mission-en.webp'
+              : 'assets/images/mission.webp';
 
           return Container(
             width: buttonSize.width,
@@ -808,8 +808,8 @@ class _HomeScreenState extends State<HomeScreen>
         builder: (context, localeState, child) {
           final isEnglish = localeState.currentLocale.languageCode == 'en';
           final imagePath = isEnglish
-              ? 'assets/images/collection-en.png'
-              : 'assets/images/collection.png';
+              ? 'assets/images/collection-en.webp'
+              : 'assets/images/collection.webp';
 
           return Container(
             width: buttonSize.width,
@@ -850,8 +850,8 @@ class _HomeScreenState extends State<HomeScreen>
         builder: (context, localeState, child) {
           final isEnglish = localeState.currentLocale.languageCode == 'en';
           final imagePath = isEnglish
-              ? 'assets/images/shop-en.png'
-              : 'assets/images/shop.png';
+              ? 'assets/images/shop-en.webp'
+              : 'assets/images/shop.webp';
 
           return Container(
             width: buttonSize.width,
@@ -892,8 +892,8 @@ class _HomeScreenState extends State<HomeScreen>
         builder: (context, localeState, child) {
           final isEnglish = localeState.currentLocale.languageCode == 'en';
           final imagePath = isEnglish
-              ? 'assets/images/ranking-en.png'
-              : 'assets/images/ranking.png';
+              ? 'assets/images/ranking-en.webp'
+              : 'assets/images/ranking.webp';
 
           return Container(
             width: buttonSize.width,
@@ -937,7 +937,7 @@ class _HomeScreenState extends State<HomeScreen>
     return GestureDetector(
       onTap: () => _showSoundSettings(context),
       child: Image.asset(
-        'assets/images/button-setting.png',
+        'assets/images/button-setting.webp',
         width: buttonWidth,
         height: buttonHeight,
         fit: BoxFit.contain,
@@ -1047,11 +1047,11 @@ class _HomeScreenState extends State<HomeScreen>
     // 이미지 경로 결정
     final imagePath = isBack
         ? (enabled
-            ? 'assets/images/arrow-back-active.png'
-            : 'assets/images/arrow-back-disabled.png')
+            ? 'assets/images/arrow-back-active.webp'
+            : 'assets/images/arrow-back-disabled.webp')
         : (enabled
-            ? 'assets/images/arrow-front-active.png'
-            : 'assets/images/arrow-front-disabled.png');
+            ? 'assets/images/arrow-front-active.webp'
+            : 'assets/images/arrow-front-disabled.webp');
 
     return GestureDetector(
       onTap: enabled ? onTap : null,
@@ -1114,19 +1114,19 @@ class _HomeScreenState extends State<HomeScreen>
         String imagePath;
         switch (difficulty) {
           case GameDifficulty.level1:
-            imagePath = 'assets/images/button-level1.png';
+            imagePath = 'assets/images/button-level1.webp';
             break;
           case GameDifficulty.level2:
-            imagePath = 'assets/images/button-level2.png';
+            imagePath = 'assets/images/button-level2.webp';
             break;
           case GameDifficulty.level3:
-            imagePath = 'assets/images/button-level3.png';
+            imagePath = 'assets/images/button-level3.webp';
             break;
           case GameDifficulty.level4:
-            imagePath = 'assets/images/button-level4.png';
+            imagePath = 'assets/images/button-level4.webp';
             break;
           case GameDifficulty.level5:
-            imagePath = 'assets/images/button-level5.png';
+            imagePath = 'assets/images/button-level5.webp';
             break;
         }
 
@@ -1468,7 +1468,7 @@ class _HomeScreenState extends State<HomeScreen>
                 errorBuilder: (context, error, stackTrace) {
                   // 이미지 로드 실패 시 기본 이미지 표시
                   return Image.asset(
-                    'assets/home_capybara/easy1.png',
+                    'assets/home_capybara/easy1.webp',
                     fit: BoxFit.contain,
                     errorBuilder: (_, __, ___) {
                       return Container(

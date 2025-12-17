@@ -316,7 +316,7 @@ class _DailyMissionModalState extends State<DailyMissionModal> {
                           Row(
                             children: [
                               Image.asset(
-                                'assets/images/coin.png',
+                                'assets/images/coin.webp',
                                 width: 18,
                                 height: 18,
                                 errorBuilder: (context, error, stackTrace) {
@@ -361,7 +361,7 @@ class _DailyMissionModalState extends State<DailyMissionModal> {
             Positioned.fill(
               child: Center(
                 child: Image.asset(
-                  'assets/images/mission_complete.png',
+                  'assets/images/mission_complete.webp',
                   width: 120,
                   height: 120,
                   fit: BoxFit.contain,

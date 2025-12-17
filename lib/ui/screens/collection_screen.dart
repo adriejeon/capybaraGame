@@ -554,7 +554,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                 child: Image.asset(
                   item.isUnlocked
                       ? item.imagePath
-                      : 'assets/images/null-card.png',
+                      : 'assets/images/null-card.webp',
                   fit: BoxFit.cover,
                   errorBuilder: (context, error, stackTrace) {
                     return Container(
@@ -678,7 +678,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                   child: Image.asset(
                     item.isUnlocked
                         ? item.imagePath
-                        : 'assets/images/null-card.png',
+                        : 'assets/images/null-card.webp',
                     fit: BoxFit.cover,
                     errorBuilder: (context, error, stackTrace) {
                       return Container(
@@ -981,7 +981,7 @@ class _CollectionScreenState extends State<CollectionScreen>
                         child: Image.asset(
                           card.isUnlocked
                               ? card.imagePath
-                              : 'assets/images/null-card.png',
+                              : 'assets/images/null-card.webp',
                           fit: BoxFit.cover,
                           errorBuilder: (context, error, stackTrace) {
                             return Container(
@@ -1060,135 +1060,135 @@ class _StoryComicModalState extends State<_StoryComicModal>
       // 아기 단계 - 에피소드 1 (걸음마 연습)
       if (widget.isKo) {
         return [
-          'assets/toon/baby_story_1.png',
-          'assets/toon/baby_story_2.png',
-          'assets/toon/baby_story_3.png',
+          'assets/toon/baby_story_1.webp',
+          'assets/toon/baby_story_2.webp',
+          'assets/toon/baby_story_3.webp',
         ];
       } else {
         return [
-          'assets/toon/baby_story_en_1.png',
-          'assets/toon/baby_story_en_2.png',
-          'assets/toon/baby_story_en_3.png',
+          'assets/toon/baby_story_en_1.webp',
+          'assets/toon/baby_story_en_2.webp',
+          'assets/toon/baby_story_en_3.webp',
         ];
       }
     } else if (widget.story.id == 7) {
       // 아기 단계 - 에피소드 2 (엄마처럼 하고 싶어!)
       if (widget.isKo) {
         return [
-          'assets/toon/baby_story_2_1.png',
-          'assets/toon/baby_story_2_2.png',
-          'assets/toon/baby_story_2_3.png',
+          'assets/toon/baby_story_2_1.webp',
+          'assets/toon/baby_story_2_2.webp',
+          'assets/toon/baby_story_2_3.webp',
         ];
       } else {
         return [
-          'assets/toon/baby_story_2_en_1.png',
-          'assets/toon/baby_story_2_en_2.png',
-          'assets/toon/baby_story_2_en_3.png',
+          'assets/toon/baby_story_2_en_1.webp',
+          'assets/toon/baby_story_2_en_2.webp',
+          'assets/toon/baby_story_2_en_3.webp',
         ];
       }
     } else if (widget.story.id == 2) {
       // 어린이 단계 - 에피소드 1 (친구가 좋아)
       if (widget.isKo) {
         return [
-          'assets/toon/child_story_1.png',
-          'assets/toon/child_story_2.png',
-          'assets/toon/child_story_3.png',
+          'assets/toon/child_story_1.webp',
+          'assets/toon/child_story_2.webp',
+          'assets/toon/child_story_3.webp',
         ];
       } else {
         return [
-          'assets/toon/child_story_en_1.png',
-          'assets/toon/child_story_en_2.png',
-          'assets/toon/child_story_en_3.png',
+          'assets/toon/child_story_en_1.webp',
+          'assets/toon/child_story_en_2.webp',
+          'assets/toon/child_story_en_3.webp',
         ];
       }
     } else if (widget.story.id == 8) {
       // 어린이 단계 - 에피소드 2 (첫 이별)
       if (widget.isKo) {
         return [
-          'assets/toon/child_story_2_1.png',
-          'assets/toon/child_story_2_2.png',
-          'assets/toon/child_story_2_3.png',
+          'assets/toon/child_story_2_1.webp',
+          'assets/toon/child_story_2_2.webp',
+          'assets/toon/child_story_2_3.webp',
         ];
       } else {
         return [
-          'assets/toon/child_story_2_en_1.png',
-          'assets/toon/child_story_2_en_2.png',
-          'assets/toon/child_story_2_en_3.png',
+          'assets/toon/child_story_2_en_1.webp',
+          'assets/toon/child_story_2_en_2.webp',
+          'assets/toon/child_story_2_en_3.webp',
         ];
       }
     } else if (widget.story.id == 3) {
       // 청소년 단계 - 에피소드 1 (첫 사랑)
       if (widget.isKo) {
         return [
-          'assets/toon/teen_story_1.png',
-          'assets/toon/teen_story_2.png',
-          'assets/toon/teen_story_3.png',
+          'assets/toon/teen_story_1.webp',
+          'assets/toon/teen_story_2.webp',
+          'assets/toon/teen_story_3.webp',
         ];
       } else {
         return [
-          'assets/toon/teen_story_en_1.png',
-          'assets/toon/teen_story_en_2.png',
-          'assets/toon/teen_story_en_3.png',
+          'assets/toon/teen_story_en_1.webp',
+          'assets/toon/teen_story_en_2.webp',
+          'assets/toon/teen_story_en_3.webp',
         ];
       }
     } else if (widget.story.id == 9) {
       // 청소년 단계 - 에피소드 2 (나만의 감성)
       if (widget.isKo) {
         return [
-          'assets/toon/teen_story_2_1.png',
-          'assets/toon/teen_story_2_2.png',
-          'assets/toon/teen_story_2_3.png',
+          'assets/toon/teen_story_2_1.webp',
+          'assets/toon/teen_story_2_2.webp',
+          'assets/toon/teen_story_2_3.webp',
         ];
       } else {
         return [
-          'assets/toon/teen_story_2_en_1.png',
-          'assets/toon/teen_story_2_en_2.png',
-          'assets/toon/teen_story_2_en_3.png',
+          'assets/toon/teen_story_2_en_1.webp',
+          'assets/toon/teen_story_2_en_2.webp',
+          'assets/toon/teen_story_2_en_3.webp',
         ];
       }
     } else if (widget.story.id == 4) {
       // 어른 단계
       if (widget.isKo) {
         return [
-          'assets/toon/adult_story_1.png',
-          'assets/toon/adult_story_2.png',
-          'assets/toon/adult_story_3.png',
+          'assets/toon/adult_story_1.webp',
+          'assets/toon/adult_story_2.webp',
+          'assets/toon/adult_story_3.webp',
         ];
       } else {
         return [
-          'assets/toon/adult_story_en_1.png',
-          'assets/toon/adult_story_en_2.png',
-          'assets/toon/adult_story_en_3.png',
+          'assets/toon/adult_story_en_1.webp',
+          'assets/toon/adult_story_en_2.webp',
+          'assets/toon/adult_story_en_3.webp',
         ];
       }
     } else if (widget.story.id == 5) {
       // 신의 경지 단계
       if (widget.isKo) {
         return [
-          'assets/toon/god_story_1.png',
-          'assets/toon/god_story_2.png',
-          'assets/toon/god_story_3.png',
+          'assets/toon/god_story_1.webp',
+          'assets/toon/god_story_2.webp',
+          'assets/toon/god_story_3.webp',
         ];
       } else {
         return [
-          'assets/toon/god_story_en_1.png',
-          'assets/toon/god_story_en_2.png',
-          'assets/toon/god_story_en_3.png',
+          'assets/toon/god_story_en_1.webp',
+          'assets/toon/god_story_en_2.webp',
+          'assets/toon/god_story_en_3.webp',
         ];
       }
     } else {
       // 기본값 (아기 단계)
       if (widget.isKo) {
         return [
-          'assets/toon/baby_story_1.png',
-          'assets/toon/baby_story_2.png',
-          'assets/toon/baby_story_3.png',
+          'assets/toon/baby_story_1.webp',
+          'assets/toon/baby_story_2.webp',
+          'assets/toon/baby_story_3.webp',
         ];
       } else {
         return [
-          'assets/toon/baby_story_en_1.png',
-          'assets/toon/baby_story_en_2.png',
-          'assets/toon/baby_story_en_3.png',
+          'assets/toon/baby_story_en_1.webp',
+          'assets/toon/baby_story_en_2.webp',
+          'assets/toon/baby_story_en_3.webp',
         ];
       }
     }

@@ -148,7 +148,7 @@ class CollectionManager {
   static const String _collectionVersionKey = 'collection_version';
   static const int _currentCollectionVersion = 5; // 버전 5: basic과 normal을 20개로 확장
   static const String _defaultImagePath =
-      'assets/capybara/collection/collection.jpg';
+      'assets/capybara/collection/collection.webp';
 
   static final CollectionManager _instance = CollectionManager._internal();
   factory CollectionManager() => _instance;
@@ -1658,31 +1658,31 @@ class CollectionManager {
       case GameDifficulty.level1:
         // 아기 단계 - easy1-20 사용 (전체 20개)
         for (int i = 1; i <= 20; i++) {
-          cards.add('assets/capybara/collection/easy$i.jpg');
+          cards.add('assets/capybara/collection/easy$i.webp');
         }
         break;
       case GameDifficulty.level2:
         // 어린이 단계 - basic1-20 사용 (전체 20개)
         for (int i = 1; i <= 20; i++) {
-          cards.add('assets/capybara/collection/basic$i.jpg');
+          cards.add('assets/capybara/collection/basic$i.webp');
         }
         break;
       case GameDifficulty.level3:
         // 청소년 단계 - normal1-20 사용 (전체 20개)
         for (int i = 1; i <= 20; i++) {
-          cards.add('assets/capybara/collection/normal$i.jpg');
+          cards.add('assets/capybara/collection/normal$i.webp');
         }
         break;
       case GameDifficulty.level4:
         // 어른 단계 - advanced1-10 사용 (전체 10개)
         for (int i = 1; i <= 10; i++) {
-          cards.add('assets/capybara/collection/advanced$i.jpg');
+          cards.add('assets/capybara/collection/advanced$i.webp');
         }
         break;
       case GameDifficulty.level5:
         // 신의 경지 - hard1-10만 사용 (10개)
         for (int i = 1; i <= 10; i++) {
-          cards.add('assets/capybara/collection/hard$i.jpg');
+          cards.add('assets/capybara/collection/hard$i.webp');
         }
         break;
     }
