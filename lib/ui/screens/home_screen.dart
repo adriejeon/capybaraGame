@@ -11,6 +11,9 @@ import 'package:vibration/vibration.dart';
 import '../../utils/constants.dart';
 import 'game_screen.dart';
 import 'collection_screen.dart';
+import 'spot_difference_screen.dart';
+import 'gacha_screen.dart';
+import '../../data/ticket_manager.dart';
 import 'shop_screen.dart';
 import '../widgets/sound_settings_dialog.dart';
 import '../widgets/daily_mission_modal.dart';
@@ -35,7 +38,9 @@ class _HomeScreenState extends State<HomeScreen>
   final AdmobHandler _adMobHandler = AdmobHandler();
   final HomeCharacterManager _homeCharacterManager = HomeCharacterManager();
   final ThemeManager _themeManager = ThemeManager();
+  final TicketManager _ticketManager = TicketManager();
   int _currentLevelIndex = 0; // 현재 선택된 레벨 인덱스 (0~4)
+  int _currentTickets = 0; // 현재 보유 뽑기권
   String _currentThemeImagePath = ''; // 현재 테마 이미지 경로
   AnimationController? _bounceController;
   Animation<double>? _bounceAnimation;
@@ -253,9 +258,10 @@ class _HomeScreenState extends State<HomeScreen>
     // 현재 캐릭터 ID 저장
     _lastCharacterId = _homeCharacterManager.currentCharacterId;
 
-    // 코인 및 테마 로드
+    // 코인, 테마, 뽑기권 로드
     _loadCoins();
     _loadTheme();
+    _loadTickets();
 
     // 전면 광고 미리 로드 (즉시 로드)
     Future.delayed(const Duration(milliseconds: 0), () async {
@@ -327,6 +333,16 @@ class _HomeScreenState extends State<HomeScreen>
     if (mounted) {
       setState(() {
         _currentThemeImagePath = _themeManager.currentTheme.imagePath;
+      });
+    }
+  }
+
+  /// 뽑기권 로드
+  Future<void> _loadTickets() async {
+    await _ticketManager.initialize();
+    if (mounted) {
+      setState(() {
+        _currentTickets = _ticketManager.ticketCount;
       });
     }
   }
@@ -606,7 +622,7 @@ class _HomeScreenState extends State<HomeScreen>
         child: SafeArea(
           child: Column(
             children: [
-              // 상단 영역 (코인 + 설정)
+              // 상단 영역 (코인 + 뽑기통 + 설정)
               Padding(
                 padding:
                     const EdgeInsets.only(top: 8.0, left: 16.0, right: 16.0),
@@ -616,6 +632,8 @@ class _HomeScreenState extends State<HomeScreen>
                   children: [
                     // 코인 표시 (왼쪽)
                     _buildCoinDisplay(context),
+                    // 뽑기통 버튼 (중앙)
+                    _buildGachaButton(context),
                     // 설정 버튼 (오른쪽)
                     _buildSettingsButton(context),
                   ],
@@ -754,6 +772,115 @@ class _HomeScreenState extends State<HomeScreen>
         ),
       ),
     );
+  }
+
+  /// 뽑기통 버튼 위젯 (상단 중앙)
+  Widget _buildGachaButton(BuildContext context) {
+    final borderRadius = BorderRadius.circular(24);
+
+    return GestureDetector(
+      onTap: () => _openGacha(context),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: borderRadius,
+              border: Border.all(
+                color: Colors.orange.withOpacity(0.85),
+                width: 2,
+              ),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.orange.withOpacity(0.35),
+                  Colors.orange.withOpacity(0.15),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.orange.withOpacity(0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
+              ],
+            ),
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // 뽑기통 아이콘 (임시)
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[500],
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: const Icon(
+                    Icons.all_inbox,
+                    color: Colors.white,
+                    size: 20,
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Text(
+                      '뽑기통',
+                      style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                    Text(
+                      '$_currentTickets장',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        shadows: [
+                          Shadow(
+                            color: Colors.black26,
+                            offset: Offset(0, 1),
+                            blurRadius: 2,
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 뽑기통 화면 열기
+  void _openGacha(BuildContext context) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const GachaScreen(),
+      ),
+    );
+
+    // 뽑기통 화면에서 돌아온 후 뽑기권 리로드
+    await _loadTickets();
   }
 
   /// 일일 미션 버튼
@@ -1198,14 +1325,175 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 게임 시작
+  /// 게임 시작 - 게임 종류 선택 모달 표시
   void _startGame(BuildContext context, GameDifficulty difficulty) async {
-    // 게임 횟수 증가
-    await GameCounter.incrementGameCount();
+    // 게임 종류 선택 모달 표시
+    _showGameTypeSelectionModal(context, difficulty);
+  }
 
-    print('홈 화면에서 게임 시작 - 광고 없이 바로 시작');
-    // 홈 화면에서 게임 시작 시에는 광고 없이 바로 시작
-    _navigateToGame(context, difficulty);
+  /// 게임 종류 선택 모달
+  void _showGameTypeSelectionModal(
+      BuildContext context, GameDifficulty difficulty) {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    showDialog(
+      context: context,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(24),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFE8F4F8), Color(0xFFD6EBF5)],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: const Color(0xFF4A90E2), width: 3),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 타이틀
+              Text(
+                isKorean ? '게임 선택' : 'Select Game',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A90E2),
+                ),
+              ),
+              const SizedBox(height: 24),
+
+              // 카드 짝 맞추기 버튼
+              _buildGameTypeButton(
+                context: context,
+                icon: Icons.grid_view_rounded,
+                title: isKorean ? '동일한 카드 짝 맞추기' : 'Card Matching',
+                subtitle: isKorean ? '같은 카드를 찾아 짝을 맞추세요' : 'Find matching cards',
+                color: const Color(0xFF4A90E2),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await GameCounter.incrementGameCount();
+                  _navigateToGame(context, difficulty);
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // 틀린그림찾기 버튼
+              _buildGameTypeButton(
+                context: context,
+                icon: Icons.search_rounded,
+                title: isKorean ? '틀린그림 찾기' : 'Spot the Difference',
+                subtitle: isKorean ? '두 그림의 다른 부분을 찾으세요' : 'Find differences between images',
+                color: const Color(0xFFFF9800),
+                onTap: () async {
+                  Navigator.of(context).pop();
+                  await GameCounter.incrementGameCount();
+                  _navigateToSpotDifference(context, difficulty);
+                },
+              ),
+              const SizedBox(height: 16),
+
+              // 취소 버튼
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  isKorean ? '취소' : 'Cancel',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 게임 종류 버튼 위젯
+  Widget _buildGameTypeButton({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(icon, color: color, size: 32),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    subtitle,
+                    style: TextStyle(
+                      fontSize: 12,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: color, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 틀린그림찾기 게임 화면으로 이동
+  void _navigateToSpotDifference(
+      BuildContext context, GameDifficulty difficulty) async {
+    await Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SpotDifferenceScreen(difficulty: difficulty),
+      ),
+    );
+
+    // 게임 화면에서 돌아온 후 코인, 뽑기권 리로드
+    await _loadCoins();
+    await _loadTickets();
   }
 
   /// 게임 화면으로 이동
@@ -1217,8 +1505,9 @@ class _HomeScreenState extends State<HomeScreen>
       ),
     );
 
-    // 게임 화면에서 돌아온 후 코인 리로드
+    // 게임 화면에서 돌아온 후 코인, 뽑기권 리로드
     await _loadCoins();
+    await _loadTickets();
   }
 
   /// 컬렉션 화면 열기

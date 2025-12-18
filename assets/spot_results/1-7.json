@@ -1,0 +1,26 @@
+[
+  {
+    "id": 1,
+    "x": 200,
+    "y": 0,
+    "width": 824,
+    "height": 434,
+    "center_x": 612,
+    "center_y": 217,
+    "relative_x": 0.5977,
+    "relative_y": 0.5,
+    "relative_radius": 0.4828
+  },
+  {
+    "id": 2,
+    "x": 106,
+    "y": 30,
+    "width": 47,
+    "height": 47,
+    "center_x": 129,
+    "center_y": 53,
+    "relative_x": 0.126,
+    "relative_y": 0.1221,
+    "relative_radius": 0.0275
+  }
+]

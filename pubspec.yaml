@@ -87,6 +87,7 @@ flutter:
     - assets/home_capybara/
     - assets/theme/
     - assets/toon/
+    - assets/soptTheDifference/
 
 # 앱 아이콘 설정
 flutter_launcher_icons:

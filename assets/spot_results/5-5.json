@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "x": 947,
+    "y": 495,
+    "width": 77,
+    "height": 77,
+    "center_x": 985,
+    "center_y": 533,
+    "relative_x": 0.9619,
+    "relative_y": 0.9318,
+    "relative_radius": 0.0451
+  },
+  {
+    "id": 2,
+    "x": 222,
+    "y": 459,
+    "width": 100,
+    "height": 72,
+    "center_x": 272,
+    "center_y": 495,
+    "relative_x": 0.2656,
+    "relative_y": 0.8654,
+    "relative_radius": 0.0586
+  },
+  {
+    "id": 3,
+    "x": 245,
+    "y": 304,
+    "width": 65,
+    "height": 77,
+    "center_x": 277,
+    "center_y": 342,
+    "relative_x": 0.2705,
+    "relative_y": 0.5979,
+    "relative_radius": 0.0451
+  },
+  {
+    "id": 4,
+    "x": 637,
+    "y": 302,
+    "width": 69,
+    "height": 65,
+    "center_x": 671,
+    "center_y": 334,
+    "relative_x": 0.6553,
+    "relative_y": 0.5839,
+    "relative_radius": 0.0404
+  },
+  {
+    "id": 5,
+    "x": 329,
+    "y": 300,
+    "width": 58,
+    "height": 65,
+    "center_x": 358,
+    "center_y": 332,
+    "relative_x": 0.3496,
+    "relative_y": 0.5804,
+    "relative_radius": 0.0381
+  },
+  {
+    "id": 6,
+    "x": 548,
+    "y": 153,
+    "width": 111,
+    "height": 124,
+    "center_x": 603,
+    "center_y": 215,
+    "relative_x": 0.5889,
+    "relative_y": 0.3759,
+    "relative_radius": 0.0727
+  },
+  {
+    "id": 7,
+    "x": 389,
+    "y": 156,
+    "width": 65,
+    "height": 67,
+    "center_x": 421,
+    "center_y": 189,
+    "relative_x": 0.4111,
+    "relative_y": 0.3304,
+    "relative_radius": 0.0393
+  },
+  {
+    "id": 8,
+    "x": 463,
+    "y": 43,
+    "width": 98,
+    "height": 57,
+    "center_x": 512,
+    "center_y": 71,
+    "relative_x": 0.5,
+    "relative_y": 0.1241,
+    "relative_radius": 0.0574
+  },
+  {
+    "id": 9,
+    "x": 53,
+    "y": 36,
+    "width": 108,
+    "height": 60,
+    "center_x": 107,
+    "center_y": 66,
+    "relative_x": 0.1045,
+    "relative_y": 0.1154,
+    "relative_radius": 0.0633
+  },
+  {
+    "id": 10,
+    "x": 610,
+    "y": 0,
+    "width": 85,
+    "height": 89,
+    "center_x": 652,
+    "center_y": 44,
+    "relative_x": 0.6367,
+    "relative_y": 0.0769,
+    "relative_radius": 0.0521
+  }
+]

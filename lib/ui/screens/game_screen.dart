@@ -10,6 +10,7 @@ import '../widgets/game_card_widget.dart';
 import '../../sound_manager.dart';
 import '../../data/collection_manager.dart';
 import '../../data/game_counter.dart';
+import '../../data/ticket_manager.dart';
 import '../../ads/admob_handler.dart';
 import 'collection_screen.dart';
 import '../../services/share_service.dart';
@@ -38,6 +39,7 @@ class _GameScreenState extends State<GameScreen>
   final CollectionManager _collectionManager = CollectionManager();
   final AdmobHandler _adMobHandler = AdmobHandler();
   final DailyMissionService _missionService = DailyMissionService();
+  final TicketManager _ticketManager = TicketManager();
 
   Timer? _gameTimer;
   Timer? _hintTimer;
@@ -397,17 +399,219 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  /// 선물 박스 다이얼로그 표시
-  void _showGiftBoxDialog() {
+  /// 선물 박스 다이얼로그 표시 (뽑기권 획득)
+  void _showGiftBoxDialog() async {
+    // 티켓 매니저 초기화
+    await _ticketManager.initialize();
+    
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => _GiftBoxDialog(
+      builder: (context) => _TicketRewardDialog(
         score: _score,
         moves: _moves,
         remainingTime: _remainingTime,
         difficulty: widget.difficulty,
-        onOpenGiftBox: () => _openGiftBox(context),
+        canEarnTicket: _ticketManager.canEarnTicketToday,
+        remainingTickets: _ticketManager.remainingDailyTickets,
+        currentTicketCount: _ticketManager.ticketCount,
+        onClaimTicket: () => _claimTicket(context),
+        onHome: () {
+          Navigator.of(context).pop();
+          Navigator.of(context).pop();
+        },
+        onReplay: () {
+          Navigator.of(context).pop();
+          _restartGame();
+        },
+      ),
+    );
+  }
+  
+  /// 뽑기권 획득
+  Future<void> _claimTicket(BuildContext dialogContext) async {
+    // 전면 광고 표시
+    await _adMobHandler.showInterstitialAd();
+    
+    if (!mounted) return;
+    
+    // 뽑기권 획득 시도
+    final earned = await _ticketManager.earnTicket();
+    
+    if (earned) {
+      // 데일리 미션 업데이트
+      await _missionService.completeGame();
+      
+      Navigator.of(dialogContext).pop();
+      _showTicketEarnedDialog();
+    } else {
+      Navigator.of(dialogContext).pop();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            Localizations.localeOf(context).languageCode == 'ko'
+                ? '오늘 뽑기권을 모두 획득했습니다!'
+                : 'You\'ve earned all tickets for today!',
+          ),
+        ),
+      );
+      Navigator.of(context).pop(); // 홈으로 이동
+    }
+  }
+  
+  /// 뽑기권 획득 완료 다이얼로그
+  void _showTicketEarnedDialog() {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+    
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Dialog(
+        backgroundColor: Colors.transparent,
+        child: Container(
+          padding: const EdgeInsets.all(30),
+          decoration: BoxDecoration(
+            gradient: const LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFE8F4F8), Color(0xFFD6EBF5)],
+            ),
+            borderRadius: BorderRadius.circular(30),
+            border: Border.all(color: const Color(0xFF4A90E2), width: 3),
+          ),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 뽑기권 아이콘 (임시 회색 박스)
+              Container(
+                width: 100,
+                height: 100,
+                decoration: BoxDecoration(
+                  color: Colors.grey[400],
+                  borderRadius: BorderRadius.circular(20),
+                  border: Border.all(color: Colors.grey[600]!, width: 2),
+                ),
+                child: const Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(Icons.confirmation_number, size: 40, color: Colors.white),
+                      SizedBox(height: 4),
+                      Text(
+                        '+1',
+                        style: TextStyle(
+                          fontSize: 20,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 24),
+              Text(
+                isKorean ? '뽑기권 1개 획득!' : 'Got 1 Gacha Ticket!',
+                style: const TextStyle(
+                  fontSize: 22,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A90E2),
+                ),
+              ),
+              const SizedBox(height: 12),
+              Text(
+                isKorean
+                    ? '현재 뽑기권: ${_ticketManager.ticketCount}개'
+                    : 'Current Tickets: ${_ticketManager.ticketCount}',
+                style: const TextStyle(fontSize: 16, color: Colors.black87),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                isKorean
+                    ? '오늘 남은 획득 횟수: ${_ticketManager.remainingDailyTickets}회'
+                    : 'Remaining today: ${_ticketManager.remainingDailyTickets}',
+                style: TextStyle(fontSize: 14, color: Colors.grey[600]),
+              ),
+              const SizedBox(height: 20),
+              // 코인 획득 정보
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Image.asset(
+                      'assets/images/coin.webp',
+                      width: 24,
+                      height: 24,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.monetization_on,
+                        color: Colors.amber,
+                        size: 24,
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      isKorean ? '+10 코인' : '+10 Coins',
+                      style: const TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFFB8860B),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 30),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        Navigator.of(context).pop();
+                      },
+                      child: Text(
+                        isKorean ? '홈으로' : 'Home',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF4A90E2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _restartGame();
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A90E2),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: Text(
+                        isKorean ? '다시하기' : 'Play Again',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
@@ -2375,6 +2579,353 @@ class _BannerAdContainerState extends State<_BannerAdContainer> {
         bottom: 40, // 하단 마진 40px
       ),
       child: _adMobHandler.getBannerAd(),
+    );
+  }
+}
+
+/// 뽑기권 획득 다이얼로그 (게임 완료 시)
+class _TicketRewardDialog extends StatefulWidget {
+  final int score;
+  final int moves;
+  final int remainingTime;
+  final GameDifficulty difficulty;
+  final bool canEarnTicket;
+  final int remainingTickets;
+  final int currentTicketCount;
+  final VoidCallback onClaimTicket;
+  final VoidCallback onHome;
+  final VoidCallback onReplay;
+
+  const _TicketRewardDialog({
+    required this.score,
+    required this.moves,
+    required this.remainingTime,
+    required this.difficulty,
+    required this.canEarnTicket,
+    required this.remainingTickets,
+    required this.currentTicketCount,
+    required this.onClaimTicket,
+    required this.onHome,
+    required this.onReplay,
+  });
+
+  @override
+  State<_TicketRewardDialog> createState() => _TicketRewardDialogState();
+}
+
+class _TicketRewardDialogState extends State<_TicketRewardDialog>
+    with SingleTickerProviderStateMixin {
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
+  @override
+  void initState() {
+    super.initState();
+    _setupShakeAnimation();
+    _startShakeAnimation();
+  }
+
+  void _setupShakeAnimation() {
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
+    _shakeAnimation = TweenSequence<double>([
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.0, end: -0.1)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: -0.1, end: 0.1)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 2,
+      ),
+      TweenSequenceItem(
+        tween: Tween<double>(begin: 0.1, end: 0.0)
+            .chain(CurveTween(curve: Curves.easeInOut)),
+        weight: 1,
+      ),
+    ]).animate(_shakeController);
+  }
+
+  void _startShakeAnimation() async {
+    await Future.delayed(const Duration(milliseconds: 200));
+
+    while (mounted) {
+      await _shakeController.forward();
+      _shakeController.reset();
+      await Future.delayed(const Duration(milliseconds: 1500));
+    }
+  }
+
+  @override
+  void dispose() {
+    _shakeController.dispose();
+    super.dispose();
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFE8F4F8), Color(0xFFD6EBF5)],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: const Color(0xFF4A90E2), width: 3),
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              // 타이틀
+              Text(
+                isKorean ? '게임 완료!' : 'Game Complete!',
+                style: const TextStyle(
+                  fontSize: 24,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF4A90E2),
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 점수 정보
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(16),
+                decoration: BoxDecoration(
+                  color: Colors.white,
+                  borderRadius: BorderRadius.circular(15),
+                ),
+                child: Column(
+                  children: [
+                    _buildScoreRow(
+                      isKorean ? '점수' : 'Score',
+                      '${widget.score}${isKorean ? '점' : ' pts'}',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildScoreRow(
+                      isKorean ? '이동 횟수' : 'Moves',
+                      '${widget.moves}${isKorean ? '회' : ''}',
+                    ),
+                    const SizedBox(height: 8),
+                    _buildScoreRow(
+                      isKorean ? '남은 시간' : 'Time Left',
+                      GameHelpers.formatTime(widget.remainingTime),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+
+              // 뽑기권 획득 영역
+              if (widget.canEarnTicket) ...[
+                AnimatedBuilder(
+                  animation: _shakeAnimation,
+                  builder: (context, child) {
+                    return Transform.translate(
+                      offset: Offset(_shakeAnimation.value * 10, 0),
+                      child: Transform.rotate(
+                        angle: _shakeAnimation.value * 0.3,
+                        child: child,
+                      ),
+                    );
+                  },
+                  child: Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFFFF8E1),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: const Color(0xFFFFD699), width: 2),
+                    ),
+                    child: Column(
+                      children: [
+                        // 뽑기권 아이콘 (임시 회색 박스)
+                        Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            color: Colors.grey[400],
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Colors.grey[600]!, width: 2),
+                          ),
+                          child: const Center(
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  Icons.confirmation_number,
+                                  size: 36,
+                                  color: Colors.white,
+                                ),
+                                Text(
+                                  '뽑기권',
+                                  style: TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.bold,
+                                    color: Colors.white,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                        const SizedBox(height: 16),
+                        Text(
+                          isKorean
+                              ? '뽑기권 1개를 받을 수 있어요!'
+                              : 'You can get 1 Gacha Ticket!',
+                          style: const TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          isKorean
+                              ? '현재 보유: ${widget.currentTicketCount}개'
+                              : 'Current: ${widget.currentTicketCount}',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        Text(
+                          isKorean
+                              ? '오늘 남은 획득 횟수: ${widget.remainingTickets}회'
+                              : 'Remaining today: ${widget.remainingTickets}',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[500],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+                const SizedBox(height: 16),
+                SizedBox(
+                  width: double.infinity,
+                  child: ElevatedButton(
+                    onPressed: widget.onClaimTicket,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFFFFB74D),
+                      foregroundColor: Colors.white,
+                      padding: const EdgeInsets.symmetric(vertical: 16),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(20),
+                      ),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      children: [
+                        const Icon(Icons.confirmation_number, size: 24),
+                        const SizedBox(width: 8),
+                        Text(
+                          isKorean ? '뽑기권 받기' : 'Get Ticket',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ),
+              ] else ...[
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: Colors.grey[200],
+                    borderRadius: BorderRadius.circular(15),
+                  ),
+                  child: Column(
+                    children: [
+                      Icon(Icons.info_outline, color: Colors.grey[600], size: 32),
+                      const SizedBox(height: 8),
+                      Text(
+                        isKorean
+                            ? '오늘 뽑기권을 모두 획득했습니다'
+                            : 'You\'ve earned all tickets for today',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(color: Colors.grey[600]),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+
+              const SizedBox(height: 16),
+
+              // 홈/다시하기 버튼
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: widget.onHome,
+                      child: Text(
+                        isKorean ? '홈으로' : 'Home',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          color: Color(0xFF4A90E2),
+                        ),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: ElevatedButton(
+                      onPressed: widget.onReplay,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: const Color(0xFF4A90E2),
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(20),
+                        ),
+                      ),
+                      child: Text(
+                        isKorean ? '다시하기' : 'Play Again',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildScoreRow(String label, String value) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        Text(label, style: const TextStyle(fontSize: 14)),
+        Text(
+          value,
+          style: const TextStyle(
+            fontSize: 16,
+            fontWeight: FontWeight.bold,
+            color: Color(0xFF4A90E2),
+          ),
+        ),
+      ],
     );
   }
 }
