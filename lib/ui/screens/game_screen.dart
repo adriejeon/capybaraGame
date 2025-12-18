@@ -403,7 +403,7 @@ class _GameScreenState extends State<GameScreen>
   void _showGiftBoxDialog() async {
     // 티켓 매니저 초기화
     await _ticketManager.initialize();
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -427,21 +427,21 @@ class _GameScreenState extends State<GameScreen>
       ),
     );
   }
-  
+
   /// 뽑기권 획득
   Future<void> _claimTicket(BuildContext dialogContext) async {
     // 전면 광고 표시
     await _adMobHandler.showInterstitialAd();
-    
+
     if (!mounted) return;
-    
+
     // 뽑기권 획득 시도
     final earned = await _ticketManager.earnTicket();
-    
+
     if (earned) {
       // 데일리 미션 업데이트
       await _missionService.completeGame();
-      
+
       Navigator.of(dialogContext).pop();
       _showTicketEarnedDialog();
     } else {
@@ -458,11 +458,11 @@ class _GameScreenState extends State<GameScreen>
       Navigator.of(context).pop(); // 홈으로 이동
     }
   }
-  
+
   /// 뽑기권 획득 완료 다이얼로그
   void _showTicketEarnedDialog() {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
-    
+
     showDialog(
       context: context,
       barrierDismissible: false,
@@ -482,31 +482,43 @@ class _GameScreenState extends State<GameScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 뽑기권 아이콘 (임시 회색 박스)
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey[600]!, width: 2),
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.confirmation_number, size: 40, color: Colors.white),
-                      SizedBox(height: 4),
-                      Text(
-                        '+1',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+              // 뽑기권 이미지
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/gacha_coin.png',
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey[600]!, width: 2),
+                      ),
+                      child: const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.confirmation_number,
+                                size: 40, color: Colors.white),
+                            SizedBox(height: 4),
+                            Text(
+                              '+1',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 24),
@@ -2745,38 +2757,51 @@ class _TicketRewardDialogState extends State<_TicketRewardDialog>
                     decoration: BoxDecoration(
                       color: const Color(0xFFFFF8E1),
                       borderRadius: BorderRadius.circular(20),
-                      border: Border.all(color: const Color(0xFFFFD699), width: 2),
+                      border:
+                          Border.all(color: const Color(0xFFFFD699), width: 2),
                     ),
                     child: Column(
                       children: [
-                        // 뽑기권 아이콘 (임시 회색 박스)
-                        Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            color: Colors.grey[400],
-                            borderRadius: BorderRadius.circular(16),
-                            border: Border.all(color: Colors.grey[600]!, width: 2),
-                          ),
-                          child: const Center(
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  Icons.confirmation_number,
-                                  size: 36,
-                                  color: Colors.white,
+                        // 뽑기권 이미지
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(16),
+                          child: Image.asset(
+                            'assets/images/gacha_coin.png',
+                            width: 80,
+                            height: 80,
+                            fit: BoxFit.cover,
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                width: 80,
+                                height: 80,
+                                decoration: BoxDecoration(
+                                  color: Colors.grey[400],
+                                  borderRadius: BorderRadius.circular(16),
+                                  border: Border.all(
+                                      color: Colors.grey[600]!, width: 2),
                                 ),
-                                Text(
-                                  '뽑기권',
-                                  style: TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.white,
+                                child: const Center(
+                                  child: Column(
+                                    mainAxisAlignment: MainAxisAlignment.center,
+                                    children: [
+                                      Icon(
+                                        Icons.confirmation_number,
+                                        size: 36,
+                                        color: Colors.white,
+                                      ),
+                                      Text(
+                                        '뽑기권',
+                                        style: TextStyle(
+                                          fontSize: 10,
+                                          fontWeight: FontWeight.bold,
+                                          color: Colors.white,
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ),
-                              ],
-                            ),
+                              );
+                            },
                           ),
                         ),
                         const SizedBox(height: 16),
@@ -2818,12 +2843,13 @@ class _TicketRewardDialogState extends State<_TicketRewardDialog>
                   child: ElevatedButton(
                     onPressed: widget.onClaimTicket,
                     style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFFFFB74D),
+                      backgroundColor: const Color(0xFF4A90E2),
                       foregroundColor: Colors.white,
                       padding: const EdgeInsets.symmetric(vertical: 16),
                       shape: RoundedRectangleBorder(
                         borderRadius: BorderRadius.circular(20),
                       ),
+                      elevation: 0,
                     ),
                     child: Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -2851,7 +2877,8 @@ class _TicketRewardDialogState extends State<_TicketRewardDialog>
                   ),
                   child: Column(
                     children: [
-                      Icon(Icons.info_outline, color: Colors.grey[600], size: 32),
+                      Icon(Icons.info_outline,
+                          color: Colors.grey[600], size: 32),
                       const SizedBox(height: 8),
                       Text(
                         isKorean
@@ -2873,26 +2900,26 @@ class _TicketRewardDialogState extends State<_TicketRewardDialog>
                   Expanded(
                     child: TextButton(
                       onPressed: widget.onHome,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A90E2),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
                       child: Text(
                         isKorean ? '홈으로' : 'Home',
                         style: const TextStyle(
                           fontSize: 16,
-                          color: Color(0xFF4A90E2),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
+                    child: TextButton(
                       onPressed: widget.onReplay,
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4A90E2),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A90E2),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: Text(
                         isKorean ? '다시하기' : 'Play Again',

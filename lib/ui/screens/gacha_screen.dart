@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
-import 'dart:math';
 import '../../data/ticket_manager.dart';
 import '../../data/collection_manager.dart';
 import '../../utils/constants.dart';
@@ -27,7 +26,6 @@ class _GachaScreenState extends State<GachaScreen>
   bool _isGachaing = false; // 뽑기 중 여부
   bool _showResult = false; // 결과 표시 여부
   CollectionResult? _gachaResult; // 뽑기 결과
-  GameDifficulty _selectedDifficulty = GameDifficulty.level1;
 
   // 애니메이션 컨트롤러
   late AnimationController _shakeController;
@@ -127,9 +125,9 @@ class _GachaScreenState extends State<GachaScreen>
       await _shakeController.reverse();
     }
 
-    // 4. 캐릭터 뽑기
-    final result = await _collectionManager.addNewCard(_selectedDifficulty);
-    
+    // 4. 캐릭터 뽑기 (랜덤 단계별 희귀도 적용)
+    final result = await _collectionManager.addRandomCard();
+
     // 데일리 미션 업데이트
     await _missionService.collectCharacter();
 
@@ -192,15 +190,30 @@ class _GachaScreenState extends State<GachaScreen>
 
     switch (difficulty) {
       case GameDifficulty.level1:
-        return isKorean ? '아기 단계' : 'Baby';
+        return isKorean ? '아기바라' : 'Baby';
       case GameDifficulty.level2:
-        return isKorean ? '어린이 단계' : 'Child';
+        return isKorean ? '어린이바라' : 'Child';
       case GameDifficulty.level3:
-        return isKorean ? '청소년 단계' : 'Teen';
+        return isKorean ? '청소년바라' : 'Teen';
       case GameDifficulty.level4:
-        return isKorean ? '어른 단계' : 'Adult';
+        return isKorean ? '어른바라' : 'Adult';
       case GameDifficulty.level5:
-        return isKorean ? '신의 경지' : 'Legend';
+        return isKorean ? '신이된바라' : 'Legend';
+    }
+  }
+
+  Color _getRarityColor(GameDifficulty difficulty) {
+    switch (difficulty) {
+      case GameDifficulty.level1:
+        return const Color(0xFF8BC34A); // 초록색 (일반)
+      case GameDifficulty.level2:
+        return const Color(0xFF4A90E2); // 파란색 (레어)
+      case GameDifficulty.level3:
+        return const Color(0xFF9C27B0); // 보라색 (에픽)
+      case GameDifficulty.level4:
+        return const Color(0xFFFF9800); // 주황색 (레전더리)
+      case GameDifficulty.level5:
+        return const Color(0xFFE91E63); // 분홍색 (신화)
     }
   }
 
@@ -223,9 +236,6 @@ class _GachaScreenState extends State<GachaScreen>
               children: [
                 // 뽑기권 보유량 표시
                 _buildTicketDisplay(),
-
-                // 난이도 선택
-                _buildDifficultySelector(),
 
                 // 뽑기통 영역
                 Expanded(
@@ -267,18 +277,29 @@ class _GachaScreenState extends State<GachaScreen>
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          // 뽑기권 아이콘 (임시 회색 박스)
-          Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: Colors.grey[400],
-              borderRadius: BorderRadius.circular(10),
-            ),
-            child: const Icon(
-              Icons.confirmation_number,
-              color: Colors.white,
-              size: 24,
+          // 뽑기권 이미지
+          ClipRRect(
+            borderRadius: BorderRadius.circular(10),
+            child: Image.asset(
+              'assets/images/gacha_coin.png',
+              width: 40,
+              height: 40,
+              fit: BoxFit.cover,
+              errorBuilder: (context, error, stackTrace) {
+                return Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: Colors.grey[400],
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: const Icon(
+                    Icons.confirmation_number,
+                    color: Colors.white,
+                    size: 24,
+                  ),
+                );
+              },
             ),
           ),
           const SizedBox(width: 12),
@@ -307,72 +328,6 @@ class _GachaScreenState extends State<GachaScreen>
     );
   }
 
-  Widget _buildDifficultySelector() {
-    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Padding(
-            padding: const EdgeInsets.only(left: 8, bottom: 8),
-            child: Text(
-              isKorean ? '뽑기 등급 선택' : 'Select Grade',
-              style: const TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF4A90E2),
-              ),
-            ),
-          ),
-          SingleChildScrollView(
-            scrollDirection: Axis.horizontal,
-            child: Row(
-              children: GameDifficulty.values.map((difficulty) {
-                final isSelected = _selectedDifficulty == difficulty;
-                return GestureDetector(
-                  onTap: _isGachaing
-                      ? null
-                      : () {
-                          setState(() {
-                            _selectedDifficulty = difficulty;
-                          });
-                        },
-                  child: Container(
-                    margin: const EdgeInsets.only(right: 8),
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 16,
-                      vertical: 10,
-                    ),
-                    decoration: BoxDecoration(
-                      color: isSelected
-                          ? const Color(0xFF4A90E2)
-                          : Colors.white,
-                      borderRadius: BorderRadius.circular(20),
-                      border: Border.all(
-                        color: const Color(0xFF4A90E2),
-                        width: 2,
-                      ),
-                    ),
-                    child: Text(
-                      _getDifficultyText(difficulty),
-                      style: TextStyle(
-                        fontSize: 14,
-                        fontWeight: FontWeight.bold,
-                        color: isSelected ? Colors.white : const Color(0xFF4A90E2),
-                      ),
-                    ),
-                  ),
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Widget _buildGachaMachine() {
     return Center(
       child: AnimatedBuilder(
@@ -383,85 +338,73 @@ class _GachaScreenState extends State<GachaScreen>
             child: child,
           );
         },
-        child: Stack(
-          alignment: Alignment.center,
-          children: [
-            // 뽑기통 (임시 회색 박스)
-            Container(
-              width: 200,
-              height: 280,
-              decoration: BoxDecoration(
-                color: Colors.grey[400],
-                borderRadius: BorderRadius.circular(30),
-                border: Border.all(color: Colors.grey[600]!, width: 4),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.2),
-                    blurRadius: 15,
-                    offset: const Offset(0, 8),
-                  ),
-                ],
-              ),
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Icon(
-                    Icons.all_inbox,
-                    size: 80,
-                    color: Colors.grey[600],
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '뽑기통',
-                    style: TextStyle(
-                      fontSize: 20,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.grey[700],
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    _getDifficultyText(_selectedDifficulty),
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
+        child: LayoutBuilder(
+          builder: (context, constraints) {
+            // 화면 너비의 80% 계산
+            final imageWidth = MediaQuery.of(context).size.width * 0.8;
+            // 원본 이미지 비율 유지 (대략 200:280 비율)
+            final imageHeight = imageWidth * 1.4;
 
-            // 뽑기권 이동 애니메이션
-            if (_isGachaing)
-              AnimatedBuilder(
-                animation: _ticketMoveAnimation,
-                builder: (context, child) {
-                  final progress = _ticketMoveAnimation.value;
-                  return Transform.translate(
-                    offset: Offset(
-                      0,
-                      -100 + (progress * 200), // 위에서 아래로 이동
-                    ),
-                    child: Opacity(
-                      opacity: 1 - progress,
-                      child: Container(
-                        width: 50,
-                        height: 50,
-                        decoration: BoxDecoration(
-                          color: Colors.grey[500],
-                          borderRadius: BorderRadius.circular(10),
-                        ),
-                        child: const Icon(
-                          Icons.confirmation_number,
-                          color: Colors.white,
-                          size: 30,
-                        ),
+            return Stack(
+              alignment: Alignment.center,
+              children: [
+                // 뽑기통 이미지
+                Image.asset(
+                  'assets/images/gacha.png',
+                  width: imageWidth,
+                  height: imageHeight,
+                  fit: BoxFit.contain,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: imageWidth,
+                      height: imageHeight,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(30),
+                        border: Border.all(color: Colors.grey[600]!, width: 4),
                       ),
-                    ),
-                  );
-                },
-              ),
-          ],
+                      child: const Icon(
+                        Icons.all_inbox,
+                        size: 80,
+                        color: Colors.white,
+                      ),
+                    );
+                  },
+                ),
+
+                // 뽑기권 이동 애니메이션
+                if (_isGachaing)
+                  AnimatedBuilder(
+                    animation: _ticketMoveAnimation,
+                    builder: (context, child) {
+                      final progress = _ticketMoveAnimation.value;
+                      return Transform.translate(
+                        offset: Offset(
+                          0,
+                          -100 + (progress * 200), // 위에서 아래로 이동
+                        ),
+                        child: Opacity(
+                          opacity: (1 - progress).clamp(0.0, 1.0),
+                          child: Container(
+                            width: 50,
+                            height: 50,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[500],
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: const Icon(
+                              Icons.confirmation_number,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+              ],
+            );
+          },
         ),
       ),
     );
@@ -478,7 +421,7 @@ class _GachaScreenState extends State<GachaScreen>
           onPressed: _isGachaing ? null : _startGacha,
           style: ElevatedButton.styleFrom(
             backgroundColor: _currentTickets > 0
-                ? const Color(0xFFFFB74D)
+                ? const Color(0xFF4A90E2)
                 : Colors.grey[400],
             foregroundColor: Colors.white,
             padding: const EdgeInsets.symmetric(vertical: 18),
@@ -487,39 +430,35 @@ class _GachaScreenState extends State<GachaScreen>
             ),
             elevation: 5,
           ),
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              if (_isGachaing) ...[
-                const SizedBox(
-                  width: 24,
-                  height: 24,
-                  child: CircularProgressIndicator(
-                    color: Colors.white,
-                    strokeWidth: 3,
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Text(
-                  isKorean ? '뽑는 중...' : 'Drawing...',
+          child: _isGachaing
+              ? Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const SizedBox(
+                      width: 24,
+                      height: 24,
+                      child: CircularProgressIndicator(
+                        color: Colors.white,
+                        strokeWidth: 3,
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Text(
+                      isKorean ? '뽑는 중...' : 'Drawing...',
+                      style: const TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                )
+              : Text(
+                  isKorean ? '카피바라 뽑기' : 'Draw Capybara',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
                   ),
                 ),
-              ] else ...[
-                const Icon(Icons.celebration, size: 28),
-                const SizedBox(width: 12),
-                Text(
-                  isKorean ? '뽑기! (1장)' : 'Draw! (1)',
-                  style: const TextStyle(
-                    fontSize: 20,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ],
-            ],
-          ),
         ),
       ),
     );
@@ -619,22 +558,24 @@ class _GachaScreenState extends State<GachaScreen>
                   ),
                   const SizedBox(height: 20),
 
-                  // 등급 표시
+                  // 등급 표시 (뽑힌 카드의 단계)
                   Container(
                     padding: const EdgeInsets.symmetric(
                       horizontal: 16,
                       vertical: 8,
                     ),
                     decoration: BoxDecoration(
-                      color: const Color(0xFFE6F3FF),
+                      color: _getRarityColor(
+                          result.card?.difficulty ?? GameDifficulty.level1),
                       borderRadius: BorderRadius.circular(20),
                     ),
                     child: Text(
-                      _getDifficultyText(_selectedDifficulty),
+                      _getDifficultyText(
+                          result.card?.difficulty ?? GameDifficulty.level1),
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,
-                        color: Color(0xFF4A90E2),
+                        color: Colors.white,
                       ),
                     ),
                   ),
@@ -657,4 +598,3 @@ class _GachaScreenState extends State<GachaScreen>
     );
   }
 }
-

@@ -42,19 +42,19 @@ class AppLocalizationsKo extends AppLocalizations {
   String get hard => '어려움';
 
   @override
-  String get level1 => '아기 단계';
+  String get level1 => '아기바라';
 
   @override
-  String get level2 => '어린이 단계';
+  String get level2 => '어린이바라';
 
   @override
-  String get level3 => '청소년 단계';
+  String get level3 => '청소년바라';
 
   @override
-  String get level4 => '어른 단계';
+  String get level4 => '어른바라';
 
   @override
-  String get level5 => '신의 경지';
+  String get level5 => '신이된바라';
 
   @override
   String get collection => '컬렉션';

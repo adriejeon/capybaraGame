@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:io';
 import 'dart:async';
 import '../utils/app_environment.dart';
@@ -17,6 +18,12 @@ class AdmobHandler {
 
   // 광고 활성화 여부
   static bool isAdEnabled = true;
+
+  // 광고 제거 여부
+  static const String _adsRemovedKey = 'ads_removed';
+  bool _adsRemoved = false;
+
+  bool get adsRemoved => _adsRemoved;
 
   // Ad Unit IDs - 테스트 광고 ID
   static const String _androidBannerTestId =
@@ -60,6 +67,31 @@ class AdmobHandler {
   // 지원되는 플랫폼인지 확인
   bool get _isSupported {
     return Platform.isIOS || Platform.isAndroid;
+  }
+
+  /// 광고 제거 상태 로드
+  Future<void> loadAdsRemovedStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    _adsRemoved = prefs.getBool(_adsRemovedKey) ?? false;
+    if (_adsRemoved) {
+      isAdEnabled = false;
+      print('[AdMob] 광고 제거 상태 로드됨 - 광고 비활성화');
+    }
+  }
+
+  /// 광고 제거 설정
+  Future<void> setAdsRemoved(bool removed) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_adsRemovedKey, removed);
+    _adsRemoved = removed;
+    isAdEnabled = !removed;
+
+    if (removed) {
+      // 기존 배너 광고 제거
+      _bannerAd?.dispose();
+      _bannerAd = null;
+      print('[AdMob] 광고 제거 완료 - 광고 비활성화');
+    }
   }
 
   // 광고 ID 가져오기
@@ -221,7 +253,8 @@ class AdmobHandler {
     // 새로운 위젯 인스턴스를 생성하여 위젯 트리 충돌 방지
     // 고유한 키를 사용하여 위젯이 재사용되지 않도록 함
     return _BannerAdWidget(
-      key: ValueKey('banner_ad_${DateTime.now().millisecondsSinceEpoch}'), // 고유한 키 사용
+      key: ValueKey(
+          'banner_ad_${DateTime.now().millisecondsSinceEpoch}'), // 고유한 키 사용
       bannerAd: _bannerAd!,
       height: bannerHeight,
       width: _bannerAd!.size.width.toDouble(),
@@ -267,9 +300,10 @@ class AdmobHandler {
         return;
       }
     }
-    
+
     if (!isAdEnabled || !_isSupported || _isBannerLoading) {
-      print('AdMob: 배너 광고 로드 조건 불만족 - isAdEnabled: $isAdEnabled, _isSupported: $_isSupported, _isBannerLoading: $_isBannerLoading');
+      print(
+          'AdMob: 배너 광고 로드 조건 불만족 - isAdEnabled: $isAdEnabled, _isSupported: $_isSupported, _isBannerLoading: $_isBannerLoading');
       return;
     }
 
@@ -297,7 +331,7 @@ class AdmobHandler {
 
       final adUnitId = await _bannerAdUnitId;
       print('AdMob: 배너 광고 로드 시작 - ID: $adUnitId');
-      
+
       if (adUnitId.isEmpty) {
         print('AdMob: 배너 광고 ID가 비어있음 - 로드 중단');
         _isBannerLoading = false;
@@ -310,9 +344,10 @@ class AdmobHandler {
         await Future.delayed(const Duration(milliseconds: 100)); // 약간의 지연
         await _bannerAd?.dispose();
         _bannerAd = null;
-        await Future.delayed(const Duration(milliseconds: 100)); // dispose 완료 대기
+        await Future.delayed(
+            const Duration(milliseconds: 100)); // dispose 완료 대기
       }
-      
+
       _bannerAd = BannerAd(
         size: adaptiveSize,
         adUnitId: adUnitId,
@@ -332,9 +367,10 @@ class AdmobHandler {
             _isBannerLoading = false;
             _isBannerAdInWidgetTree = false;
             _notifyBannerStateChanged(); // 상태 변경 알림
-            
+
             // 로드 실패 시 3초 후 재시도 (최대 1회)
-            if (error.code == 2) { // 네트워크 오류
+            if (error.code == 2) {
+              // 네트워크 오류
               print('AdMob: 3초 후 배너 광고 재시도');
               Future.delayed(const Duration(seconds: 3), () {
                 if (!_isBannerLoading && _bannerAd == null) {
@@ -415,7 +451,7 @@ class AdmobHandler {
         return;
       }
     }
-    
+
     if (!isAdEnabled) {
       print('AdMob: 광고 비활성화됨 - 전면 광고 로드 건너뜀');
       return;
@@ -424,12 +460,12 @@ class AdmobHandler {
     try {
       final adUnitId = await _interstitialAdUnitId;
       print('AdMob: 전면 광고 로드 시작 - ID: $adUnitId');
-      
+
       if (adUnitId.isEmpty) {
         print('AdMob: 전면 광고 ID가 비어있음 - 로드 중단');
         return;
       }
-      
+
       final completer = Completer<void>();
 
       await InterstitialAd.load(
@@ -444,7 +480,8 @@ class AdmobHandler {
           },
           onAdFailedToLoad: (error) {
             _isInterstitialAdLoaded = false;
-            print('AdMob: 전면 광고 로드 실패 - Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}');
+            print(
+                'AdMob: 전면 광고 로드 실패 - Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}');
             debugPrint('전면 광고 로드 실패 상세: $error');
             completer.completeError(error);
           },
@@ -491,12 +528,12 @@ class AdmobHandler {
         return;
       }
     }
-    
+
     if (!isAdEnabled) {
       print('AdMob: 광고 비활성화됨 - 전면 광고 표시 건너뜀');
       return;
     }
-    
+
     if (!_isInterstitialAdLoaded) {
       print('AdMob: 전면 광고가 로드되지 않음 - 표시 건너뜀');
       return;
@@ -531,22 +568,22 @@ class AdmobHandler {
         return;
       }
     }
-    
+
     if (!isAdEnabled) {
       print('AdMob: 광고 비활성화됨 - 보상형 광고 로드 건너뜀');
       return;
     }
-    
+
     print('AdMob: 보상형 광고 로드 시작...');
     try {
       final adUnitId = await _rewardedAdUnitId;
       print('AdMob: 보상형 광고 ID: $adUnitId');
-      
+
       if (adUnitId.isEmpty) {
         print('AdMob: 보상형 광고 ID가 비어있음 - 로드 중단');
         return;
       }
-      
+
       final completer = Completer<void>();
 
       await RewardedAd.load(
@@ -561,7 +598,8 @@ class AdmobHandler {
           },
           onAdFailedToLoad: (error) {
             _isRewardedAdLoaded = false;
-            print('AdMob: 보상형 광고 로드 실패 - Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}');
+            print(
+                'AdMob: 보상형 광고 로드 실패 - Code: ${error.code}, Message: ${error.message}, Domain: ${error.domain}');
             debugPrint('보상형 광고 로드 실패 상세: $error');
             completer.completeError(error);
           },
@@ -613,12 +651,12 @@ class AdmobHandler {
         return;
       }
     }
-    
+
     if (!isAdEnabled) {
       print('AdMob: 광고 비활성화됨 - 보상형 광고 표시 건너뜀');
       return;
     }
-    
+
     if (!_isRewardedAdLoaded) {
       print('AdMob: 보상형 광고가 로드되지 않았습니다.');
       return;
@@ -722,7 +760,7 @@ class _BannerAdWidgetState extends State<_BannerAdWidget> {
     if (_isDisposed) {
       return const SizedBox.shrink();
     }
-    
+
     return SizedBox(
       width: double.infinity,
       height: widget.height,

@@ -2,8 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../services/theme_manager.dart';
 import '../../services/coin_manager.dart';
+import '../../services/iap_service.dart';
 import '../../sound_manager.dart';
 import '../../l10n/app_localizations.dart';
+import '../../data/ticket_manager.dart';
 
 /// 상점 화면
 class ShopScreen extends StatefulWidget {
@@ -14,23 +16,48 @@ class ShopScreen extends StatefulWidget {
 }
 
 class _ShopScreenState extends State<ShopScreen>
-    with SingleTickerProviderStateMixin, WidgetsBindingObserver {
+    with TickerProviderStateMixin, WidgetsBindingObserver {
   final ThemeManager _themeManager = ThemeManager();
   final SoundManager _soundManager = SoundManager();
+  final IAPService _iapService = IAPService();
+  final TicketManager _ticketManager = TicketManager();
+
+  late TabController _tabController;
+
+  // 인앱결제 구매 완료 스트림 리스닝용
+  StreamSubscription<String>? _purchaseCompletedSubscription;
+
   List<ThemeItem> _themes = [];
   int _currentCoins = 0;
+  int _currentTickets = 0;
   bool _isLoading = true;
   String _currentThemeId = 'default';
+
+  // 현재 구매 진행 중인 상품 ID (로딩 다이얼로그 관리용)
+  String? _purchasingProductId;
 
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     WidgetsBinding.instance.addObserver(this);
+
+    // 인앱결제 구매 완료 스트림 리스닝 시작
+    // 실제 구매가 완료되면 이 스트림을 통해 알림을 받음
+    _purchaseCompletedSubscription = _iapService.purchaseCompleted.listen(
+      _onPurchaseCompleted,
+      onError: (error) {
+        print('[ShopScreen] 구매 완료 스트림 에러: $error');
+      },
+    );
+
     _loadData();
   }
 
   @override
   void dispose() {
+    _purchaseCompletedSubscription?.cancel();
+    _tabController.dispose();
     WidgetsBinding.instance.removeObserver(this);
     super.dispose();
   }
@@ -63,22 +90,24 @@ class _ShopScreenState extends State<ShopScreen>
           throw TimeoutException('테마 로드 타임아웃');
         },
       );
+      await _iapService.initialize();
+      await _ticketManager.initialize();
+
       final coins = await CoinManager.getCoins();
       if (mounted) {
         setState(() {
           _themes = _themeManager.themes;
           _currentCoins = coins;
+          _currentTickets = _ticketManager.ticketCount;
           _currentThemeId = _themeManager.currentThemeId;
           _isLoading = false;
         });
       }
     } catch (e) {
-      print('테마 로드 실패: $e');
+      print('데이터 로드 실패: $e');
       if (mounted) {
         setState(() {
-          _themes = _themeManager.themes.isNotEmpty
-              ? _themeManager.themes
-              : [];
+          _themes = _themeManager.themes.isNotEmpty ? _themeManager.themes : [];
           _isLoading = false;
         });
       }
@@ -91,69 +120,516 @@ class _ShopScreenState extends State<ShopScreen>
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF0F8FF), // 연한 파스텔 하늘색
+      backgroundColor: const Color(0xFFF0F8FF),
       appBar: AppBar(
         title: Text(localizations.shop),
         backgroundColor: Colors.white,
         elevation: 0,
         foregroundColor: Colors.black87,
         centerTitle: true,
-        actions: [
-          // 코인 표시
-          Center(
-            child: Container(
-              margin: const EdgeInsets.only(right: 16),
-              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1),
-                borderRadius: BorderRadius.circular(20),
-                border: Border.all(
-                  color: const Color(0xFFFFD700),
-                  width: 2,
+        bottom: TabBar(
+          controller: _tabController,
+          labelColor: const Color(0xFF4A90E2),
+          unselectedLabelColor: Colors.grey,
+          indicatorColor: const Color(0xFF4A90E2),
+          indicatorWeight: 3,
+          tabs: [
+            Tab(
+              icon: const Icon(Icons.palette),
+              text: isKorean ? '테마 스토어' : 'Theme Store',
+            ),
+            Tab(
+              icon: const Icon(Icons.shopping_bag),
+              text: isKorean ? '코인 충전소' : 'Coin Shop',
+            ),
+          ],
+        ),
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : TabBarView(
+              controller: _tabController,
+              children: [
+                _buildThemeStore(),
+                _buildCoinShop(),
+              ],
+            ),
+    );
+  }
+
+  /// 테마 스토어 탭
+  Widget _buildThemeStore() {
+    return Column(
+      children: [
+        // 코인 표시
+        _buildCoinDisplay(),
+
+        // 테마 그리드
+        Expanded(
+          child: _buildThemeGrid(),
+        ),
+      ],
+    );
+  }
+
+  /// 코인 충전소 탭 (가챠 코인 구매)
+  Widget _buildCoinShop() {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    return SingleChildScrollView(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 현재 보유 티켓 표시
+          _buildTicketDisplay(),
+
+          const SizedBox(height: 24),
+
+          // 코인 팩 섹션
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: [
+                const Text(
+                  '⭐️',
+                  style: TextStyle(fontSize: 20),
                 ),
+                const SizedBox(width: 8),
+                Text(
+                  isKorean ? '가챠 코인 구매' : 'Gacha Coins',
+                  style: const TextStyle(
+                    fontSize: 20,
+                    fontWeight: FontWeight.bold,
+                    color: Color(0xFF333333),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          // 코인 팩 카드들
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Column(
+              children: [
+                _buildCoinPackCard(IAPService.products[0]), // 5개
+                const SizedBox(height: 12),
+                _buildCoinPackCard(IAPService.products[1]), // 20개 (주력)
+                const SizedBox(height: 12),
+                _buildCoinPackCard(IAPService.products[2]), // 60개
+              ],
+            ),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 광고 제거 섹션
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Text(
+              isKorean ? '🚫 광고 제거' : '🚫 Remove Ads',
+              style: const TextStyle(
+                fontSize: 20,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF333333),
               ),
-              child: Row(
-                children: [
-                  Image.asset(
-                    'assets/images/coin-2.webp',
-                    width: 24,
-                    height: 24,
-                    errorBuilder: (context, error, stackTrace) {
-                      return const Icon(
-                        Icons.monetization_on,
-                        color: Colors.amber,
-                        size: 24,
-                      );
-                    },
-                  ),
-                  const SizedBox(width: 6),
-                  Text(
-                    _currentCoins.toString(),
-                    style: const TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.black87,
-                    ),
-                  ),
-                ],
+            ),
+          ),
+          const SizedBox(height: 12),
+
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: _buildRemoveAdsCard(IAPService.products[3]),
+          ),
+
+          const SizedBox(height: 24),
+
+          // 구매 복원 버튼
+          Center(
+            child: TextButton(
+              onPressed: _restorePurchases,
+              child: Text(
+                isKorean ? '구매 복원' : 'Restore Purchases',
+                style: const TextStyle(
+                  fontSize: 14,
+                  color: Color(0xFF4A90E2),
+                ),
               ),
             ),
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : Column(
-              children: [
-                // 상점 통계
-                _buildShopStats(),
+    );
+  }
 
-                // 테마 그리드
+  /// 코인 표시 위젯
+  Widget _buildCoinDisplay() {
+    return Container(
+      margin: const EdgeInsets.all(16),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(15),
+        boxShadow: [
+          BoxShadow(
+            color: Colors.black.withOpacity(0.1),
+            blurRadius: 10,
+            offset: const Offset(0, 2),
+          ),
+        ],
+      ),
+      child: Row(
+        mainAxisAlignment: MainAxisAlignment.center,
+        children: [
+          Image.asset(
+            'assets/images/coin-2.webp',
+            width: 32,
+            height: 32,
+            errorBuilder: (context, error, stackTrace) {
+              return const Icon(
+                Icons.monetization_on,
+                color: Colors.amber,
+                size: 32,
+              );
+            },
+          ),
+          const SizedBox(width: 12),
+          Text(
+            '$_currentCoins',
+            style: const TextStyle(
+              fontSize: 24,
+              fontWeight: FontWeight.bold,
+              color: Colors.black87,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text(
+            Localizations.localeOf(context).languageCode == 'ko'
+                ? '코인'
+                : 'Coins',
+            style: const TextStyle(
+              fontSize: 16,
+              color: Colors.grey,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 티켓 보유량 표시 위젯
+  ///
+  /// 흰색 테두리만으로 보유 가챠 코인을 가로 배치하여 중앙 정렬하여 표시합니다.
+  Widget _buildTicketDisplay() {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 20),
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(16),
+          border: Border.all(
+            color: Colors.white,
+            width: 2,
+          ),
+        ),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          crossAxisAlignment: CrossAxisAlignment.center,
+          children: [
+            Text(
+              isKorean ? '현재 보유 중인 가챠 코인' : 'Current Gacha Coins',
+              style: const TextStyle(
+                fontSize: 14,
+                color: Color(0xFF666666),
+              ),
+            ),
+            const SizedBox(width: 12),
+            Text(
+              '$_currentTickets${isKorean ? '개' : ''}',
+              style: const TextStyle(
+                fontSize: 28,
+                fontWeight: FontWeight.bold,
+                color: Color(0xFF4A90E2),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 코인 팩 카드
+  Widget _buildCoinPackCard(IAPProduct product) {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+    final price = _iapService.getProductPrice(product.id) ??
+        (isKorean ? product.priceKo : product.priceEn);
+
+    return GestureDetector(
+      onTap: () => _purchaseProduct(product.id),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          border: product.isFeatured
+              ? Border.all(color: const Color(0xFF4A90E2), width: 2)
+              : null,
+          boxShadow: [
+            BoxShadow(
+              color: product.isFeatured
+                  ? const Color(0xFF4A90E2).withOpacity(0.2)
+                  : Colors.black.withOpacity(0.05),
+              blurRadius: product.isFeatured ? 15 : 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Stack(
+          children: [
+            Row(
+              children: [
+                // 코인 아이콘
+                Container(
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Stack(
+                    alignment: Alignment.center,
+                    children: [
+                      Image.asset(
+                        'assets/images/gacha_coin.png',
+                        width: 40,
+                        height: 40,
+                        errorBuilder: (context, error, stackTrace) {
+                          return const Icon(
+                            Icons.confirmation_number,
+                            color: Color(0xFFFFB74D),
+                            size: 40,
+                          );
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(width: 16),
+
+                // 상품 정보
                 Expanded(
-                  child: _buildThemeGrid(),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Text(
+                            isKorean ? product.titleKo : product.titleEn,
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF333333),
+                            ),
+                          ),
+                          if (product.bonusAmount > 0) ...[
+                            const SizedBox(width: 8),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                  horizontal: 8, vertical: 2),
+                              decoration: BoxDecoration(
+                                color: const Color(0xFF4CAF50),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: Text(
+                                '+${product.bonusAmount}',
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ],
+                      ),
+                      const SizedBox(height: 4),
+                      Text(
+                        isKorean
+                            ? product.descriptionKo
+                            : product.descriptionEn,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Colors.grey[600],
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // 가격 버튼
+                Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                  decoration: BoxDecoration(
+                    color: product.isFeatured
+                        ? const Color(0xFF4A90E2)
+                        : const Color(0xFFF5F5F5),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Text(
+                    price,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: product.isFeatured
+                          ? Colors.white
+                          : const Color(0xFF333333),
+                    ),
+                  ),
                 ),
               ],
             ),
+
+            // 할인 배지
+            if (product.discountPercent > 0)
+              Positioned(
+                top: -4,
+                right: -4,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFF5252),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    '-${product.discountPercent}%',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+
+            // 주력 상품 배지
+            if (product.isFeatured)
+              Positioned(
+                top: -4,
+                left: -4,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFB74D),
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  child: Text(
+                    isKorean ? '베스트' : 'BEST',
+                    style: const TextStyle(
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.white,
+                    ),
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 광고 제거 카드
+  ///
+  /// 코인 팩 카드와 동일한 디자인으로 구성됩니다.
+  Widget _buildRemoveAdsCard(IAPProduct product) {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+    final price = _iapService.getProductPrice(product.id) ??
+        (isKorean ? product.priceKo : product.priceEn);
+
+    return GestureDetector(
+      onTap: () => _purchaseProduct(product.id),
+      child: Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(16),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.05),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            // 아이콘
+            Container(
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: const Icon(
+                Icons.block,
+                color: Color(0xFFFFB74D),
+                size: 40,
+              ),
+            ),
+            const SizedBox(width: 16),
+
+            // 상품 정보
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    isKorean ? product.titleKo : product.titleEn,
+                    style: const TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF333333),
+                    ),
+                  ),
+                  const SizedBox(height: 4),
+                  Text(
+                    isKorean ? product.descriptionKo : product.descriptionEn,
+                    style: TextStyle(
+                      fontSize: 13,
+                      color: Colors.grey[600],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+            // 가격 버튼 (간격 넓히기)
+            const SizedBox(width: 24),
+            Container(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+              decoration: BoxDecoration(
+                color: const Color(0xFFF5F5F5),
+                borderRadius: BorderRadius.circular(12),
+              ),
+              child: Text(
+                price,
+                style: const TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF333333),
+                ),
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 
@@ -166,7 +642,7 @@ class _ShopScreenState extends State<ShopScreen>
 
     return Container(
       width: double.infinity,
-      margin: const EdgeInsets.all(16),
+      margin: const EdgeInsets.symmetric(horizontal: 16),
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         color: Colors.white,
@@ -243,10 +719,10 @@ class _ShopScreenState extends State<ShopScreen>
     }
 
     return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16),
+      padding: const EdgeInsets.all(16),
       child: GridView.builder(
         gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 2, // 한 줄에 2개
+          crossAxisCount: 2,
           crossAxisSpacing: 12,
           mainAxisSpacing: 12,
           childAspectRatio: 0.85,
@@ -289,7 +765,6 @@ class _ShopScreenState extends State<ShopScreen>
           borderRadius: BorderRadius.circular(13),
           child: Stack(
             children: [
-              // 테마 이미지 또는 기본 배경
               Container(
                 width: double.infinity,
                 height: double.infinity,
@@ -320,12 +795,10 @@ class _ShopScreenState extends State<ShopScreen>
                         },
                       ),
               ),
-              // 어두운 오버레이 (미구매 시)
               if (!theme.isPurchased)
                 Container(
                   color: Colors.black.withOpacity(0.5),
                 ),
-              // 선택됨 표시
               if (isSelected)
                 Positioned(
                   top: 8,
@@ -343,7 +816,6 @@ class _ShopScreenState extends State<ShopScreen>
                     ),
                   ),
                 ),
-              // 테마 정보
               Positioned(
                 bottom: 0,
                 left: 0,
@@ -433,10 +905,8 @@ class _ShopScreenState extends State<ShopScreen>
   /// 테마 카드 탭 이벤트
   void _onThemeCardTapped(ThemeItem theme) {
     if (theme.isPurchased) {
-      // 이미 구매한 테마 -> 선택
       _selectTheme(theme);
     } else {
-      // 미구매 테마 -> 구매 다이얼로그 표시
       _showPurchaseDialog(theme);
     }
   }
@@ -475,7 +945,6 @@ class _ShopScreenState extends State<ShopScreen>
         content: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 테마 이미지 미리보기
             Container(
               width: 150,
               height: 150,
@@ -601,7 +1070,6 @@ class _ShopScreenState extends State<ShopScreen>
   void _purchaseTheme(ThemeItem theme) async {
     final localizations = AppLocalizations.of(context)!;
 
-    // 코인 차감
     final success = await CoinManager.spendCoins(theme.price);
     if (!success) {
       Navigator.of(context).pop();
@@ -609,18 +1077,125 @@ class _ShopScreenState extends State<ShopScreen>
       return;
     }
 
-    // 테마 구매
     await _themeManager.purchaseTheme(theme.id);
-
-    // 테마 자동 선택
     await _themeManager.selectTheme(theme.id);
-
-    // 데이터 리로드
     await _loadData();
 
     if (mounted) {
       Navigator.of(context).pop();
       _showSuccessMessage(localizations.themePurchased);
+    }
+  }
+
+  /// 인앱결제 상품 구매
+  ///
+  /// [productId]에 해당하는 상품의 구매를 요청합니다.
+  ///
+  /// 중요: buyProduct()의 반환값은 구매 요청이 성공적으로 시작되었는지만 나타냅니다.
+  /// 실제 구매 완료는 purchaseCompleted 스트림을 통해 _onPurchaseCompleted()에서 처리됩니다.
+  void _purchaseProduct(String productId) async {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    // 이미 구매 중인 경우 중복 요청 방지
+    if (_purchasingProductId != null) {
+      _showErrorMessage(
+        isKorean
+            ? '구매 처리 중입니다. 잠시만 기다려주세요.'
+            : 'Purchase in progress. Please wait.',
+      );
+      return;
+    }
+
+    // 구매 중 로딩 표시
+    _purchasingProductId = productId;
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const CircularProgressIndicator(),
+            const SizedBox(height: 16),
+            Text(
+              isKorean ? '구매 처리 중...' : 'Processing purchase...',
+              style: const TextStyle(fontSize: 14),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    // 구매 요청 시작
+    // 반환값은 요청 시작 성공 여부일 뿐, 실제 구매 완료는 아님
+    final success = await _iapService.buyProduct(productId);
+
+    if (mounted) {
+      if (!success) {
+        // 구매 요청 실패 시 (상품을 찾을 수 없음, 이미 구매함 등)
+        Navigator.of(context).pop(); // 로딩 닫기
+        _purchasingProductId = null;
+
+        _showErrorMessage(
+          isKorean
+              ? '구매 요청에 실패했습니다. 다시 시도해주세요.'
+              : 'Purchase request failed. Please try again.',
+        );
+      }
+      // 구매 요청이 성공한 경우, 실제 구매 완료는 _onPurchaseCompleted()에서 처리됨
+      // 로딩 다이얼로그는 구매 완료 시점에 닫힘
+    }
+  }
+
+  /// 구매 완료 콜백
+  ///
+  /// purchaseCompleted 스트림을 통해 실제 구매가 완료되었을 때 호출됩니다.
+  /// 이 시점에서 UI를 업데이트하고 성공 메시지를 표시합니다.
+  void _onPurchaseCompleted(String productId) async {
+    if (!mounted) return;
+
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    // 로딩 다이얼로그 닫기
+    if (_purchasingProductId == productId) {
+      Navigator.of(context).pop();
+      _purchasingProductId = null;
+    }
+
+    // 데이터 리로드
+    await _ticketManager.initialize();
+
+    // UI 업데이트
+    setState(() {
+      _currentTickets = _ticketManager.ticketCount;
+    });
+
+    // 성공 메시지 표시
+    _showSuccessMessage(
+      isKorean ? '구매가 완료되었습니다!' : 'Purchase complete!',
+    );
+
+    print('[ShopScreen] 구매 완료 처리됨: $productId');
+  }
+
+  /// 구매 복원
+  ///
+  /// 비소비성 상품(광고 제거 등)의 구매를 복원합니다.
+  /// 복원된 구매는 purchaseCompleted 스트림을 통해 알림을 받습니다.
+  void _restorePurchases() async {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    // 구매 복원 요청
+    await _iapService.restorePurchases();
+
+    if (mounted) {
+      // 복원은 비동기로 처리되므로, 실제 복원 완료는 purchaseCompleted 스트림을 통해 알림을 받음
+      // 여기서는 요청이 제출되었다는 메시지만 표시
+      _showSuccessMessage(
+        isKorean
+            ? '구매 복원을 요청했습니다. 잠시만 기다려주세요.'
+            : 'Restore request submitted. Please wait.',
+      );
     }
   }
 
@@ -646,4 +1221,3 @@ class _ShopScreenState extends State<ShopScreen>
     );
   }
 }
-

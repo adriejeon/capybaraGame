@@ -167,31 +167,31 @@ abstract class AppLocalizations {
   /// No description provided for @level1.
   ///
   /// In ko, this message translates to:
-  /// **'아기 단계'**
+  /// **'아기바라'**
   String get level1;
 
   /// No description provided for @level2.
   ///
   /// In ko, this message translates to:
-  /// **'어린이 단계'**
+  /// **'어린이바라'**
   String get level2;
 
   /// No description provided for @level3.
   ///
   /// In ko, this message translates to:
-  /// **'청소년 단계'**
+  /// **'청소년바라'**
   String get level3;
 
   /// No description provided for @level4.
   ///
   /// In ko, this message translates to:
-  /// **'어른 단계'**
+  /// **'어른바라'**
   String get level4;
 
   /// No description provided for @level5.
   ///
   /// In ko, this message translates to:
-  /// **'신의 경지'**
+  /// **'신이된바라'**
   String get level5;
 
   /// No description provided for @collection.

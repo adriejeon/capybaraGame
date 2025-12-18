@@ -4,7 +4,11 @@
 // 사용법:
 //   spot_difference_data.dart 파일의 _spotData 맵에
 //   아래 내용을 복사하여 붙여넣으세요.
+//
+// 주의: 이 파일은 템플릿 파일이므로 Dart 코드로 실행되지 않습니다.
+// 실제 사용을 위해서는 아래 코드를 spot_difference_data.dart에 복사하세요.
 
+/*
 static final Map<String, List<DifferenceSpot>> _spotData = {
   '1-1': [
     const DifferenceSpot(x: 0.5635, y: 0.715, radius: 0.1436),
@@ -195,3 +199,4 @@ static final Map<String, List<DifferenceSpot>> _spotData = {
     const DifferenceSpot(x: 0.376, y: 0.215, radius: 0.0416),
   ],
 };
+*/

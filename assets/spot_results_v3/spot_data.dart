@@ -1,6 +1,10 @@
 // 자동 생성된 스팟 데이터 (v3.0 - 색상 감지 강화)
 // 생성 스크립트: find_differences_v3.py
+//
+// 주의: 이 파일은 템플릿 파일이므로 Dart 코드로 실행되지 않습니다.
+// 실제 사용을 위해서는 아래 코드를 spot_difference_data.dart에 복사하세요.
 
+/*
 static final Map<String, List<DifferenceSpot>> _spotData = {
   '1-1': [
     const DifferenceSpot(x: 0.6221, y: 0.5664, radius: 0.4529),
@@ -394,3 +398,4 @@ static final Map<String, List<DifferenceSpot>> _spotData = {
     const DifferenceSpot(x: 0.8779, y: 0.0647, radius: 0.0422),
   ],
 };
+*/

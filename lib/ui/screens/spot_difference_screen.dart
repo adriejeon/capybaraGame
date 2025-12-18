@@ -41,7 +41,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   int _wrongTaps = 0; // 틀린 터치 횟수
 
   // 디버그 모드 (개발 중에만 true로 설정)
-  static const bool _debugMode = true;
+  static const bool _debugMode = false;
   String _lastTapCoord = '';
 
   // 이미지 확대 보기 상태
@@ -97,8 +97,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       return;
     }
 
-    _foundSpots =
-        List.filled(_currentStage!.spots.length, false);
+    _foundSpots = List.filled(_currentStage!.spots.length, false);
     _remainingTime = _currentStage!.timeLimit;
     _isGameOver = false;
     _isGameWon = false;
@@ -123,7 +122,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           setState(() {
             _imageAspectRatio = info.image.height / info.image.width;
           });
-          print('[SpotDifference] 이미지 비율: $_imageAspectRatio (${info.image.width}x${info.image.height})');
+          print(
+              '[SpotDifference] 이미지 비율: $_imageAspectRatio (${info.image.width}x${info.image.height})');
         }
       }),
     );
@@ -137,7 +137,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           _remainingTime--;
         });
       } else if (_remainingTime <= 0 && !_isGameOver) {
-        _endGame(false);
+        // 시간초과 시 광고 보고 시간 추가 옵션 제공
+        _showTimeUpDialog();
       }
     });
   }
@@ -165,7 +166,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     // 디버그 모드: 터치 좌표 표시
     if (_debugMode) {
       setState(() {
-        _lastTapCoord = 'x: ${relativeX.toStringAsFixed(2)}, y: ${relativeY.toStringAsFixed(2)}';
+        _lastTapCoord =
+            'x: ${relativeX.toStringAsFixed(2)}, y: ${relativeY.toStringAsFixed(2)}';
       });
     }
 
@@ -185,7 +187,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         });
         _soundManager.playMatchSuccessSound();
         foundAny = true;
-        print('[SpotDifference] 스팟 $i 발견! (터치: $relativeX, $relativeY, 스팟: ${spot.x}, ${spot.y}, 거리: ${sqrt(distance)}, 반경: ${spot.radius})');
+        print(
+            '[SpotDifference] 스팟 $i 발견! (터치: $relativeX, $relativeY, 스팟: ${spot.x}, ${spot.y}, 거리: ${sqrt(distance)}, 반경: ${spot.radius})');
         break;
       }
     }
@@ -224,9 +227,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
   /// 승리 다이얼로그
   void _showWinDialog() async {
-    // 전면 광고 표시
-    await _adMobHandler.showInterstitialAd();
-
     if (!mounted) return;
 
     // 뽑기권 획득 시도
@@ -245,7 +245,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         remainingTickets: _ticketManager.remainingDailyTickets,
         onClaimTicket: () async {
           Navigator.of(context).pop();
-          await _claimTicket();
+          await _claimTicketWithAd();
         },
         onHome: () {
           Navigator.of(context).pop();
@@ -257,6 +257,19 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         },
       ),
     );
+  }
+
+  /// 전면 광고 보고 뽑기권 획득
+  Future<void> _claimTicketWithAd() async {
+    if (!mounted) return;
+
+    // 전면 광고 표시
+    await _adMobHandler.showInterstitialAd();
+
+    if (!mounted) return;
+
+    // 뽑기권 획득
+    await _claimTicket();
   }
 
   /// 뽑기권 획득
@@ -307,31 +320,43 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              // 뽑기권 아이콘 (임시 회색 박스)
-              Container(
-                width: 100,
-                height: 100,
-                decoration: BoxDecoration(
-                  color: Colors.grey[400],
-                  borderRadius: BorderRadius.circular(20),
-                  border: Border.all(color: Colors.grey[600]!, width: 2),
-                ),
-                child: const Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.confirmation_number, size: 40, color: Colors.white),
-                      SizedBox(height: 4),
-                      Text(
-                        '+1',
-                        style: TextStyle(
-                          fontSize: 20,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.white,
+              // 뽑기권 이미지
+              ClipRRect(
+                borderRadius: BorderRadius.circular(20),
+                child: Image.asset(
+                  'assets/images/gacha_coin.png',
+                  width: 100,
+                  height: 100,
+                  fit: BoxFit.cover,
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      width: 100,
+                      height: 100,
+                      decoration: BoxDecoration(
+                        color: Colors.grey[400],
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: Colors.grey[600]!, width: 2),
+                      ),
+                      child: const Center(
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(Icons.confirmation_number,
+                                size: 40, color: Colors.white),
+                            SizedBox(height: 4),
+                            Text(
+                              '+1',
+                              style: TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    ],
-                  ),
+                    );
+                  },
                 ),
               ),
               const SizedBox(height: 24),
@@ -366,29 +391,29 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                         Navigator.of(context).pop();
                         Navigator.of(context).pop();
                       },
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A90E2),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
                       child: Text(
                         isKorean ? '홈으로' : 'Home',
                         style: const TextStyle(
                           fontSize: 16,
-                          color: Color(0xFF4A90E2),
+                          fontWeight: FontWeight.bold,
                         ),
                       ),
                     ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(
-                    child: ElevatedButton(
+                    child: TextButton(
                       onPressed: () {
                         Navigator.of(context).pop();
                         _restartGame();
                       },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4A90E2),
-                        foregroundColor: Colors.white,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A90E2),
                         padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
                       ),
                       child: Text(
                         isKorean ? '다시하기' : 'Play Again',
@@ -408,6 +433,121 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     );
   }
 
+  /// 시간초과 다이얼로그 (광고 보고 시간 추가 옵션)
+  void _showTimeUpDialog() {
+    _gameTimer?.cancel();
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        backgroundColor: Colors.white,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        title: Text(
+          isKorean ? '시간 초과!' : 'Time\'s Up!',
+          style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
+        ),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Icon(Icons.timer_off, size: 64, color: Colors.orange),
+            const SizedBox(height: 16),
+            Text(
+              isKorean
+                  ? '${_foundSpots.where((f) => f).length}/${_currentStage?.spots.length ?? 0}개 발견'
+                  : 'Found ${_foundSpots.where((f) => f).length}/${_currentStage?.spots.length ?? 0}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+            const SizedBox(height: 20),
+            Container(
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: const Color(0xFFFFF8E1),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: const Color(0xFFFFD699)),
+              ),
+              child: Column(
+                children: [
+                  Icon(Icons.play_circle_outline,
+                      size: 40, color: Colors.orange[700]),
+                  const SizedBox(height: 8),
+                  Text(
+                    isKorean
+                        ? '광고를 보고\n30초를 추가하시겠어요?'
+                        : 'Watch an ad to\nadd 30 seconds?',
+                    textAlign: TextAlign.center,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.grey[800],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+        actions: [
+          Column(
+            children: [
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton.icon(
+                  onPressed: () async {
+                    Navigator.of(context).pop();
+                    await _watchAdForExtraTime();
+                  },
+                  icon: const Icon(Icons.play_circle_outline, size: 24),
+                  label: Text(
+                    isKorean ? '광고 보고 30초 추가' : 'Watch Ad for +30s',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
+                    ),
+                    elevation: 0,
+                  ),
+                ),
+              ),
+              const SizedBox(height: 8),
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: () {
+                        Navigator.of(context).pop();
+                        _endGame(false);
+                      },
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A90E2),
+                        padding: const EdgeInsets.symmetric(vertical: 16),
+                      ),
+                      child: Text(
+                        isKorean ? '포기' : 'Give Up',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ],
+      ),
+    );
+  }
+
   /// 패배 다이얼로그
   void _showLoseDialog() {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
@@ -419,7 +559,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         backgroundColor: Colors.white,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         title: Text(
-          isKorean ? '시간 초과!' : 'Time\'s Up!',
+          isKorean ? '게임 오버!' : 'Game Over!',
           style: const TextStyle(fontSize: 24, fontWeight: FontWeight.bold),
         ),
         content: Column(
@@ -444,24 +584,28 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                     Navigator.of(context).pop();
                     Navigator.of(context).pop();
                   },
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                  ),
                   child: Text(
                     isKorean ? '홈으로' : 'Home',
                     style: const TextStyle(
                       fontSize: 16,
-                      color: Color(0xFF4A90E2),
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
                 ),
               ),
               Expanded(
-                child: ElevatedButton(
+                child: TextButton(
                   onPressed: () {
                     Navigator.of(context).pop();
                     _restartGame();
                   },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF4A90E2),
-                    foregroundColor: Colors.white,
+                  style: TextButton.styleFrom(
+                    foregroundColor: const Color(0xFF4A90E2),
+                    padding: const EdgeInsets.symmetric(vertical: 16),
                   ),
                   child: Text(
                     isKorean ? '다시하기' : 'Retry',
@@ -484,6 +628,69 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     setState(() {
       _initializeGame();
     });
+  }
+
+  /// 광고 보고 30초 추가
+  Future<void> _watchAdForExtraTime() async {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    // 보상형 광고 표시
+    if (_adMobHandler.isRewardedAdLoaded) {
+      bool rewarded = false;
+
+      await _adMobHandler.showRewardedAd(
+        onRewarded: (rewardItem) {
+          rewarded = true;
+        },
+      );
+
+      if (rewarded && mounted) {
+        // 30초 추가
+        setState(() {
+          _remainingTime += 30;
+        });
+        _startTimer();
+
+        // 성공 메시지
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                isKorean ? '30초가 추가되었습니다!' : '30 seconds added!',
+                style: const TextStyle(fontSize: 16),
+              ),
+              backgroundColor: Colors.green,
+              duration: const Duration(seconds: 2),
+            ),
+          );
+        }
+
+        // 다음 광고 로드
+        await _adMobHandler.loadRewardedAd();
+      } else {
+        // 광고를 끝까지 보지 않음 - 게임 종료
+        if (mounted) {
+          _endGame(false);
+        }
+      }
+    } else {
+      // 광고가 로드되지 않음 - 게임 종료
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              isKorean ? '광고를 불러올 수 없습니다' : 'Cannot load ad',
+              style: const TextStyle(fontSize: 16),
+            ),
+            backgroundColor: Colors.red,
+            duration: const Duration(seconds: 2),
+          ),
+        );
+
+        // 게임 종료
+        _endGame(false);
+      }
+    }
   }
 
   /// 힌트 사용 (광고 시청 후)
@@ -646,17 +853,17 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      color: _isShowingHint
-          ? const Color(0xFFFFF8E1)
-          : const Color(0xFFE6F3FF),
+      color: _isShowingHint ? const Color(0xFFFFF8E1) : const Color(0xFFE6F3FF),
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceAround,
             children: [
-              _buildInfoItem(isKorean ? '시간' : 'Time', _formatTime(_remainingTime)),
-              _buildInfoItem(isKorean ? '발견' : 'Found', '$foundCount/$totalCount'),
+              _buildInfoItem(
+                  isKorean ? '시간' : 'Time', _formatTime(_remainingTime)),
+              _buildInfoItem(
+                  isKorean ? '발견' : 'Found', '$foundCount/$totalCount'),
               _buildInfoItem(isKorean ? '오답' : 'Wrong', '$_wrongTaps'),
             ],
           ),
@@ -814,7 +1021,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                       // 이미지
                       Image.asset(
                         imagePath,
-                        fit: BoxFit.contain, // cover -> contain으로 변경 (이미지 전체 표시)
+                        fit:
+                            BoxFit.contain, // cover -> contain으로 변경 (이미지 전체 표시)
                         errorBuilder: (context, error, stackTrace) {
                           return Container(
                             color: Colors.grey[300],
@@ -930,7 +1138,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     for (int i = 0; i < _foundSpots.length; i++) {
       final spot = _currentStage!.spots[i];
       final isFound = _foundSpots[i];
-      
+
       markers.add(
         Positioned(
           left: spot.x * imageWidth - 20,
@@ -944,7 +1152,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                 color: isFound ? Colors.green : Colors.red,
                 width: 2,
               ),
-              color: isFound 
+              color: isFound
                   ? Colors.green.withOpacity(0.2)
                   : Colors.red.withOpacity(0.2),
             ),
@@ -961,7 +1169,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           ),
         ),
       );
-      
+
       // 반경 표시 (원)
       markers.add(
         Positioned(
@@ -973,7 +1181,9 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
-                color: isFound ? Colors.green.withOpacity(0.5) : Colors.red.withOpacity(0.5),
+                color: isFound
+                    ? Colors.green.withOpacity(0.5)
+                    : Colors.red.withOpacity(0.5),
                 width: 1,
                 style: BorderStyle.solid,
               ),
@@ -998,7 +1208,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
             GestureDetector(
               onTap: _useHint,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
                 decoration: BoxDecoration(
                   color: const Color(0xFF4A90E2),
                   borderRadius: BorderRadius.circular(25),
@@ -1076,7 +1287,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
               top: 50,
               left: 20,
               child: Container(
-                padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 decoration: BoxDecoration(
                   color: Colors.black.withOpacity(0.5),
                   borderRadius: BorderRadius.circular(20),
@@ -1205,18 +1417,29 @@ class _GameResultDialog extends StatelessWidget {
                 ),
                 child: Column(
                   children: [
-                    // 뽑기권 아이콘 (임시 회색 박스)
-                    Container(
-                      width: 60,
-                      height: 60,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: const Icon(
-                        Icons.confirmation_number,
-                        color: Colors.white,
-                        size: 30,
+                    // 뽑기권 이미지
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(12),
+                      child: Image.asset(
+                        'assets/images/gacha_coin.png',
+                        width: 60,
+                        height: 60,
+                        fit: BoxFit.cover,
+                        errorBuilder: (context, error, stackTrace) {
+                          return Container(
+                            width: 60,
+                            height: 60,
+                            decoration: BoxDecoration(
+                              color: Colors.grey[400],
+                              borderRadius: BorderRadius.circular(12),
+                            ),
+                            child: const Icon(
+                              Icons.confirmation_number,
+                              color: Colors.white,
+                              size: 30,
+                            ),
+                          );
+                        },
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -1245,12 +1468,13 @@ class _GameResultDialog extends StatelessWidget {
                 child: ElevatedButton(
                   onPressed: onClaimTicket,
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFFFFB74D),
+                    backgroundColor: const Color(0xFF4A90E2),
                     foregroundColor: Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 16),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(20),
                     ),
+                    elevation: 0,
                   ),
                   child: Text(
                     isKorean ? '뽑기권 받기' : 'Get Ticket',
@@ -1287,26 +1511,26 @@ class _GameResultDialog extends StatelessWidget {
                 Expanded(
                   child: TextButton(
                     onPressed: onHome,
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF4A90E2),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                    ),
                     child: Text(
                       isKorean ? '홈으로' : 'Home',
                       style: const TextStyle(
                         fontSize: 16,
-                        color: Color(0xFF4A90E2),
+                        fontWeight: FontWeight.bold,
                       ),
                     ),
                   ),
                 ),
                 const SizedBox(width: 12),
                 Expanded(
-                  child: ElevatedButton(
+                  child: TextButton(
                     onPressed: onReplay,
-                    style: ElevatedButton.styleFrom(
-                      backgroundColor: const Color(0xFF4A90E2),
-                      foregroundColor: Colors.white,
+                    style: TextButton.styleFrom(
+                      foregroundColor: const Color(0xFF4A90E2),
                       padding: const EdgeInsets.symmetric(vertical: 14),
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(20),
-                      ),
                     ),
                     child: Text(
                       isKorean ? '다시하기' : 'Play Again',
@@ -1355,4 +1579,3 @@ class _BannerAdContainerState extends State<_BannerAdContainer> {
     );
   }
 }
-

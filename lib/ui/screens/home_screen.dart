@@ -789,20 +789,20 @@ class _HomeScreenState extends State<HomeScreen>
             decoration: BoxDecoration(
               borderRadius: borderRadius,
               border: Border.all(
-                color: Colors.orange.withOpacity(0.85),
+                color: Colors.white.withOpacity(0.85),
                 width: 2,
               ),
               gradient: LinearGradient(
                 begin: Alignment.topLeft,
                 end: Alignment.bottomRight,
                 colors: [
-                  Colors.orange.withOpacity(0.35),
-                  Colors.orange.withOpacity(0.15),
+                  Colors.white.withOpacity(0.35),
+                  Colors.white.withOpacity(0.15),
                 ],
               ),
               boxShadow: [
                 BoxShadow(
-                  color: Colors.orange.withOpacity(0.25),
+                  color: Colors.white.withOpacity(0.25),
                   blurRadius: 12,
                   offset: const Offset(0, 6),
                 ),
@@ -811,56 +811,33 @@ class _HomeScreenState extends State<HomeScreen>
             child: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
-                // 뽑기통 아이콘 (임시)
-                Container(
+                Image.asset(
+                  'assets/images/gacha_coin.png',
                   width: 34,
                   height: 34,
-                  decoration: BoxDecoration(
-                    color: Colors.grey[500],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: const Icon(
-                    Icons.all_inbox,
-                    color: Colors.white,
-                    size: 20,
-                  ),
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.all_inbox,
+                      color: Colors.white,
+                      size: 34,
+                    );
+                  },
                 ),
                 const SizedBox(width: 10),
-                Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    const Text(
-                      '뽑기통',
-                      style: TextStyle(
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black26,
-                            offset: Offset(0, 1),
-                            blurRadius: 2,
-                          ),
-                        ],
+                Text(
+                  '$_currentTickets',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black26,
+                        offset: Offset(0, 1),
+                        blurRadius: 2,
                       ),
-                    ),
-                    Text(
-                      '$_currentTickets장',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.white,
-                        shadows: [
-                          Shadow(
-                            color: Colors.black26,
-                            offset: Offset(0, 1),
-                            blurRadius: 2,
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -1370,7 +1347,8 @@ class _HomeScreenState extends State<HomeScreen>
                 context: context,
                 icon: Icons.grid_view_rounded,
                 title: isKorean ? '동일한 카드 짝 맞추기' : 'Card Matching',
-                subtitle: isKorean ? '같은 카드를 찾아 짝을 맞추세요' : 'Find matching cards',
+                subtitle:
+                    isKorean ? '같은 카드를 찾아 짝을 맞추세요' : 'Find matching cards',
                 color: const Color(0xFF4A90E2),
                 onTap: () async {
                   Navigator.of(context).pop();
@@ -1385,7 +1363,9 @@ class _HomeScreenState extends State<HomeScreen>
                 context: context,
                 icon: Icons.search_rounded,
                 title: isKorean ? '틀린그림 찾기' : 'Spot the Difference',
-                subtitle: isKorean ? '두 그림의 다른 부분을 찾으세요' : 'Find differences between images',
+                subtitle: isKorean
+                    ? '두 그림의 다른 부분을 찾으세요'
+                    : 'Find differences between images',
                 color: const Color(0xFFFF9800),
                 onTap: () async {
                   Navigator.of(context).pop();

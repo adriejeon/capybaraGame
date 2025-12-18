@@ -63,6 +63,9 @@ dependencies:
   # 게임 서비스 (리더보드, 업적)
   games_services: ^4.0.0
 
+  # 인앱결제
+  in_app_purchase: ^3.2.0
+
 dev_dependencies:
   flutter_test:
     sdk: flutter
