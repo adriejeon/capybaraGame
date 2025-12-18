@@ -657,3 +657,4 @@ class _GachaScreenState extends State<GachaScreen>
     );
   }
 }
+

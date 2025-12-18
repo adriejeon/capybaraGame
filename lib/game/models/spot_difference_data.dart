@@ -104,237 +104,218 @@ class SpotDifferenceDataManager {
     5: 6, // 6개
   };
 
-  /// 모든 스테이지 데이터 (OpenCV 자동 분석 + 수동 조정)
-  /// 이미지 비교 스크립트로 자동 감지 후 수동 검증 완료
+  /// 모든 스테이지 데이터 (OpenCV 자동 분석 결과 - v3.0 색상 감지 강화)
+  /// find_differences_v3.py 스크립트로 자동 생성됨
   static final Map<String, List<DifferenceSpot>> _spotData = {
-    // ========== 레벨 1 (아기 단계) - 3개 스팟 ==========
-    // 1-1: 태양(얼굴), 모자(밀짚->베레), 옷(줄무늬->별무늬), 음식(수박->오렌지), 야자수(코코넛)
+    // ========== 레벨 1 (아기 단계) ==========
     '1-1': [
-      const DifferenceSpot(x: 0.46, y: 0.08, radius: 0.08),   // 태양 얼굴
-      const DifferenceSpot(x: 0.50, y: 0.28, radius: 0.10),   // 모자
-      const DifferenceSpot(x: 0.04, y: 0.32, radius: 0.06),   // 야자수 코코넛
+      const DifferenceSpot(x: 0.6494, y: 0.7902, radius: 0.2473),
+      const DifferenceSpot(x: 0.5166, y: 0.3339, radius: 0.198),
+      const DifferenceSpot(x: 0.0342, y: 0.3479, radius: 0.0416),
+      const DifferenceSpot(x: 0.5645, y: 0.1066, radius: 0.116),
     ],
-    // 1-2: 침대에서 자는 카피바라 (수동 조정)
-    // 실제 차이점: 1) 담요 폴카닷, 2) 화분 잎 색상, 3) 책 개수
     '1-2': [
-      const DifferenceSpot(x: 0.50, y: 0.55, radius: 0.12),   // 담요 폴카닷 (카피바라 몸 위)
-      const DifferenceSpot(x: 0.15, y: 0.25, radius: 0.08),   // 화분 잎 색상 (왼쪽 창문)
-      const DifferenceSpot(x: 0.10, y: 0.20, radius: 0.06),   // 책 개수 (창문 위)
+      const DifferenceSpot(x: 0.8076, y: 0.4983, radius: 0.0633),   // 램프 (주황→초록)
+      const DifferenceSpot(x: 0.3887, y: 0.2028, radius: 0.0938),   // 화분
+      const DifferenceSpot(x: 0.791, y: 0.2168, radius: 0.068),     // 벽 그림
     ],
-    // 1-3: 자동 감지 결과 기반
     '1-3': [
-      const DifferenceSpot(x: 0.19, y: 0.67, radius: 0.08),
-      const DifferenceSpot(x: 0.35, y: 0.30, radius: 0.06),
-      const DifferenceSpot(x: 0.86, y: 0.10, radius: 0.08),
+      const DifferenceSpot(x: 0.9121, y: 0.8899, radius: 0.0885),
+      const DifferenceSpot(x: 0.1895, y: 0.7133, radius: 0.1096),
+      const DifferenceSpot(x: 0.9492, y: 0.5717, radius: 0.0609),
+      const DifferenceSpot(x: 0.8232, y: 0.1259, radius: 0.0434),
+      const DifferenceSpot(x: 0.1006, y: 0.1101, radius: 0.1207),
     ],
-    // 1-4: 자동 감지 결과 기반
     '1-4': [
-      const DifferenceSpot(x: 0.24, y: 0.73, radius: 0.08),
-      const DifferenceSpot(x: 0.41, y: 0.67, radius: 0.08),
-      const DifferenceSpot(x: 0.59, y: 0.40, radius: 0.06),
+      const DifferenceSpot(x: 0.8789, y: 0.8322, radius: 0.1318),
+      const DifferenceSpot(x: 0.3096, y: 0.6731, radius: 0.3715),
+      const DifferenceSpot(x: 0.6943, y: 0.4545, radius: 0.0984),
+      const DifferenceSpot(x: 0.6758, y: 0.1993, radius: 0.0527),
+      const DifferenceSpot(x: 0.6895, y: 0.0507, radius: 0.0422),
     ],
-    // 1-5: 자동 감지 결과 기반
     '1-5': [
-      const DifferenceSpot(x: 0.81, y: 0.46, radius: 0.06),
-      const DifferenceSpot(x: 0.41, y: 0.20, radius: 0.08),
-      const DifferenceSpot(x: 0.08, y: 0.08, radius: 0.08),
+      const DifferenceSpot(x: 0.8135, y: 0.9266, radius: 0.2039),
+      const DifferenceSpot(x: 0.4961, y: 0.7902, radius: 0.1541),
+      const DifferenceSpot(x: 0.8105, y: 0.4563, radius: 0.0311),
+      const DifferenceSpot(x: 0.959, y: 0.486, radius: 0.0586),
+      const DifferenceSpot(x: 0.4023, y: 0.201, radius: 0.0762),
+      const DifferenceSpot(x: 0.0762, y: 0.0664, radius: 0.0709),
     ],
-    // 1-6: 아기카피바라 옷색상, 버섯, 새 (이미지 비율: 1024x448)
     '1-6': [
-      const DifferenceSpot(x: 0.30, y: 0.52, radius: 0.10),   // 왼쪽 아기 카피바라 옷 (파란줄→빨간줄)
-      const DifferenceSpot(x: 0.12, y: 0.58, radius: 0.08),   // 버섯 추가
-      const DifferenceSpot(x: 0.08, y: 0.28, radius: 0.08),   // 새 위치
+      const DifferenceSpot(x: 0.5, y: 0.5, radius: 0.6),
     ],
-    // 1-7: 나비색상, 왼쪽꽃색상, 나뭇잎
     '1-7': [
-      const DifferenceSpot(x: 0.52, y: 0.27, radius: 0.06),   // 나비
-      const DifferenceSpot(x: 0.12, y: 0.52, radius: 0.08),   // 왼쪽 꽃
-      const DifferenceSpot(x: 0.10, y: 0.12, radius: 0.08),   // 나뭇잎
+      const DifferenceSpot(x: 0.5, y: 0.5, radius: 0.6),
     ],
 
-    // ========== 레벨 2 (어린이 단계) - 4개 스팟 ==========
+    // ========== 레벨 2 (어린이 단계) ==========
     '2-1': [
-      const DifferenceSpot(x: 0.65, y: 0.92, radius: 0.06),
-      const DifferenceSpot(x: 0.74, y: 0.54, radius: 0.06),
-      const DifferenceSpot(x: 0.23, y: 0.44, radius: 0.08),
-      const DifferenceSpot(x: 0.64, y: 0.27, radius: 0.07),
+      const DifferenceSpot(x: 0.5146, y: 0.8024, radius: 0.0521),
+      const DifferenceSpot(x: 0.7422, y: 0.5402, radius: 0.0275),
+      const DifferenceSpot(x: 0.2363, y: 0.4371, radius: 0.0961),
+      const DifferenceSpot(x: 0.6338, y: 0.1818, radius: 0.1225),
     ],
     '2-2': [
-      const DifferenceSpot(x: 0.96, y: 0.93, radius: 0.05),
-      const DifferenceSpot(x: 0.93, y: 0.74, radius: 0.05),
-      const DifferenceSpot(x: 0.51, y: 0.43, radius: 0.07),
-      const DifferenceSpot(x: 0.81, y: 0.32, radius: 0.10),
+      const DifferenceSpot(x: 0.959, y: 0.9283, radius: 0.0316),
+      const DifferenceSpot(x: 0.9365, y: 0.7395, radius: 0.0434),
+      const DifferenceSpot(x: 0.5059, y: 0.4301, radius: 0.0604),
+      const DifferenceSpot(x: 0.7871, y: 0.299, radius: 0.2549),
     ],
     '2-3': [
-      const DifferenceSpot(x: 0.96, y: 0.93, radius: 0.05),
-      const DifferenceSpot(x: 0.10, y: 0.79, radius: 0.05),
-      const DifferenceSpot(x: 0.93, y: 0.74, radius: 0.05),
-      const DifferenceSpot(x: 0.51, y: 0.52, radius: 0.12),
+      const DifferenceSpot(x: 0.959, y: 0.9301, radius: 0.0316),
+      const DifferenceSpot(x: 0.1826, y: 0.5804, radius: 0.0369),
+      const DifferenceSpot(x: 0.542, y: 0.2745, radius: 0.0562),
+      const DifferenceSpot(x: 0.834, y: 0.1101, radius: 0.0387),
     ],
     '2-4': [
-      const DifferenceSpot(x: 0.84, y: 0.70, radius: 0.06),
-      const DifferenceSpot(x: 0.68, y: 0.66, radius: 0.06),
-      const DifferenceSpot(x: 0.56, y: 0.41, radius: 0.08),
-      const DifferenceSpot(x: 0.41, y: 0.40, radius: 0.07),
+      const DifferenceSpot(x: 0.959, y: 0.9283, radius: 0.0316),
+      const DifferenceSpot(x: 0.6201, y: 0.6871, radius: 0.1213),
+      const DifferenceSpot(x: 0.834, y: 0.6958, radius: 0.0521),
+      const DifferenceSpot(x: 0.0723, y: 0.3794, radius: 0.1254),
     ],
     '2-5': [
-      const DifferenceSpot(x: 0.17, y: 0.82, radius: 0.06),
-      const DifferenceSpot(x: 0.39, y: 0.77, radius: 0.06),
-      const DifferenceSpot(x: 0.20, y: 0.58, radius: 0.08),
-      const DifferenceSpot(x: 0.92, y: 0.43, radius: 0.07),
+      const DifferenceSpot(x: 0.9629, y: 0.9318, radius: 0.0375),
+      const DifferenceSpot(x: 0.8623, y: 0.8986, radius: 0.1014),
+      const DifferenceSpot(x: 0.2012, y: 0.5787, radius: 0.0873),
+      const DifferenceSpot(x: 0.915, y: 0.4073, radius: 0.0832),
     ],
     '2-6': [
-      const DifferenceSpot(x: 0.03, y: 0.87, radius: 0.05),
-      const DifferenceSpot(x: 0.97, y: 0.71, radius: 0.05),
-      const DifferenceSpot(x: 0.70, y: 0.42, radius: 0.08),
-      const DifferenceSpot(x: 0.21, y: 0.41, radius: 0.06),
+      const DifferenceSpot(x: 0.9697, y: 0.7133, radius: 0.0363),
+      const DifferenceSpot(x: 0.6777, y: 0.5507, radius: 0.1646),
+      const DifferenceSpot(x: 0.21, y: 0.4143, radius: 0.0451),
+      const DifferenceSpot(x: 0.333, y: 0.0857, radius: 0.0574),
     ],
 
-    // ========== 레벨 3 (청소년 단계) - 5개 스팟 ==========
+    // ========== 레벨 3 (청소년 단계) ==========
     '3-1': [
-      const DifferenceSpot(x: 0.27, y: 0.90, radius: 0.07),
-      const DifferenceSpot(x: 0.13, y: 0.84, radius: 0.05),
-      const DifferenceSpot(x: 0.89, y: 0.82, radius: 0.05),
-      const DifferenceSpot(x: 0.43, y: 0.66, radius: 0.06),
-      const DifferenceSpot(x: 0.46, y: 0.14, radius: 0.06),
+      const DifferenceSpot(x: 0.7988, y: 0.8934, radius: 0.184),
+      const DifferenceSpot(x: 0.1016, y: 0.8252, radius: 0.0691),
+      const DifferenceSpot(x: 0.9248, y: 0.722, radius: 0.0357),
+      const DifferenceSpot(x: 0.7725, y: 0.4423, radius: 0.0428),
+      const DifferenceSpot(x: 0.4531, y: 0.1119, radius: 0.0715),
     ],
     '3-2': [
-      const DifferenceSpot(x: 0.32, y: 0.92, radius: 0.07),
-      const DifferenceSpot(x: 0.74, y: 0.50, radius: 0.12),
-      const DifferenceSpot(x: 0.33, y: 0.70, radius: 0.08),
-      const DifferenceSpot(x: 0.45, y: 0.25, radius: 0.08),
-      const DifferenceSpot(x: 0.85, y: 0.15, radius: 0.06),
+      const DifferenceSpot(x: 0.7363, y: 0.5, radius: 0.3352),
+      const DifferenceSpot(x: 0.877, y: 0.8689, radius: 0.133),
+      const DifferenceSpot(x: 0.334, y: 0.7028, radius: 0.102),
+      const DifferenceSpot(x: 0.2295, y: 0.4948, radius: 0.1154),
+      const DifferenceSpot(x: 0.624, y: 0.0542, radius: 0.0363),
     ],
     '3-3': [
-      const DifferenceSpot(x: 0.45, y: 0.63, radius: 0.06),
-      const DifferenceSpot(x: 0.30, y: 0.63, radius: 0.06),
-      const DifferenceSpot(x: 0.72, y: 0.45, radius: 0.07),
-      const DifferenceSpot(x: 0.49, y: 0.34, radius: 0.08),
-      const DifferenceSpot(x: 0.17, y: 0.11, radius: 0.08),
+      const DifferenceSpot(x: 0.499, y: 0.8689, radius: 0.0592),
+      const DifferenceSpot(x: 0.0654, y: 0.5524, radius: 0.0814),
+      const DifferenceSpot(x: 0.2881, y: 0.5997, radius: 0.1055),
+      const DifferenceSpot(x: 0.4473, y: 0.6486, radius: 0.0779),
+      const DifferenceSpot(x: 0.3301, y: 0.2395, radius: 0.2918),
     ],
     '3-4': [
-      const DifferenceSpot(x: 0.92, y: 0.74, radius: 0.08),
-      const DifferenceSpot(x: 0.50, y: 0.67, radius: 0.05),
-      const DifferenceSpot(x: 0.68, y: 0.60, radius: 0.05),
-      const DifferenceSpot(x: 0.32, y: 0.34, radius: 0.12),
-      const DifferenceSpot(x: 0.14, y: 0.05, radius: 0.05),
+      const DifferenceSpot(x: 0.8281, y: 0.9318, radius: 0.0768),
+      const DifferenceSpot(x: 0.96, y: 0.9283, radius: 0.0299),
+      const DifferenceSpot(x: 0.6074, y: 0.6678, radius: 0.1723),
+      const DifferenceSpot(x: 0.3398, y: 0.3531, radius: 0.2062),
+      const DifferenceSpot(x: 0.1191, y: 0.3234, radius: 0.0861),
     ],
     '3-5': [
-      const DifferenceSpot(x: 0.88, y: 0.97, radius: 0.06),
-      const DifferenceSpot(x: 0.76, y: 0.79, radius: 0.05),
-      const DifferenceSpot(x: 0.90, y: 0.67, radius: 0.08),
-      const DifferenceSpot(x: 0.30, y: 0.55, radius: 0.15),
-      const DifferenceSpot(x: 0.95, y: 0.22, radius: 0.08),
+      const DifferenceSpot(x: 0.8408, y: 0.7028, radius: 0.1986),
+      const DifferenceSpot(x: 0.0723, y: 0.4808, radius: 0.0697),
+      const DifferenceSpot(x: 0.3643, y: 0.4318, radius: 0.0521),
+      const DifferenceSpot(x: 0.0342, y: 0.2203, radius: 0.0826),
+      const DifferenceSpot(x: 0.9561, y: 0.2185, radius: 0.1037),
     ],
     '3-6': [
-      const DifferenceSpot(x: 0.84, y: 0.91, radius: 0.06),
-      const DifferenceSpot(x: 0.35, y: 0.85, radius: 0.08),
-      const DifferenceSpot(x: 0.12, y: 0.76, radius: 0.10),
-      const DifferenceSpot(x: 0.44, y: 0.56, radius: 0.06),
-      const DifferenceSpot(x: 0.51, y: 0.07, radius: 0.05),
+      const DifferenceSpot(x: 0.8867, y: 0.7587, radius: 0.1494),
+      const DifferenceSpot(x: 0.2451, y: 0.7622, radius: 0.2941),
+      const DifferenceSpot(x: 0.3887, y: 0.549, radius: 0.1418),
+      const DifferenceSpot(x: 0.8594, y: 0.4773, radius: 0.041),
+      const DifferenceSpot(x: 0.5107, y: 0.0699, radius: 0.0469),
     ],
 
-    // ========== 레벨 4 (어른 단계) - 5개 스팟 ==========
+    // ========== 레벨 4 (어른 단계) ==========
     '4-1': [
-      const DifferenceSpot(x: 0.11, y: 0.87, radius: 0.10),
-      const DifferenceSpot(x: 0.77, y: 0.89, radius: 0.07),
-      const DifferenceSpot(x: 0.52, y: 0.51, radius: 0.10),
-      const DifferenceSpot(x: 0.69, y: 0.37, radius: 0.05),
-      const DifferenceSpot(x: 0.33, y: 0.21, radius: 0.06),
+      const DifferenceSpot(x: 0.959, y: 0.9283, radius: 0.0346),
+      const DifferenceSpot(x: 0.7451, y: 0.9353, radius: 0.0926),
+      const DifferenceSpot(x: 0.1309, y: 0.8094, radius: 0.1576),
+      const DifferenceSpot(x: 0.5488, y: 0.5367, radius: 0.2068),
+      const DifferenceSpot(x: 0.3271, y: 0.2063, radius: 0.0445),
     ],
     '4-2': [
-      const DifferenceSpot(x: 0.96, y: 0.93, radius: 0.05),
-      const DifferenceSpot(x: 0.78, y: 0.30, radius: 0.07),
-      const DifferenceSpot(x: 0.10, y: 0.18, radius: 0.05),
-      const DifferenceSpot(x: 0.42, y: 0.73, radius: 0.15),
-      const DifferenceSpot(x: 0.60, y: 0.50, radius: 0.08),
+      const DifferenceSpot(x: 0.5, y: 0.6084, radius: 0.6),
+      const DifferenceSpot(x: 0.8096, y: 0.257, radius: 0.1283),
+      const DifferenceSpot(x: 0.1084, y: 0.1783, radius: 0.0404),
     ],
     '4-3': [
-      const DifferenceSpot(x: 0.96, y: 0.93, radius: 0.05),
-      const DifferenceSpot(x: 0.37, y: 0.63, radius: 0.12),
-      const DifferenceSpot(x: 0.81, y: 0.41, radius: 0.10),
-      const DifferenceSpot(x: 0.50, y: 0.25, radius: 0.08),
-      const DifferenceSpot(x: 0.20, y: 0.35, radius: 0.08),
+      const DifferenceSpot(x: 0.5, y: 0.528, radius: 0.5994),
+      const DifferenceSpot(x: 0.625, y: 0.8846, radius: 0.0393),
+      const DifferenceSpot(x: 0.7266, y: 0.25, radius: 0.0604),
+      const DifferenceSpot(x: 0.1592, y: 0.1783, radius: 0.0416),
     ],
     '4-4': [
-      const DifferenceSpot(x: 0.16, y: 0.82, radius: 0.10),
-      const DifferenceSpot(x: 0.46, y: 0.67, radius: 0.05),
-      const DifferenceSpot(x: 0.65, y: 0.30, radius: 0.15),
-      const DifferenceSpot(x: 0.35, y: 0.25, radius: 0.08),
-      const DifferenceSpot(x: 0.85, y: 0.20, radius: 0.06),
+      const DifferenceSpot(x: 0.3916, y: 0.5577, radius: 0.4699),
+      const DifferenceSpot(x: 0.9092, y: 0.4038, radius: 0.0416),
+      const DifferenceSpot(x: 0.8545, y: 0.1259, radius: 0.1746),
     ],
     '4-5': [
-      const DifferenceSpot(x: 0.87, y: 0.81, radius: 0.05),
-      const DifferenceSpot(x: 0.69, y: 0.74, radius: 0.05),
-      const DifferenceSpot(x: 0.87, y: 0.69, radius: 0.05),
-      const DifferenceSpot(x: 0.66, y: 0.47, radius: 0.08),
-      const DifferenceSpot(x: 0.14, y: 0.39, radius: 0.06),
+      const DifferenceSpot(x: 0.3281, y: 0.5, radius: 0.3492),
+      const DifferenceSpot(x: 0.9072, y: 0.743, radius: 0.0996),
+      const DifferenceSpot(x: 0.6348, y: 0.3252, radius: 0.198),
+      const DifferenceSpot(x: 0.9141, y: 0.1538, radius: 0.1031),
+      const DifferenceSpot(x: 0.1855, y: 0.1136, radius: 0.0475),
     ],
     '4-6': [
-      const DifferenceSpot(x: 0.94, y: 0.85, radius: 0.08),
-      const DifferenceSpot(x: 0.39, y: 0.48, radius: 0.15),
-      const DifferenceSpot(x: 0.94, y: 0.22, radius: 0.05),
-      const DifferenceSpot(x: 0.97, y: 0.05, radius: 0.05),
-      const DifferenceSpot(x: 0.15, y: 0.30, radius: 0.08),
+      const DifferenceSpot(x: 0.5, y: 0.5, radius: 0.6),
+      const DifferenceSpot(x: 0.7139, y: 0.1888, radius: 0.0475),
     ],
 
-    // ========== 레벨 5 (신의 경지) - 6개 스팟 ==========
+    // ========== 레벨 5 (신의 경지) ==========
     '5-1': [
-      const DifferenceSpot(x: 0.26, y: 0.89, radius: 0.07),
-      const DifferenceSpot(x: 0.03, y: 0.77, radius: 0.05),
-      const DifferenceSpot(x: 0.82, y: 0.68, radius: 0.05),
-      const DifferenceSpot(x: 0.30, y: 0.52, radius: 0.10),
-      const DifferenceSpot(x: 0.71, y: 0.63, radius: 0.06),
-      const DifferenceSpot(x: 0.84, y: 0.17, radius: 0.08),
+      const DifferenceSpot(x: 0.9072, y: 0.8409, radius: 0.1066),
+      const DifferenceSpot(x: 0.6016, y: 0.9003, radius: 0.1541),
+      const DifferenceSpot(x: 0.2471, y: 0.6696, radius: 0.232),
+      const DifferenceSpot(x: 0.7441, y: 0.6538, radius: 0.1283),
+      const DifferenceSpot(x: 0.4238, y: 0.4231, radius: 0.0691),
+      const DifferenceSpot(x: 0.8428, y: 0.1731, radius: 0.0979),
     ],
     '5-2': [
-      const DifferenceSpot(x: 0.87, y: 0.85, radius: 0.10),
-      const DifferenceSpot(x: 0.71, y: 0.35, radius: 0.10),
-      const DifferenceSpot(x: 0.14, y: 0.30, radius: 0.05),
-      const DifferenceSpot(x: 0.50, y: 0.60, radius: 0.08),
-      const DifferenceSpot(x: 0.30, y: 0.75, radius: 0.06),
-      const DifferenceSpot(x: 0.90, y: 0.20, radius: 0.06),
+      const DifferenceSpot(x: 0.6338, y: 0.9476, radius: 0.0879),
+      const DifferenceSpot(x: 0.8623, y: 0.8619, radius: 0.1482),
+      const DifferenceSpot(x: 0.9678, y: 0.7255, radius: 0.0457),
+      const DifferenceSpot(x: 0.6865, y: 0.3497, radius: 0.1377),
+      const DifferenceSpot(x: 0.2295, y: 0.465, radius: 0.0346),
+      const DifferenceSpot(x: 0.1396, y: 0.3024, radius: 0.027),
     ],
     '5-3': [
-      const DifferenceSpot(x: 0.08, y: 0.91, radius: 0.05),
-      const DifferenceSpot(x: 0.89, y: 0.87, radius: 0.04),
-      const DifferenceSpot(x: 0.64, y: 0.85, radius: 0.05),
-      const DifferenceSpot(x: 0.47, y: 0.76, radius: 0.08),
-      const DifferenceSpot(x: 0.93, y: 0.36, radius: 0.05),
-      const DifferenceSpot(x: 0.47, y: 0.31, radius: 0.05),
+      const DifferenceSpot(x: 0.7012, y: 0.8199, radius: 0.3586),
+      const DifferenceSpot(x: 0.1182, y: 0.8619, radius: 0.1418),
+      const DifferenceSpot(x: 0.9268, y: 0.3601, radius: 0.0434),
+      const DifferenceSpot(x: 0.7881, y: 0.1119, radius: 0.0521),
+      const DifferenceSpot(x: 0.126, y: 0.0839, radius: 0.0328),
     ],
     '5-4': [
-      const DifferenceSpot(x: 0.66, y: 0.91, radius: 0.08),
-      const DifferenceSpot(x: 0.18, y: 0.84, radius: 0.10),
-      const DifferenceSpot(x: 0.89, y: 0.89, radius: 0.10),
-      const DifferenceSpot(x: 0.50, y: 0.62, radius: 0.05),
-      const DifferenceSpot(x: 0.96, y: 0.63, radius: 0.05),
-      const DifferenceSpot(x: 0.10, y: 0.28, radius: 0.10),
+      const DifferenceSpot(x: 0.5, y: 0.757, radius: 0.6),
+      const DifferenceSpot(x: 0.9551, y: 0.5979, radius: 0.0551),
+      const DifferenceSpot(x: 0.5811, y: 0.3864, radius: 0.092),
+      const DifferenceSpot(x: 0.1396, y: 0.3636, radius: 0.0738),
+      const DifferenceSpot(x: 0.083, y: 0.1888, radius: 0.0879),
+      const DifferenceSpot(x: 0.4756, y: 0.1976, radius: 0.034),
     ],
     '5-5': [
-      const DifferenceSpot(x: 0.96, y: 0.93, radius: 0.05),
-      const DifferenceSpot(x: 0.27, y: 0.87, radius: 0.05),
-      const DifferenceSpot(x: 0.27, y: 0.60, radius: 0.05),
-      const DifferenceSpot(x: 0.66, y: 0.58, radius: 0.05),
-      const DifferenceSpot(x: 0.59, y: 0.38, radius: 0.06),
-      const DifferenceSpot(x: 0.50, y: 0.12, radius: 0.05),
+      const DifferenceSpot(x: 0.5, y: 0.5, radius: 0.6),
     ],
     '5-6': [
-      const DifferenceSpot(x: 0.30, y: 0.91, radius: 0.05),
-      const DifferenceSpot(x: 0.96, y: 0.93, radius: 0.05),
-      const DifferenceSpot(x: 0.39, y: 0.70, radius: 0.08),
-      const DifferenceSpot(x: 0.91, y: 0.57, radius: 0.05),
-      const DifferenceSpot(x: 0.12, y: 0.48, radius: 0.08),
-      const DifferenceSpot(x: 0.42, y: 0.27, radius: 0.10),
+      const DifferenceSpot(x: 0.959, y: 0.9283, radius: 0.0328),
+      const DifferenceSpot(x: 0.2598, y: 0.9003, radius: 0.0592),
+      const DifferenceSpot(x: 0.2715, y: 0.4738, radius: 0.3258),
+      const DifferenceSpot(x: 0.6953, y: 0.4161, radius: 0.1623),
+      const DifferenceSpot(x: 0.958, y: 0.3514, radius: 0.0656),
+      const DifferenceSpot(x: 0.915, y: 0.0962, radius: 0.0709),
     ],
-    // 5-7: 드래곤 머리(카피바라->드래곤), 모자 색상, 천사들 옷/날개 변화
     '5-7': [
-      const DifferenceSpot(x: 0.67, y: 0.50, radius: 0.10),   // 드래곤 머리
-      const DifferenceSpot(x: 0.46, y: 0.28, radius: 0.06),   // 모자 색상
-      const DifferenceSpot(x: 0.76, y: 0.28, radius: 0.06),   // 오른쪽 천사 옷
-      const DifferenceSpot(x: 0.10, y: 0.55, radius: 0.06),   // 왼쪽 천사
-      const DifferenceSpot(x: 0.92, y: 0.80, radius: 0.05),   // 오른쪽 아래 천사
-      const DifferenceSpot(x: 0.70, y: 0.83, radius: 0.05),   // 가운데 아래 천사
+      const DifferenceSpot(x: 0.8975, y: 0.7955, radius: 0.1119),
+      const DifferenceSpot(x: 0.4707, y: 0.8916, radius: 0.1313),
+      const DifferenceSpot(x: 0.3428, y: 0.6031, radius: 0.3732),
+      const DifferenceSpot(x: 0.7607, y: 0.4615, radius: 0.0738),
+      const DifferenceSpot(x: 0.3965, y: 0.2535, radius: 0.0744),
+      const DifferenceSpot(x: 0.8779, y: 0.0664, radius: 0.041),
     ],
   };
 
@@ -398,3 +379,4 @@ class SpotDifferenceDataManager {
     }
   }
 }
+

@@ -1355,3 +1355,4 @@ class _BannerAdContainerState extends State<_BannerAdContainer> {
     );
   }
 }
+
