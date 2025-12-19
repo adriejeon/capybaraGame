@@ -25,6 +25,7 @@ class SoundManager {
   static const String cardFlipSound = 'audio/card-flip.mp3';
   static const String matchSuccessSound = 'audio/card-mach.mp3';
   static const String gameCompleteSound = 'audio/success-game.mp3';
+  static const String sparkleSound = 'audio/sparkle.mp3';
   static const String bgmSound = 'audio/bgm.mp3';
 
   // Getter
@@ -257,6 +258,11 @@ class SoundManager {
   // 게임 완료 효과음
   Future<void> playGameCompleteSound() async {
     await playSound(gameCompleteSound);
+  }
+
+  // 틀린그림찾기 정답 효과음 (sparkle)
+  Future<void> playSparkleSound() async {
+    await playSound(sparkleSound);
   }
 
   // 리소스 정리

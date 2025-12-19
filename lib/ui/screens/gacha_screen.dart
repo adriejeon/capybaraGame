@@ -5,6 +5,7 @@ import '../../data/collection_manager.dart';
 import '../../utils/constants.dart';
 import '../../sound_manager.dart';
 import '../../services/daily_mission_service.dart';
+import '../widgets/gacha_machine_widget.dart';
 
 /// 뽑기통 화면
 /// 뽑기권을 사용해서 캐릭터를 뽑을 수 있는 화면
@@ -330,82 +331,46 @@ class _GachaScreenState extends State<GachaScreen>
 
   Widget _buildGachaMachine() {
     return Center(
-      child: AnimatedBuilder(
-        animation: _shakeAnimation,
-        builder: (context, child) {
-          return Transform.rotate(
-            angle: _isGachaing ? _shakeAnimation.value : 0.0,
-            child: child,
-          );
-        },
-        child: LayoutBuilder(
-          builder: (context, constraints) {
-            // 화면 너비의 80% 계산
-            final imageWidth = MediaQuery.of(context).size.width * 0.8;
-            // 원본 이미지 비율 유지 (대략 200:280 비율)
-            final imageHeight = imageWidth * 1.4;
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          // 가챠 기계 위젯 (인형 포함) - 흔들림 애니메이션은 위젯 내부에서 처리
+          GachaMachineWidget(
+            isAnimating: _isGachaing,
+            shakeAnimation: _isGachaing ? _shakeAnimation : null,
+          ),
 
-            return Stack(
-              alignment: Alignment.center,
-              children: [
-                // 뽑기통 이미지
-                Image.asset(
-                  'assets/images/gacha.png',
-                  width: imageWidth,
-                  height: imageHeight,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      width: imageWidth,
-                      height: imageHeight,
+          // 뽑기권 이동 애니메이션
+          if (_isGachaing)
+            AnimatedBuilder(
+              animation: _ticketMoveAnimation,
+              builder: (context, child) {
+                final progress = _ticketMoveAnimation.value;
+                return Transform.translate(
+                  offset: Offset(
+                    0,
+                    -100 + (progress * 200), // 위에서 아래로 이동
+                  ),
+                  child: Opacity(
+                    opacity: (1 - progress).clamp(0.0, 1.0),
+                    child: Container(
+                      width: 50,
+                      height: 50,
                       decoration: BoxDecoration(
-                        color: Colors.grey[400],
-                        borderRadius: BorderRadius.circular(30),
-                        border: Border.all(color: Colors.grey[600]!, width: 4),
+                        color: Colors.grey[500],
+                        borderRadius: BorderRadius.circular(10),
                       ),
                       child: const Icon(
-                        Icons.all_inbox,
-                        size: 80,
+                        Icons.confirmation_number,
                         color: Colors.white,
+                        size: 30,
                       ),
-                    );
-                  },
-                ),
-
-                // 뽑기권 이동 애니메이션
-                if (_isGachaing)
-                  AnimatedBuilder(
-                    animation: _ticketMoveAnimation,
-                    builder: (context, child) {
-                      final progress = _ticketMoveAnimation.value;
-                      return Transform.translate(
-                        offset: Offset(
-                          0,
-                          -100 + (progress * 200), // 위에서 아래로 이동
-                        ),
-                        child: Opacity(
-                          opacity: (1 - progress).clamp(0.0, 1.0),
-                          child: Container(
-                            width: 50,
-                            height: 50,
-                            decoration: BoxDecoration(
-                              color: Colors.grey[500],
-                              borderRadius: BorderRadius.circular(10),
-                            ),
-                            child: const Icon(
-                              Icons.confirmation_number,
-                              color: Colors.white,
-                              size: 30,
-                            ),
-                          ),
-                        ),
-                      );
-                    },
+                    ),
                   ),
-              ],
-            );
-          },
-        ),
+                );
+              },
+            ),
+        ],
       ),
     );
   }
@@ -598,3 +563,4 @@ class _GachaScreenState extends State<GachaScreen>
     );
   }
 }
+

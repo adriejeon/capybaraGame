@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import 'dart:math';
 import '../../game/models/spot_difference_data.dart';
@@ -44,16 +45,62 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   static const bool _debugMode = false;
   String _lastTapCoord = '';
 
-  // 이미지 확대 보기 상태
-  bool _isZoomed = false;
-  bool _isZoomingOriginal = true; // true: 원본 이미지 확대, false: 틀린 이미지 확대
-
   // 이미지 비율 (동적으로 계산)
   double _imageAspectRatio = 0.56; // 기본값 (572/1024)
 
-  // 애니메이션
+  // ========== 전역 터치 반경 설정 ==========
+  // 모든 스팟에 동일하게 적용되는 터치 반경 (이미지 너비의 4%)
+  static const double kDefaultTouchRadius = 0.04;
+  
+  // 정답 원 시각적 표시 크기 (고정값)
+  static const double kSpotCircleSize = 30.0;
+
+  // 동기화된 확대/축소를 위한 TransformationController
+  final TransformationController _transformationController =
+      TransformationController();
+
+  // 현재 줌 레벨 표시용
+  double _currentScale = 1.0;
+
+  // 연한 초록색 (라임 그린)
+  static const Color _spotCircleColor = Color(0xFF7ED321);
+
+  // 애니메이션 컨트롤러들
   late AnimationController _wrongTapController;
   late Animation<double> _wrongTapAnimation;
+  late AnimationController _shakeController;
+  late Animation<double> _shakeAnimation;
+
+  // 오답 X 표시 상태
+  Offset? _wrongTapPosition;
+  bool _showWrongTapX = false;
+  bool _isOriginalImageWrongTap = true; // 오답 표시가 어느 이미지에 있는지
+
+  // 정답 표시 애니메이션 상태 (스팟 인덱스별)
+  final Map<int, AnimationController> _spotAnimationControllers = {};
+  final Map<int, Animation<double>> _spotAnimations = {};
+
+  // 체크박스 애니메이션 컨트롤러들 (인덱스별)
+  final Map<int, AnimationController> _checkboxAnimationControllers = {};
+  final Map<int, Animation<double>> _checkboxAnimations = {};
+
+  // 입자 애니메이션 상태
+  final List<_ParticleData> _particles = [];
+  Timer? _particleTimer;
+
+  // 상단 체크박스들의 GlobalKey (입자 도착 위치 계산용)
+  final List<GlobalKey> _checkboxKeys = [];
+
+  // 이미지 영역 GlobalKey (입자 시작 위치 계산용)
+  final GlobalKey _originalImageKey = GlobalKey();
+  final GlobalKey _wrongImageKey = GlobalKey();
+  
+  // 실제 Image 위젯의 GlobalKey (정확한 렌더링 영역 계산용)
+  final GlobalKey _originalImageWidgetKey = GlobalKey();
+  final GlobalKey _wrongImageWidgetKey = GlobalKey();
+
+  // 최근에 찾은 스팟 인덱스 (체크박스 애니메이션용)
+  int? _lastFoundSpotIndex;
 
   @override
   void initState() {
@@ -61,23 +108,99 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     _initializeGame();
     _setupAnimations();
     _loadAds();
+
+    // Transform 변경 리스너
+    _transformationController.addListener(_onTransformChanged);
   }
 
   @override
   void dispose() {
     _gameTimer?.cancel();
+    _particleTimer?.cancel();
     _wrongTapController.dispose();
+    _shakeController.dispose();
+    _transformationController.removeListener(_onTransformChanged);
+    _transformationController.dispose();
+    for (final controller in _spotAnimationControllers.values) {
+      controller.dispose();
+    }
+    for (final controller in _checkboxAnimationControllers.values) {
+      controller.dispose();
+    }
     super.dispose();
   }
 
+  void _onTransformChanged() {
+    if (!mounted) return;
+    final scale = _transformationController.value.getMaxScaleOnAxis();
+    if (_currentScale != scale) {
+      setState(() {
+        _currentScale = scale;
+      });
+    }
+  }
+
   void _setupAnimations() {
+    // 오답 애니메이션 (X 표시)
     _wrongTapController = AnimationController(
-      duration: const Duration(milliseconds: 300),
+      duration: const Duration(milliseconds: 500),
       vsync: this,
     );
     _wrongTapAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
       CurvedAnimation(parent: _wrongTapController, curve: Curves.elasticOut),
     );
+    _wrongTapController.addStatusListener((status) {
+      if (status == AnimationStatus.completed) {
+        Future.delayed(const Duration(milliseconds: 300), () {
+          if (mounted) {
+            setState(() {
+              _showWrongTapX = false;
+            });
+          }
+        });
+      }
+    });
+
+    // 화면 흔들림 애니메이션
+    _shakeController = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    _shakeAnimation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: _shakeController, curve: Curves.elasticOut),
+    );
+  }
+
+  /// 스팟별 애니메이션 컨트롤러 생성
+  void _createSpotAnimationController(int index) {
+    if (_spotAnimationControllers.containsKey(index)) return;
+
+    final controller = AnimationController(
+      duration: const Duration(milliseconds: 400),
+      vsync: this,
+    );
+    final animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: controller, curve: Curves.elasticOut),
+    );
+
+    _spotAnimationControllers[index] = controller;
+    _spotAnimations[index] = animation;
+  }
+
+  /// 체크박스 애니메이션 컨트롤러 생성
+  void _createCheckboxAnimationController(int index) {
+    if (_checkboxAnimationControllers.containsKey(index)) return;
+
+    final controller = AnimationController(
+      duration: const Duration(milliseconds: 500),
+      vsync: this,
+    );
+    final animation = Tween<double>(begin: 0.0, end: 1.0).animate(
+      CurvedAnimation(parent: controller, curve: Curves.elasticOut),
+    );
+
+    _checkboxAnimationControllers[index] = controller;
+    _checkboxAnimations[index] = animation;
   }
 
   void _loadAds() {
@@ -104,6 +227,31 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     _hasUsedHint = false;
     _isShowingHint = false;
     _wrongTaps = 0;
+    _particles.clear();
+    _currentScale = 1.0;
+    _lastFoundSpotIndex = null;
+
+    // Transform 초기화
+    _transformationController.value = Matrix4.identity();
+
+    // 이전 애니메이션 컨트롤러 정리
+    for (final controller in _spotAnimationControllers.values) {
+      controller.dispose();
+    }
+    _spotAnimationControllers.clear();
+    _spotAnimations.clear();
+
+    for (final controller in _checkboxAnimationControllers.values) {
+      controller.dispose();
+    }
+    _checkboxAnimationControllers.clear();
+    _checkboxAnimations.clear();
+
+    // 체크박스 GlobalKey 초기화
+    _checkboxKeys.clear();
+    for (int i = 0; i < _currentStage!.spots.length; i++) {
+      _checkboxKeys.add(GlobalKey());
+    }
 
     // 이미지 비율 계산
     _loadImageAspectRatio();
@@ -153,57 +301,303 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     }
   }
 
-  /// 이미지 터치 처리
-  void _onImageTapped(Offset tapPosition, Size imageSize, bool isOriginal) {
+  /// 줌 리셋
+  void _resetZoom() {
+    _transformationController.value = Matrix4.identity();
+    setState(() {
+      _currentScale = 1.0;
+    });
+  }
+
+  /// BoxFit.fitWidth로 렌더링될 때 실제 이미지 영역 계산
+  /// BoxFit.fitWidth는 width에 맞추고 height는 이미지 비율에 맞게 조정 (상하 여백 가능)
+  /// 반환값: (실제 이미지 너비, 실제 이미지 높이, X 오프셋, Y 오프셋)
+  ({double width, double height, double offsetX, double offsetY}) _calculateActualImageRect(Size containerSize) {
+    // BoxFit.fitWidth: width에 맞추고 height는 이미지 비율에 맞게 조정
+    final actualWidth = containerSize.width;
+    final actualHeight = containerSize.width * _imageAspectRatio;
+    
+    // 상하 여백 계산 (이미지가 컨테이너보다 작을 경우)
+    final offsetY = actualHeight < containerSize.height 
+        ? (containerSize.height - actualHeight) / 2 
+        : 0.0;
+    
+    return (
+      width: actualWidth,
+      height: actualHeight,
+      offsetX: 0.0,
+      offsetY: offsetY,
+    );
+  }
+
+  /// 실제 Image 위젯의 RenderBox를 사용하여 정확한 렌더링 영역 계산
+  /// 반환값: (실제 이미지 너비, 실제 이미지 높이, X 오프셋, Y 오프셋, 성공 여부)
+  ({double width, double height, double offsetX, double offsetY, bool success}) _getActualImageRectFromRenderBox(bool isOriginal) {
+    final imageKey = isOriginal ? _originalImageWidgetKey : _wrongImageWidgetKey;
+    final containerKey = isOriginal ? _originalImageKey : _wrongImageKey;
+    
+    // Image 위젯의 RenderBox 가져오기
+    final imageBox = imageKey.currentContext?.findRenderObject() as RenderBox?;
+    // Container의 RenderBox 가져오기
+    final containerBox = containerKey.currentContext?.findRenderObject() as RenderBox?;
+    
+    if (imageBox == null || containerBox == null) {
+      print('[SpotDifference] RenderBox를 찾을 수 없습니다.');
+      return (width: 0, height: 0, offsetX: 0, offsetY: 0, success: false);
+    }
+    
+    // Image 위젯의 실제 크기
+    final imageSize = imageBox.size;
+    // Container의 크기
+    final containerSize = containerBox.size;
+    
+    // Image 위젯의 위치 (Container 기준)
+    final imagePosition = imageBox.localToGlobal(Offset.zero);
+    final containerPosition = containerBox.localToGlobal(Offset.zero);
+    final relativePosition = imagePosition - containerPosition;
+    
+    // BoxFit.contain으로 인한 실제 이미지 렌더링 영역 계산
+    final containerRatio = containerSize.height / containerSize.width;
+    double actualWidth, actualHeight, offsetX, offsetY;
+    
+    if (_imageAspectRatio > containerRatio) {
+      // 이미지가 세로로 더 길다 → 높이에 맞추고 좌우 여백
+      actualHeight = containerSize.height;
+      actualWidth = containerSize.height / _imageAspectRatio;
+      offsetX = relativePosition.dx + (containerSize.width - actualWidth) / 2;
+      offsetY = relativePosition.dy;
+    } else {
+      // 이미지가 가로로 더 길다 → 너비에 맞추고 상하 여백
+      actualWidth = containerSize.width;
+      actualHeight = containerSize.width * _imageAspectRatio;
+      offsetX = relativePosition.dx;
+      offsetY = relativePosition.dy + (containerSize.height - actualHeight) / 2;
+    }
+    
+    print('[SpotDifference] RenderBox 기반 계산: 이미지 크기=${imageSize.width}x${imageSize.height}, 컨테이너=${containerSize.width}x${containerSize.height}');
+    print('[SpotDifference] 실제 렌더링 영역: ${actualWidth}x${actualHeight}, 오프셋=($offsetX, $offsetY)');
+    
+    return (width: actualWidth, height: actualHeight, offsetX: offsetX, offsetY: offsetY, success: true);
+  }
+
+  /// 이미지 터치 처리 (BoxFit.cover + InteractiveViewer 줌/팬 고려한 정확한 좌표 변환)
+  void _onImageTapped(
+      Offset tapPosition, Size containerSize, bool isOriginal, Offset globalTapPosition) {
     if (_isGameOver || _currentStage == null) return;
 
-    // 비율 좌표로 변환
-    final relativeX = tapPosition.dx / imageSize.width;
-    final relativeY = tapPosition.dy / imageSize.height;
+    // InteractiveViewer의 변환 행렬 (줌 + 팬)
+    final matrix = _transformationController.value;
+    
+    // Matrix4에서 스케일과 translation 추출
+    final scale = matrix.getMaxScaleOnAxis();
+    final translation = matrix.getTranslation();
+    
+    // 역변환 계산: (localPos - translation) / scale
+    // 이는 Matrix4.inverted()를 사용한 것과 동일한 결과
+    final adjustedTapPosition = Offset(
+      (tapPosition.dx - translation.x) / scale,
+      (tapPosition.dy - translation.y) / scale,
+    );
 
-    print('[SpotDifference] 터치: ($relativeX, $relativeY)');
+    // BoxFit.cover로 인한 실제 이미지 렌더링 영역 계산 (여백 없음)
+    final actualImageRect = _calculateActualImageRect(containerSize);
+    
+    // ClipRect로 인한 크롭 오프셋 고려 (widthFactor: 0.92, heightFactor: 0.92)
+    // Align이 topLeft이므로 크롭된 부분은 우측 하단
+    // 좌표 계산은 컨테이너 전체 기준이므로 크롭 오프셋은 필요 없음
+    
+    // 터치 위치에서 이미지 영역의 오프셋을 빼서 순수 이미지 내 좌표로 변환
+    final touchInImageX = adjustedTapPosition.dx - actualImageRect.offsetX;
+    final touchInImageY = adjustedTapPosition.dy - actualImageRect.offsetY;
+    
+    // 이미지 영역 밖이면 무시
+    if (touchInImageX < 0 || touchInImageX > actualImageRect.width ||
+        touchInImageY < 0 || touchInImageY > actualImageRect.height) {
+      print('[SpotDifference] 터치가 이미지 영역 밖입니다. (${touchInImageX.toStringAsFixed(1)}, ${touchInImageY.toStringAsFixed(1)}) / (${actualImageRect.width.toStringAsFixed(1)}, ${actualImageRect.height.toStringAsFixed(1)})');
+      return;
+    }
+
+    // 비율 좌표로 변환 (0.0 ~ 1.0)
+    final relativeX = touchInImageX / actualImageRect.width;
+    final relativeY = touchInImageY / actualImageRect.height;
+
+    print('[SpotDifference] ========== 터치 좌표 계산 ==========');
+    print('[SpotDifference] 원본 터치: (${tapPosition.dx.toStringAsFixed(1)}, ${tapPosition.dy.toStringAsFixed(1)})');
+    print('[SpotDifference] 역변환 후: (${adjustedTapPosition.dx.toStringAsFixed(1)}, ${adjustedTapPosition.dy.toStringAsFixed(1)})');
+    print('[SpotDifference] 이미지 영역: ${actualImageRect.width.toStringAsFixed(1)}x${actualImageRect.height.toStringAsFixed(1)}, 오프셋: (${actualImageRect.offsetX.toStringAsFixed(1)}, ${actualImageRect.offsetY.toStringAsFixed(1)})');
+    print('[SpotDifference] 이미지 내 좌표: (${touchInImageX.toStringAsFixed(1)}, ${touchInImageY.toStringAsFixed(1)})');
+    print('[SpotDifference] 비율 좌표: ($relativeX, $relativeY)');
+    print('[SpotDifference] ======================================');
+
+    _processTouchWithRelativeCoords(relativeX, relativeY, tapPosition, containerSize, isOriginal, globalTapPosition);
+  }
+
+  /// 비율 좌표를 사용하여 스팟 판정 처리
+  void _processTouchWithRelativeCoords(double relativeX, double relativeY, Offset tapPosition,
+      Size containerSize, bool isOriginal, Offset globalTapPosition) {
+    if (_isGameOver || _currentStage == null) return;
 
     // 디버그 모드: 터치 좌표 표시
     if (_debugMode) {
       setState(() {
         _lastTapCoord =
-            'x: ${relativeX.toStringAsFixed(2)}, y: ${relativeY.toStringAsFixed(2)}';
+            'x: ${relativeX.toStringAsFixed(3)}, y: ${relativeY.toStringAsFixed(3)}';
       });
     }
 
-    // 각 스팟에 대해 터치 여부 확인
-    bool foundAny = false;
+    // 전역 터치 반경을 사용하여 가장 가까운 스팟 찾기
+    // (개별 spot.radius 무시, 모든 스팟에 동일한 kDefaultTouchRadius 적용)
+    int closestSpotIndex = -1;
+    double closestDistance = double.infinity;
+    const double touchRadiusSquared = kDefaultTouchRadius * kDefaultTouchRadius;
+
     for (int i = 0; i < _currentStage!.spots.length; i++) {
       if (_foundSpots[i]) continue; // 이미 찾은 스팟
 
       final spot = _currentStage!.spots[i];
       final distance = _calculateDistance(relativeX, relativeY, spot.x, spot.y);
 
-      // distance는 제곱 거리이므로, radius도 제곱해서 비교하거나 sqrt를 사용
-      if (distance <= spot.radius * spot.radius) {
-        // 정답!
-        setState(() {
-          _foundSpots[i] = true;
-        });
-        _soundManager.playMatchSuccessSound();
-        foundAny = true;
-        print(
-            '[SpotDifference] 스팟 $i 발견! (터치: $relativeX, $relativeY, 스팟: ${spot.x}, ${spot.y}, 거리: ${sqrt(distance)}, 반경: ${spot.radius})');
-        break;
+      print('[SpotDifference] 스팟 $i: 데이터 좌표=(${spot.x.toStringAsFixed(3)}, ${spot.y.toStringAsFixed(3)}), 거리=${distance.toStringAsFixed(6)}');
+
+      // 전역 터치 반경 내에 있고, 가장 가까운 스팟인 경우
+      if (distance <= touchRadiusSquared && distance < closestDistance) {
+        closestDistance = distance;
+        closestSpotIndex = i;
       }
     }
 
-    if (!foundAny) {
+    if (closestSpotIndex >= 0) {
+      // 정답!
+      final spot = _currentStage!.spots[closestSpotIndex];
+      print('[SpotDifference] ✅ 정답! 스팟 $closestSpotIndex 발견!');
+      print('[SpotDifference] 터치 좌표: ($relativeX, $relativeY)');
+      print('[SpotDifference] 스팟 좌표: (${spot.x}, ${spot.y})');
+      print('[SpotDifference] 거리: ${closestDistance.toStringAsFixed(6)}');
+      _onCorrectTap(closestSpotIndex, globalTapPosition, containerSize);
+    } else {
       // 틀림
-      _wrongTaps++;
-      _wrongTapController.forward(from: 0.0);
-      print('[SpotDifference] 틀림! 총 $_wrongTaps회');
+      print('[SpotDifference] ❌ 오답! 가장 가까운 스팟까지의 거리: ${closestDistance == double.infinity ? "무한대" : closestDistance.toStringAsFixed(6)}');
+      _onWrongTap(tapPosition, containerSize, isOriginal);
     }
 
     // 모든 스팟을 찾았는지 확인
     if (_foundSpots.every((found) => found)) {
       _endGame(true);
     }
+  }
+
+  /// 정답 처리
+  void _onCorrectTap(int spotIndex, Offset globalTapPosition, Size containerSize) {
+    setState(() {
+      _foundSpots[spotIndex] = true;
+      _lastFoundSpotIndex = spotIndex;
+    });
+
+    // 가벼운 진동 피드백
+    HapticFeedback.lightImpact();
+
+    // 사운드 재생 (sparkle.mp3)
+    _soundManager.playSparkleSound();
+
+    // 스팟 애니메이션 시작
+    _createSpotAnimationController(spotIndex);
+    _spotAnimationControllers[spotIndex]?.forward(from: 0.0);
+
+    // 입자 애니메이션 시작 (정답 위치에서 상단 체크박스로)
+    _startParticleAnimation(globalTapPosition, spotIndex);
+
+    // 체크박스 애니메이션 (입자 도착 후 시작)
+    _createCheckboxAnimationController(spotIndex);
+    Future.delayed(const Duration(milliseconds: 400), () {
+      if (mounted) {
+        _checkboxAnimationControllers[spotIndex]?.forward(from: 0.0);
+      }
+    });
+
+    final spot = _currentStage!.spots[spotIndex];
+    print('[SpotDifference] 스팟 $spotIndex 발견! (스팟: ${spot.x}, ${spot.y})');
+  }
+
+  /// 오답 처리
+  void _onWrongTap(Offset tapPosition, Size containerSize, bool isOriginal) {
+    _wrongTaps++;
+
+    // 진동 피드백 (더 강하게)
+    HapticFeedback.mediumImpact();
+
+    // X 표시 위치 저장 및 표시
+    setState(() {
+      _wrongTapPosition = tapPosition;
+      _showWrongTapX = true;
+      _isOriginalImageWrongTap = isOriginal;
+    });
+
+    // X 표시 애니메이션 시작
+    _wrongTapController.forward(from: 0.0);
+
+    // 화면 흔들림 애니메이션
+    _shakeController.forward(from: 0.0);
+
+    print('[SpotDifference] 틀림! 총 $_wrongTaps회');
+  }
+
+  /// 입자 애니메이션 시작 (특정 체크박스로)
+  void _startParticleAnimation(Offset startPosition, int targetIndex) {
+    // 해당 체크박스의 위치 계산
+    if (targetIndex >= _checkboxKeys.length) return;
+
+    final RenderBox? checkboxBox =
+        _checkboxKeys[targetIndex].currentContext?.findRenderObject() as RenderBox?;
+    if (checkboxBox == null) return;
+
+    final checkboxPosition = checkboxBox.localToGlobal(Offset.zero);
+    final checkboxCenter = Offset(
+      checkboxPosition.dx + checkboxBox.size.width / 2,
+      checkboxPosition.dy + checkboxBox.size.height / 2,
+    );
+
+    // 여러 개의 입자 생성
+    final random = Random();
+    for (int i = 0; i < 8; i++) {
+      final particle = _ParticleData(
+        id: DateTime.now().millisecondsSinceEpoch + i,
+        startPosition: startPosition +
+            Offset(
+              random.nextDouble() * 20 - 10,
+              random.nextDouble() * 20 - 10,
+            ),
+        endPosition: checkboxCenter,
+        progress: 0.0,
+        color: _spotCircleColor,
+        size: 6.0 + random.nextDouble() * 4,
+      );
+      _particles.add(particle);
+    }
+
+    // 입자 애니메이션 업데이트
+    _particleTimer?.cancel();
+    _particleTimer =
+        Timer.periodic(const Duration(milliseconds: 16), (timer) {
+      if (!mounted) {
+        timer.cancel();
+        return;
+      }
+
+      setState(() {
+        final toRemove = <_ParticleData>[];
+        for (final particle in _particles) {
+          particle.progress += 0.05;
+          if (particle.progress >= 1.0) {
+            toRemove.add(particle);
+          }
+        }
+        _particles.removeWhere((p) => toRemove.contains(p));
+
+        if (_particles.isEmpty) {
+          timer.cancel();
+        }
+      });
+    });
   }
 
   double _calculateDistance(double x1, double y1, double x2, double y2) {
@@ -625,6 +1019,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
   void _restartGame() {
     _gameTimer?.cancel();
+    _particleTimer?.cancel();
     setState(() {
       _initializeGame();
     });
@@ -740,22 +1135,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     });
   }
 
-  /// 이미지 확대 보기
-  void _showZoomedImage(bool isOriginal) {
-    _pauseTimer();
-    setState(() {
-      _isZoomed = true;
-      _isZoomingOriginal = isOriginal;
-    });
-  }
-
-  void _closeZoomedImage() {
-    setState(() {
-      _isZoomed = false;
-    });
-    _resumeTimer();
-  }
-
   String _getDifficultyText() {
     final localizations = AppLocalizations.of(context);
     if (localizations == null) {
@@ -819,35 +1198,89 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           ),
         ],
       ),
-      body: Stack(
-        children: [
-          Column(
-            children: [
-              // 게임 정보 바
-              _buildInfoBar(),
+      body: AnimatedBuilder(
+        animation: _shakeAnimation,
+        builder: (context, child) {
+          // 화면 흔들림 효과
+          final shakeOffset = sin(_shakeAnimation.value * pi * 4) *
+              (1 - _shakeAnimation.value) *
+              10;
+          return Transform.translate(
+            offset: Offset(shakeOffset, 0),
+            child: child,
+          );
+        },
+        child: Stack(
+          children: [
+            Column(
+              children: [
+                // 게임 정보 바 (체크박스 형태)
+                _buildInfoBar(),
 
-              // 이미지 영역
-              Expanded(
-                child: _buildImageArea(),
-              ),
+                // 이미지 영역 (동기화된 확대/축소) - 높이 제한
+                Flexible(
+                  child: ConstrainedBox(
+                    constraints: const BoxConstraints(
+                      maxHeight: 570, // 최대 높이 제한 (두 이미지 합쳐서) - 살짝 축소
+                    ),
+                    child: _buildSyncedImageArea(),
+                  ),
+                ),
 
-              // 힌트 버튼
-              _buildHintButton(),
+                // 하단 버튼 영역
+                _buildBottomButtons(),
 
-              // 하단 배너 광고
-              const _BannerAdContainer(),
-            ],
-          ),
+                // 하단 배너 광고
+                const _BannerAdContainer(),
+              ],
+            ),
 
-          // 확대 보기 오버레이
-          if (_isZoomed) _buildZoomOverlay(),
-        ],
+            // 입자 애니메이션 오버레이
+            ..._buildParticles(),
+          ],
+        ),
       ),
     );
   }
 
+  /// 입자 위젯들 빌드
+  List<Widget> _buildParticles() {
+    return _particles.map((particle) {
+      final currentPosition = Offset.lerp(
+        particle.startPosition,
+        particle.endPosition,
+        Curves.easeInOut.transform(particle.progress),
+      )!;
+
+      final opacity = 1.0 - (particle.progress * 0.5);
+      final scale = 1.0 - (particle.progress * 0.3);
+
+      return Positioned(
+        left: currentPosition.dx - particle.size / 2,
+        top: currentPosition.dy - particle.size / 2,
+        child: Transform.scale(
+          scale: scale,
+          child: Container(
+            width: particle.size,
+            height: particle.size,
+            decoration: BoxDecoration(
+              color: particle.color.withOpacity(opacity),
+              shape: BoxShape.circle,
+              boxShadow: [
+                BoxShadow(
+                  color: particle.color.withOpacity(opacity * 0.5),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        ),
+      );
+    }).toList();
+  }
+
   Widget _buildInfoBar() {
-    final foundCount = _foundSpots.where((f) => f).length;
     final totalCount = _currentStage?.spots.length ?? 0;
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
 
@@ -858,17 +1291,32 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceAround,
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
+              // 시간 표시
               _buildInfoItem(
                   isKorean ? '시간' : 'Time', _formatTime(_remainingTime)),
-              _buildInfoItem(
-                  isKorean ? '발견' : 'Found', '$foundCount/$totalCount'),
+
+              // 체크박스들
+              Expanded(
+                child: Center(
+                  child: Wrap(
+                    spacing: 6,
+                    runSpacing: 4,
+                    alignment: WrapAlignment.center,
+                    children: List.generate(totalCount, (index) {
+                      return _buildCheckbox(index);
+                    }),
+                  ),
+                ),
+              ),
+
+              // 오답 횟수
               _buildInfoItem(isKorean ? '오답' : 'Wrong', '$_wrongTaps'),
             ],
           ),
-          // 디버그 모드: 터치 좌표 표시
-          if (_debugMode && _lastTapCoord.isNotEmpty) ...[
+          // 디버그 모드: 터치 좌표 및 이미지 비율 표시
+          if (_debugMode) ...[
             const SizedBox(height: 8),
             Container(
               padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
@@ -876,18 +1324,89 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                 color: Colors.orange.withOpacity(0.2),
                 borderRadius: BorderRadius.circular(8),
               ),
-              child: Text(
-                '📍 터치 좌표: $_lastTapCoord',
-                style: const TextStyle(
-                  fontSize: 14,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.deepOrange,
-                ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  if (_lastTapCoord.isNotEmpty)
+                    Text(
+                      '📍 터치 좌표: $_lastTapCoord',
+                      style: const TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.deepOrange,
+                      ),
+                    ),
+                  Text(
+                    '📐 이미지 비율: ${_imageAspectRatio.toStringAsFixed(3)} (H/W)',
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.bold,
+                      color: Colors.deepOrange,
+                    ),
+                  ),
+                ],
               ),
             ),
           ],
         ],
       ),
+    );
+  }
+
+  /// 개별 체크박스 위젯
+  Widget _buildCheckbox(int index) {
+    final isFound = _foundSpots[index];
+    final animation = _checkboxAnimations[index];
+    final hasAnimation = animation != null && isFound;
+
+    return Container(
+      key: _checkboxKeys[index],
+      child: hasAnimation
+          ? AnimatedBuilder(
+              animation: animation,
+              builder: (context, child) {
+                return Transform.scale(
+                  scale: 1.0 + (animation.value * 0.3) * (1 - animation.value),
+                  child: _buildCheckboxContent(isFound),
+                );
+              },
+            )
+          : _buildCheckboxContent(isFound),
+    );
+  }
+
+  Widget _buildCheckboxContent(bool isFound) {
+    return Container(
+      width: 28,
+      height: 28,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: isFound ? _spotCircleColor : Colors.white,
+        border: Border.all(
+          color: isFound ? _spotCircleColor : const Color(0xFFBDBDBD),
+          width: 2.5,
+        ),
+        boxShadow: isFound
+            ? [
+                BoxShadow(
+                  color: _spotCircleColor.withOpacity(0.4),
+                  blurRadius: 6,
+                  spreadRadius: 1,
+                ),
+              ]
+            : null,
+      ),
+      child: isFound
+          ? const Icon(
+              Icons.check,
+              color: Colors.white,
+              size: 18,
+            )
+          : const Icon(
+              Icons.help_outline,
+              color: Color(0xFFBDBDBD),
+              size: 16,
+            ),
     );
   }
 
@@ -922,36 +1441,43 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     return '${min.toString().padLeft(2, '0')}:${sec.toString().padLeft(2, '0')}';
   }
 
-  Widget _buildImageArea() {
-    return SingleChildScrollView(
-      child: Padding(
-        padding: const EdgeInsets.all(8.0),
-        child: Column(
-          children: [
-            // 원본 이미지
-            _buildInteractiveImage(
+  /// 동기화된 이미지 영역 (두 이미지가 같이 확대/축소)
+  Widget _buildSyncedImageArea() {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Column(
+        children: [
+          // 원본 이미지 (높이 축소)
+          Expanded(
+            flex: 7, // 높이 축소 (기존 9에서 7로)
+            child: _buildSyncedInteractiveImage(
+              key: _originalImageKey,
               imagePath: _currentStage!.originalImage,
               isOriginal: true,
-              label: Localizations.localeOf(context).languageCode == 'ko'
-                  ? '원본'
-                  : 'Original',
+              label: isKorean ? '원본' : 'Original',
             ),
-            const SizedBox(height: 8),
-            // 틀린그림 이미지
-            _buildInteractiveImage(
+          ),
+          const SizedBox(height: 8),
+          // 틀린그림 이미지 (높이 축소)
+          Expanded(
+            flex: 7, // 높이 축소 (기존 9에서 7로)
+            child: _buildSyncedInteractiveImage(
+              key: _wrongImageKey,
               imagePath: _currentStage!.wrongImage,
               isOriginal: false,
-              label: Localizations.localeOf(context).languageCode == 'ko'
-                  ? '틀린그림'
-                  : 'Different',
+              label: isKorean ? '틀린그림' : 'Different',
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _buildInteractiveImage({
+  /// 동기화된 InteractiveViewer 이미지
+  Widget _buildSyncedInteractiveImage({
+    required GlobalKey key,
     required String imagePath,
     required bool isOriginal,
     required String label,
@@ -970,42 +1496,36 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                 color: Color(0xFF4A90E2),
               ),
             ),
-            GestureDetector(
-              onTap: () => _showZoomedImage(isOriginal),
-              child: const Row(
-                children: [
-                  Icon(Icons.zoom_in, size: 20, color: Color(0xFF4A90E2)),
-                  SizedBox(width: 4),
-                  Text(
-                    '확대',
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Color(0xFF4A90E2),
-                    ),
+            // 줌 레벨 표시
+            if (_currentScale > 1.0)
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                decoration: BoxDecoration(
+                  color: const Color(0xFF4A90E2).withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(10),
+                ),
+                child: Text(
+                  '${(_currentScale * 100).toInt()}%',
+                  style: const TextStyle(
+                    fontSize: 12,
+                    color: Color(0xFF4A90E2),
+                    fontWeight: FontWeight.bold,
                   ),
-                ],
+                ),
               ),
-            ),
           ],
         ),
         const SizedBox(height: 4),
-        // 이미지
-        LayoutBuilder(
-          builder: (context, constraints) {
-            final imageHeight = constraints.maxWidth * _imageAspectRatio;
-            return GestureDetector(
-              onTapDown: (details) {
-                if (!_isGameOver) {
-                  _onImageTapped(
-                    details.localPosition,
-                    Size(constraints.maxWidth, imageHeight),
-                    isOriginal,
-                  );
-                }
-              },
-              child: Container(
-                width: constraints.maxWidth,
-                height: imageHeight, // 동적 비율
+        // 이미지 (InteractiveViewer로 감싸서 확대/축소 가능)
+        Expanded(
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 이미지 프레임의 실제 높이 계산 (라벨과 SizedBox 제외)
+              final frameHeight = constraints.maxHeight;
+              print('[SpotDifference] 이미지 프레임 높이: ${frameHeight.toStringAsFixed(1)}px');
+              
+              return Container(
+                key: key,
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(
@@ -1015,84 +1535,219 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                 ),
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(10),
-                  child: Stack(
-                    fit: StackFit.expand,
-                    children: [
-                      // 이미지
-                      Image.asset(
-                        imagePath,
-                        fit:
-                            BoxFit.contain, // cover -> contain으로 변경 (이미지 전체 표시)
-                        errorBuilder: (context, error, stackTrace) {
-                          return Container(
-                            color: Colors.grey[300],
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                const Icon(
-                                  Icons.image_not_supported,
-                                  size: 40,
-                                  color: Colors.grey,
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  imagePath.split('/').last,
-                                  style: const TextStyle(
-                                    fontSize: 12,
-                                    color: Colors.grey,
-                                  ),
-                                ),
-                              ],
-                            ),
+                  child: LayoutBuilder(
+                    builder: (context, innerConstraints) {
+                      final imageWidth = innerConstraints.maxWidth;
+                      final imageHeight = innerConstraints.maxHeight;
+
+                  return InteractiveViewer(
+                    transformationController: _transformationController,
+                    minScale: 1.0,
+                    maxScale: 3.0,
+                    panEnabled: true,
+                    scaleEnabled: true,
+                    onInteractionUpdate: (details) {
+                      // 줌 레벨 업데이트
+                      final scale = _transformationController.value.getMaxScaleOnAxis();
+                      setState(() {
+                        _currentScale = scale;
+                      });
+                    },
+                    onInteractionEnd: (details) {
+                      // 상호작용 종료 시 줌 레벨 업데이트
+                      final scale = _transformationController.value.getMaxScaleOnAxis();
+                      setState(() {
+                        _currentScale = scale;
+                      });
+                    },
+                    child: GestureDetector(
+                      onTapDown: (details) {
+                        if (!_isGameOver) {
+                          // Global position 계산
+                          final RenderBox? box =
+                              key.currentContext?.findRenderObject() as RenderBox?;
+                          Offset globalPos = details.globalPosition;
+                          if (box != null) {
+                            globalPos = box.localToGlobal(details.localPosition);
+                          }
+
+                          _onImageTapped(
+                            details.localPosition,
+                            Size(imageWidth, imageHeight),
+                            isOriginal,
+                            globalPos,
                           );
-                        },
+                        }
+                      },
+                      child: Stack(
+                        fit: StackFit.expand,
+                        children: [
+                          // 이미지 (반응형으로 프레임 width에 100% 맞춤, 우측 하단 시그니처 크롭)
+                          // Transform.scale로 약간 확대하여 우측 하단이 잘리도록 (시그니처 숨김)
+                          ClipRect(
+                            child: Transform.scale(
+                              scale: 1.087, // 약 8.7% 확대하여 우측 하단이 잘리도록 (1/0.92 ≈ 1.087)
+                              alignment: Alignment.topLeft, // 상단 좌측 기준으로 확대
+                              child: Image.asset(
+                                imagePath,
+                                key: isOriginal ? _originalImageWidgetKey : _wrongImageWidgetKey,
+                                fit: BoxFit.fitWidth, // 프레임의 width에 100% 맞춤 (반응형)
+                                alignment: Alignment.topLeft, // 이미지 정렬
+                            errorBuilder: (context, error, stackTrace) {
+                              return Container(
+                                color: Colors.grey[300],
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    const Icon(
+                                      Icons.image_not_supported,
+                                      size: 40,
+                                      color: Colors.grey,
+                                    ),
+                                    const SizedBox(height: 8),
+                                    Text(
+                                      imagePath.split('/').last,
+                                      style: const TextStyle(
+                                        fontSize: 12,
+                                        color: Colors.grey,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              );
+                            },
+                            ),
+                            ),
+                          ),
+
+                          // 찾은 스팟 표시 (테두리만 있는 연한 초록색 동그라미)
+                          ..._buildFoundSpotMarkers(imageWidth, imageHeight),
+
+                          // 오답 X 표시 (해당 이미지에만 표시)
+                          if (_showWrongTapX &&
+                              _wrongTapPosition != null &&
+                              _isOriginalImageWrongTap == isOriginal)
+                            _buildWrongTapMarker(),
+
+                          // 힌트 표시
+                          if (_isShowingHint)
+                            ..._buildHintMarkers(imageWidth, imageHeight),
+
+                          // 디버그 모드: 모든 스팟 위치 표시
+                          if (_debugMode)
+                            ..._buildDebugSpotMarkers(imageWidth, imageHeight, isOriginal),
+                        ],
                       ),
-
-                      // 찾은 스팟 표시
-                      ..._buildFoundSpotMarkers(constraints.maxWidth),
-
-                      // 힌트 표시
-                      if (_isShowingHint)
-                        ..._buildHintMarkers(constraints.maxWidth),
-
-                      // 디버그 모드: 모든 스팟 위치 표시
-                      if (_debugMode)
-                        ..._buildDebugSpotMarkers(constraints.maxWidth),
-                    ],
+                    ),
+                  );
+                    },
                   ),
                 ),
-              ),
-            );
-          },
+              );
+            },
+          ),
         ),
       ],
     );
   }
 
-  List<Widget> _buildFoundSpotMarkers(double imageWidth) {
+  /// 오답 X 표시 위젯
+  Widget _buildWrongTapMarker() {
+    return AnimatedBuilder(
+      animation: _wrongTapAnimation,
+      builder: (context, child) {
+        return Positioned(
+          left: _wrongTapPosition!.dx - 20,
+          top: _wrongTapPosition!.dy - 20,
+          child: Transform.scale(
+            scale: _wrongTapAnimation.value,
+            child: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: Colors.red.withOpacity(0.3),
+                border: Border.all(color: Colors.red, width: 3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.red.withOpacity(0.5),
+                    blurRadius: 8,
+                    spreadRadius: 2,
+                  ),
+                ],
+              ),
+              child: const Center(
+                child: Icon(
+                  Icons.close,
+                  color: Colors.red,
+                  size: 28,
+                ),
+              ),
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  /// 찾은 스팟 마커들 (테두리만 있는 연한 초록색 동그라미 - 체크 아이콘 없음)
+  /// 시각적 크기는 kSpotCircleSize (30x30) 고정
+  List<Widget> _buildFoundSpotMarkers(double containerWidth, double containerHeight) {
     final markers = <Widget>[];
-    final imageHeight = imageWidth * _imageAspectRatio;
+    
+    // 실제 이미지 영역 계산
+    final imageRect = _calculateActualImageRect(Size(containerWidth, containerHeight));
+    
+    // 정답 원 크기 = 고정값 30x30
+    const circleSize = kSpotCircleSize;
+    const circleRadius = circleSize / 2;
 
     for (int i = 0; i < _foundSpots.length; i++) {
       if (_foundSpots[i]) {
         final spot = _currentStage!.spots[i];
+        final animation = _spotAnimations[i];
+
         markers.add(
-          Positioned(
-            left: spot.x * imageWidth - 15,
-            top: spot.y * imageHeight - 15,
-            child: Container(
-              width: 30,
-              height: 30,
-              decoration: BoxDecoration(
-                shape: BoxShape.circle,
-                border: Border.all(color: Colors.green, width: 3),
-              ),
-              child: const Icon(
-                Icons.check,
-                color: Colors.green,
-                size: 20,
-              ),
-            ),
+          AnimatedBuilder(
+            animation: animation ?? const AlwaysStoppedAnimation(1.0),
+            builder: (context, child) {
+              final scale = animation?.value ?? 1.0;
+              return Positioned(
+                left: imageRect.offsetX + spot.x * imageRect.width - circleRadius,
+                top: imageRect.offsetY + spot.y * imageRect.height - circleRadius,
+                child: Transform.scale(
+                  scale: scale,
+                  child: Container(
+                    width: circleSize,
+                    height: circleSize,
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      // 테두리만 있는 동그라미 (배경 없음)
+                      border: Border.all(
+                        color: _spotCircleColor,
+                        width: 3,
+                      ),
+                      // 외곽선 그림자 (시인성 강화 - 복잡한 배경에서도 잘 보이도록)
+                      boxShadow: [
+                        // 외부 검은색 그림자 (강화)
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 4,
+                          spreadRadius: 1,
+                        ),
+                        // 내부 발광 효과
+                        BoxShadow(
+                          color: _spotCircleColor.withOpacity(0.4),
+                          blurRadius: 6,
+                          spreadRadius: 0,
+                        ),
+                      ],
+                    ),
+                    // 체크 아이콘 없음 - 테두리만!
+                  ),
+                ),
+              );
+            },
           ),
         );
       }
@@ -1101,9 +1756,16 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     return markers;
   }
 
-  List<Widget> _buildHintMarkers(double imageWidth) {
+  /// 힌트 마커 (kSpotCircleSize 크기로 통일)
+  List<Widget> _buildHintMarkers(double containerWidth, double containerHeight) {
     final markers = <Widget>[];
-    final imageHeight = imageWidth * _imageAspectRatio;
+    
+    // 실제 이미지 영역 계산
+    final imageRect = _calculateActualImageRect(Size(containerWidth, containerHeight));
+    
+    // 힌트 원 크기 = 고정값 30x30
+    const circleSize = kSpotCircleSize;
+    const circleRadius = circleSize / 2;
 
     for (int i = 0; i < _foundSpots.length; i++) {
       if (!_foundSpots[i]) {
@@ -1111,15 +1773,22 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         final spot = _currentStage!.spots[i];
         markers.add(
           Positioned(
-            left: spot.x * imageWidth - 20,
-            top: spot.y * imageHeight - 20,
+            left: imageRect.offsetX + spot.x * imageRect.width - circleRadius,
+            top: imageRect.offsetY + spot.y * imageRect.height - circleRadius,
             child: Container(
-              width: 40,
-              height: 40,
+              width: circleSize,
+              height: circleSize,
               decoration: BoxDecoration(
                 shape: BoxShape.circle,
                 border: Border.all(color: Colors.orange, width: 3),
                 color: Colors.orange.withOpacity(0.3),
+                boxShadow: [
+                  BoxShadow(
+                    color: Colors.black.withOpacity(0.3),
+                    blurRadius: 4,
+                    spreadRadius: 1,
+                  ),
+                ],
               ),
             ),
           ),
@@ -1130,10 +1799,21 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     return markers;
   }
 
-  /// 디버그 모드: 모든 스팟 위치 표시
-  List<Widget> _buildDebugSpotMarkers(double imageWidth) {
+  /// 디버그 모드: 모든 스팟 위치 표시 (kDefaultTouchRadius 기준)
+  /// actualImageRect 기준으로 정확히 표시
+  List<Widget> _buildDebugSpotMarkers(double containerWidth, double containerHeight, bool isOriginal) {
+    // 실제 이미지 렌더링 영역 계산 (BoxFit.contain 여백 고려)
+    final actualImageRect = _calculateActualImageRect(Size(containerWidth, containerHeight));
+    return _buildDebugMarkersWithRect(actualImageRect.width, actualImageRect.height, actualImageRect.offsetX, actualImageRect.offsetY);
+  }
+
+  /// 디버그 마커를 실제 이미지 영역 기준으로 생성
+  List<Widget> _buildDebugMarkersWithRect(double imageWidth, double imageHeight, double offsetX, double offsetY) {
     final markers = <Widget>[];
-    final imageHeight = imageWidth * _imageAspectRatio;
+    
+    // 디버그 원 크기 = kDefaultTouchRadius 기준 (실제 이미지 너비 기준)
+    final circleRadius = kDefaultTouchRadius * imageWidth;
+    final circleSize = circleRadius * 2;
 
     for (int i = 0; i < _foundSpots.length; i++) {
       final spot = _currentStage!.spots[i];
@@ -1141,11 +1821,11 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
       markers.add(
         Positioned(
-          left: spot.x * imageWidth - 20,
-          top: spot.y * imageHeight - 20,
+          left: offsetX + spot.x * imageWidth - circleRadius,
+          top: offsetY + spot.y * imageHeight - circleRadius,
           child: Container(
-            width: 40,
-            height: 40,
+            width: circleSize,
+            height: circleSize,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
@@ -1170,14 +1850,16 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         ),
       );
 
-      // 반경 표시 (원)
+      // 터치 반경 표시 (원) - kDefaultTouchRadius 기준
+      // (개별 spot.radius는 무시, 전역 상수 사용)
+      final touchRadius = kDefaultTouchRadius * imageWidth;
       markers.add(
         Positioned(
-          left: spot.x * imageWidth - spot.radius * imageWidth,
-          top: spot.y * imageHeight - spot.radius * imageWidth,
+          left: offsetX + spot.x * imageWidth - touchRadius,
+          top: offsetY + spot.y * imageHeight - touchRadius,
           child: Container(
-            width: spot.radius * imageWidth * 2,
-            height: spot.radius * imageWidth * 2,
+            width: touchRadius * 2,
+            height: touchRadius * 2,
             decoration: BoxDecoration(
               shape: BoxShape.circle,
               border: Border.all(
@@ -1196,7 +1878,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     return markers;
   }
 
-  Widget _buildHintButton() {
+  /// 하단 버튼 영역 (힌트 + 줌 리셋)
+  Widget _buildBottomButtons() {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
 
     return Container(
@@ -1204,6 +1887,44 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       child: Row(
         mainAxisAlignment: MainAxisAlignment.center,
         children: [
+          // 줌 리셋 버튼 (확대 상태일 때만 표시)
+          if (_currentScale > 1.0)
+            GestureDetector(
+              onTap: _resetZoom,
+              child: Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
+                margin: const EdgeInsets.only(right: 12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[600],
+                  borderRadius: BorderRadius.circular(25),
+                  boxShadow: [
+                    BoxShadow(
+                      color: Colors.black.withOpacity(0.1),
+                      blurRadius: 8,
+                      offset: const Offset(0, 4),
+                    ),
+                  ],
+                ),
+                child: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const Icon(Icons.zoom_out_map,
+                        color: Colors.white, size: 18),
+                    const SizedBox(width: 6),
+                    Text(
+                      isKorean ? '원래대로' : 'Reset',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontWeight: FontWeight.bold,
+                        fontSize: 13,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          // 힌트 버튼
           if (!_hasUsedHint && !_isGameOver)
             GestureDetector(
               onTap: _useHint,
@@ -1241,78 +1962,25 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       ),
     );
   }
+}
 
-  Widget _buildZoomOverlay() {
-    return GestureDetector(
-      onTap: _closeZoomedImage,
-      child: Container(
-        color: Colors.black.withOpacity(0.9),
-        child: Stack(
-          children: [
-            Center(
-              child: InteractiveViewer(
-                minScale: 1.0,
-                maxScale: 3.0,
-                child: Image.asset(
-                  _isZoomingOriginal
-                      ? _currentStage!.originalImage
-                      : _currentStage!.wrongImage,
-                  fit: BoxFit.contain,
-                  errorBuilder: (context, error, stackTrace) {
-                    return Container(
-                      color: Colors.grey[800],
-                      child: const Center(
-                        child: Icon(
-                          Icons.image_not_supported,
-                          size: 64,
-                          color: Colors.grey,
-                        ),
-                      ),
-                    );
-                  },
-                ),
-              ),
-            ),
-            // 닫기 버튼
-            Positioned(
-              top: 50,
-              right: 20,
-              child: IconButton(
-                icon: const Icon(Icons.close, color: Colors.white, size: 30),
-                onPressed: _closeZoomedImage,
-              ),
-            ),
-            // 라벨
-            Positioned(
-              top: 50,
-              left: 20,
-              child: Container(
-                padding:
-                    const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                decoration: BoxDecoration(
-                  color: Colors.black.withOpacity(0.5),
-                  borderRadius: BorderRadius.circular(20),
-                ),
-                child: Text(
-                  _isZoomingOriginal
-                      ? (Localizations.localeOf(context).languageCode == 'ko'
-                          ? '원본'
-                          : 'Original')
-                      : (Localizations.localeOf(context).languageCode == 'ko'
-                          ? '틀린그림'
-                          : 'Different'),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+/// 입자 데이터 클래스
+class _ParticleData {
+  final int id;
+  final Offset startPosition;
+  final Offset endPosition;
+  double progress;
+  final Color color;
+  final double size;
+
+  _ParticleData({
+    required this.id,
+    required this.startPosition,
+    required this.endPosition,
+    required this.progress,
+    required this.color,
+    required this.size,
+  });
 }
 
 /// 게임 결과 다이얼로그
