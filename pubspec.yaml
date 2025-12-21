@@ -21,6 +21,7 @@ dependencies:
 
   # 게임 엔진
   flame: ^1.15.0
+  flame_forge2d: ^0.19.2
 
   # 상태 관리
   provider: ^6.1.1

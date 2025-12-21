@@ -1,5 +1,6 @@
 import 'dart:math';
 import 'package:flutter/material.dart';
+import '../../utils/gacha_glass_constants.dart';
 
 /// 가챠 기계 위젯
 /// 유리창 안에 인형들이 쌓여있고, 버튼을 누르면 튀어오르는 애니메이션을 제공합니다.
@@ -26,17 +27,17 @@ class GachaMachineWidget extends StatefulWidget {
 
 class _GachaMachineWidgetState extends State<GachaMachineWidget>
     with TickerProviderStateMixin {
-  // 유리창 위치 및 크기 조정 상수 (이미지에 맞게 미세 조정 가능)
-  static const double _glassSize = 1.1; // 기계 이미지 너비 대비 유리창 크기 비율
-  static const double _glassTop = 0.2; // 기계 이미지 상단에서 유리창까지의 거리 비율
-  static const double _glassCenterX = 0.5; // 유리창 중심 X 위치 (0.0 ~ 1.0)
-  static const double _glassCenterY = 0.3; // 유리창 중심 Y 위치 (0.0 ~ 1.0)
-  static const double _glassWidthRatio = 0.88; // 유리창 가로 비율 (기본값 1.0)
-  static const double _glassHeightRatio = 0.9; // 유리창 세로 비율 (0.85 = 가로보다 세로가 짧아서 타원형)
+  // 공유 상수 사용
+  static const double _glassSize = GachaGlassConstants.glassSize;
+  static const double _glassTop = GachaGlassConstants.glassTop;
+  static const double _glassCenterX = GachaGlassConstants.glassCenterX;
+  static const double _glassCenterY = GachaGlassConstants.glassCenterY;
+  static const double _glassWidthRatio = GachaGlassConstants.glassWidthRatio;
+  static const double _glassHeightRatio = GachaGlassConstants.glassHeightRatio;
 
   // 인형 설정
-  static const int _dollCount = 15; // 인형 개수
-  static const double _dollSize = 60.0; // 인형 이미지 크기
+  static const int _dollCount = GachaGlassConstants.dollCount;
+  static const double _dollSize = GachaGlassConstants.dollSize;
   static const List<String> _dollImages = [
     'assets/images/gacha_doll_1.png',
     'assets/images/gacha_doll_2.png',
@@ -45,7 +46,7 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
 
   // 애니메이션 설정
   static const Duration _animationDuration = Duration(milliseconds: 2000);
-  static const double _maxBounceHeight = 80.0; // 최대 튀는 높이
+  static const double _maxBounceHeight = 100.0; // 최대 튀는 높이
 
   late AnimationController _bounceController;
   final List<DollData> _dolls = [];
@@ -81,42 +82,103 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
   }
 
   /// 인형 데이터 초기화
+  /// 물리적 공간을 확보하면서 쌓이도록 배치
   void _initializeDolls() {
     _dolls.clear();
-    for (int i = 0; i < _dollCount; i++) {
-      _dolls.add(_createRandomDoll());
-    }
-  }
 
-  /// 랜덤 인형 데이터 생성
-  /// 유리통 바닥 쪽에 자연스럽게 쌓이도록 위치와 회전을 랜덤하게 설정
-  DollData _createRandomDoll() {
-    // X 위치: 유리창 전체 너비에 걸쳐 넓게 분산 (-0.9 ~ 0.9)
-    // 중심에서 좌우로 넓게 퍼지도록 설정
-    final xOffset = (_random.nextDouble() - 0.5) * 1.8; // -0.9 ~ 0.9
-    
-    // Y 위치: 유리창 하단에 몰리도록 설정
-    // initialY가 클수록 아래쪽 (유리창 중심 기준 아래)
-    // 0.6 ~ 1.0 범위로 설정하여 바닥 쪽에 더 가깝게 쌓이도록 함
-    final yOffset = _random.nextDouble() * 0.4 + 0.6; // 0.6 ~ 1.0 (하단 40% 영역)
-    
-    // 회전 각도: 0 ~ 2π 완전 랜덤
-    final rotation = _random.nextDouble() * 2 * pi;
-    
-    // 애니메이션 지연: 각 인형마다 다른 타이밍
-    final delay = _random.nextDouble() * 0.3; // 0 ~ 0.3초 지연
-    
-    // 튀는 높이: 각 인형마다 다른 높이
-    final bounceHeight = _random.nextDouble() * 0.7 + 0.3; // 0.3 ~ 1.0 배율
-    
-    return DollData(
-      imageIndex: _random.nextInt(_dollImages.length),
-      initialX: xOffset,
-      initialY: yOffset,
-      rotation: rotation,
-      delay: delay,
-      bounceHeight: bounceHeight,
-    );
+    // 인형들 간의 최소 거리 (상대적 비율, 겹치지 않도록)
+    // initialX, initialY는 -1.0 ~ 1.0 범위의 상대적 위치
+    final minDistance = 0.15; // 상대적 최소 거리 (15%)
+
+    // 레이어별로 인형 배치 (바닥부터 위로)
+    final layers = <List<DollData>>[];
+
+    for (int i = 0; i < _dollCount; i++) {
+      bool placed = false;
+      int attempts = 0;
+      const maxAttempts = 100;
+
+      while (!placed && attempts < maxAttempts) {
+        attempts++;
+
+        // 랜덤 X 위치 (원형 영역 내, 중심에서 벗어나지 않게)
+        final angle = _random.nextDouble() * 2 * pi;
+        final radiusRatio = _random.nextDouble() * 0.65 + 0.15; // 0.15 ~ 0.8
+        final xOffset = cos(angle) * radiusRatio;
+
+        // 레이어별로 Y 위치 결정 (바닥부터 위로 쌓기)
+        double yOffset = 0.0;
+        int targetLayer = 0;
+
+        // 기존 레이어들을 확인하여 적절한 레이어 찾기
+        bool foundLayer = false;
+        for (int layerIndex = 0; layerIndex < layers.length; layerIndex++) {
+          final layer = layers[layerIndex];
+          bool canPlaceInLayer = true;
+
+          // 이 레이어의 다른 인형들과 충돌 체크
+          for (final existingDoll in layer) {
+            final dx = xOffset - existingDoll.initialX;
+            final dy = 0.0; // 같은 레이어이므로 Y 차이는 0
+            final distance = sqrt(dx * dx + dy * dy);
+            if (distance < minDistance) {
+              canPlaceInLayer = false;
+              break;
+            }
+          }
+
+          if (canPlaceInLayer) {
+            targetLayer = layerIndex;
+            // 레이어의 Y 위치 계산 (바닥부터 위로)
+            // initialY: 0.0 = 바닥, 1.0 = 상단 (바닥 기준)
+            // 하단부터 위로 쌓이므로 0.0부터 시작
+            yOffset = targetLayer * 0.12; // 각 레이어마다 0.12씩 위로 (더 조밀하게)
+            foundLayer = true;
+            break;
+          }
+        }
+
+        // 적절한 레이어를 찾지 못했으면 새 레이어 생성
+        if (!foundLayer) {
+          targetLayer = layers.length;
+          yOffset = targetLayer * 0.12;
+        }
+
+        // 유리창 하단 경계 체크 (initialY가 0.4를 넘지 않도록, 바닥 기준)
+        if (yOffset > 0.4) {
+          continue; // 하단 경계를 넘으면 다시 시도
+        }
+
+        // 회전 각도: 더 큰 랜덤 회전 (쓰러진 것처럼 보이게)
+        final rotation = _random.nextDouble() * pi * 0.8 -
+            pi * 0.4; // -0.4π ~ 0.4π 라디안 (약 -72도 ~ 72도)
+
+        // 애니메이션 지연: 각 인형마다 다른 타이밍
+        final delay = _random.nextDouble() * 0.3;
+
+        // 튀는 높이: 각 인형마다 다른 높이
+        final bounceHeight = _random.nextDouble() * 0.7 + 0.3;
+
+        final newDoll = DollData(
+          imageIndex: _random.nextInt(_dollImages.length),
+          initialX: xOffset,
+          initialY: yOffset,
+          rotation: rotation,
+          delay: delay,
+          bounceHeight: bounceHeight,
+        );
+
+        // 새 레이어 생성 (필요한 경우)
+        if (targetLayer >= layers.length) {
+          layers.add([]);
+        }
+
+        // 레이어에 추가
+        layers[targetLayer].add(newDoll);
+        _dolls.add(newDoll);
+        placed = true;
+      }
+    }
   }
 
   /// 튀어오르는 애니메이션 시작
@@ -142,7 +204,7 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
   Widget build(BuildContext context) {
     return LayoutBuilder(
       builder: (context, constraints) {
-        // 기계 이미지 크기 계산
+        // 기계 이미지 크기 계산 (화면 경계에서 잘리지 않도록 여유 공간 확보)
         final imageWidth = constraints.maxWidth * 0.8;
         final imageHeight = imageWidth * 1.4;
 
@@ -205,6 +267,7 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
                           glassRadius: glassBaseRadius,
                           glassCenterX: glassWidth / 2,
                           glassCenterY: glassHeight / 2,
+                          glassHeight: glassHeight,
                         );
                       }),
                     ],
@@ -224,6 +287,7 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
     required double glassRadius, // 기본 반지름 (타원형 계산에 사용)
     required double glassCenterX, // 타원형 중심 X
     required double glassCenterY, // 타원형 중심 Y
+    required double glassHeight, // 유리창 높이
   }) {
     return AnimatedBuilder(
       animation: Listenable.merge([
@@ -257,19 +321,34 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
             (doll.initialX * glassRadius * _glassWidthRatio * 0.9) +
             horizontalOffset +
             shakeOffset;
-        
-        // Y: 유리창 중심 기준 아래쪽에 배치 (세로 비율 고려)
-        // initialY가 0.6~1.0 범위이므로, 중심에서 아래쪽으로 배치됨
+
+        // Y: 바닥 기준으로 배치 (initialY는 0.0 = 바닥, 값이 클수록 위로)
+        // 유리창 하단에서부터 쌓이도록 계산
         // bounceOffset을 빼서 튀어오르는 효과 적용
-        final y = glassCenterY +
-            (doll.initialY * glassRadius * _glassHeightRatio * 0.9) -
+        final bottomY = glassHeight - 16.0; // 유리창 하단 (여유 공간 포함)
+        // y는 인형의 중심 Y 좌표 (Positioned의 top: y - _dollSize / 2이므로)
+        // 인형의 하단이 바닥에 닿으려면: y = bottomY - _dollSize / 2
+        var y = bottomY -
+            _dollSize / 2 - // 인형 중심이 바닥에서 반 크기만큼 위에 있도록
+            (doll.initialY *
+                glassRadius *
+                _glassHeightRatio *
+                0.7) - // 바닥부터 위로 쌓기
             bounceOffset;
+
+        // 유리창 하단 경계 체크 (인형이 바닥 아래로 가지 않도록)
+        final minY = bottomY - _dollSize / 2;
+        if (y < minY) {
+          y = minY;
+        }
 
         // 회전 애니메이션 (튀는 동안 약간 회전) + 흔들림 회전
         final shakeRotation = widget.shakeAnimation != null
             ? widget.shakeAnimation!.value * 0.05 // 작은 회전
             : 0.0;
-        final rotation = doll.rotation + (progress * pi * 0.5 * doll.bounceHeight) + shakeRotation;
+        final rotation = doll.rotation +
+            (progress * pi * 0.5 * doll.bounceHeight) +
+            shakeRotation;
 
         return Positioned(
           left: x - _dollSize / 2,

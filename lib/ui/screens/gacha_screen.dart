@@ -6,6 +6,7 @@ import '../../utils/constants.dart';
 import '../../sound_manager.dart';
 import '../../services/daily_mission_service.dart';
 import '../widgets/gacha_machine_widget.dart';
+import '../widgets/gacha_physics_widget.dart';
 
 /// 뽑기통 화면
 /// 뽑기권을 사용해서 캐릭터를 뽑을 수 있는 화면
@@ -330,47 +331,51 @@ class _GachaScreenState extends State<GachaScreen>
   }
 
   Widget _buildGachaMachine() {
-    return Center(
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          // 가챠 기계 위젯 (인형 포함) - 흔들림 애니메이션은 위젯 내부에서 처리
-          GachaMachineWidget(
-            isAnimating: _isGachaing,
-            shakeAnimation: _isGachaing ? _shakeAnimation : null,
-          ),
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 20, horizontal: 10),
+      child: Center(
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            // 가챠 기계 물리 시뮬레이션 위젯
+            GachaPhysicsWidget(
+              isAnimating: _isGachaing,
+              shakeAnimation: _isGachaing ? _shakeAnimation : null,
+              dollCount: _currentTickets > 0 ? 25 : 0,
+            ),
 
-          // 뽑기권 이동 애니메이션
-          if (_isGachaing)
-            AnimatedBuilder(
-              animation: _ticketMoveAnimation,
-              builder: (context, child) {
-                final progress = _ticketMoveAnimation.value;
-                return Transform.translate(
-                  offset: Offset(
-                    0,
-                    -100 + (progress * 200), // 위에서 아래로 이동
-                  ),
-                  child: Opacity(
-                    opacity: (1 - progress).clamp(0.0, 1.0),
-                    child: Container(
-                      width: 50,
-                      height: 50,
-                      decoration: BoxDecoration(
-                        color: Colors.grey[500],
-                        borderRadius: BorderRadius.circular(10),
-                      ),
-                      child: const Icon(
-                        Icons.confirmation_number,
-                        color: Colors.white,
-                        size: 30,
+            // 뽑기권 이동 애니메이션
+            if (_isGachaing)
+              AnimatedBuilder(
+                animation: _ticketMoveAnimation,
+                builder: (context, child) {
+                  final progress = _ticketMoveAnimation.value;
+                  return Transform.translate(
+                    offset: Offset(
+                      0,
+                      -100 + (progress * 200), // 위에서 아래로 이동
+                    ),
+                    child: Opacity(
+                      opacity: (1 - progress).clamp(0.0, 1.0),
+                      child: Container(
+                        width: 50,
+                        height: 50,
+                        decoration: BoxDecoration(
+                          color: Colors.grey[500],
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: const Icon(
+                          Icons.confirmation_number,
+                          color: Colors.white,
+                          size: 30,
+                        ),
                       ),
                     ),
-                  ),
-                );
-              },
-            ),
-        ],
+                  );
+                },
+              ),
+          ],
+        ),
       ),
     );
   }
@@ -563,4 +568,3 @@ class _GachaScreenState extends State<GachaScreen>
     );
   }
 }
-
