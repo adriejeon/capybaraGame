@@ -25,12 +25,24 @@ class GachaPhysicsGame extends Forge2DGame {
   late double glassCenterX_px;
   late double glassCenterY_px;
 
-  // 인형 개수
-  int dollCount = 25;
+  // 전경 인형 개수 (물리 적용)
+  int dollCount = 5;
+  
+  // 배경 인형 개수 (고정, 물리 연산 없음)
+  static const int backgroundDollCount = 20;
+  
+  // 인형 통 크기 비율 (한 곳에서 관리)
+  // 이 값을 변경하면 통의 가로 크기가 변경됩니다
+  // 0.60 = 좁게, 0.65 = 기본, 0.70 = 넓게, 0.80 = 매우 넓게
+  static const double containerWidthRatio = 0.65;
 
   // 스폰 타이머 (dart:async의 Timer 사용)
   dart_async.Timer? _spawnTimer;
   int _spawnedCount = 0;
+  
+  // 얼음땡 전체 타이머: 게임 시작 후 일정 시간이 지나면 모든 인형을 Static으로 변환
+  dart_async.Timer? _freezeAllTimer;
+  double _gameStartTime = 0.0;
 
   // 고정 해상도 (선택적)
   final flame.Vector2? _fixedResolution;
@@ -87,68 +99,93 @@ class GachaPhysicsGame extends Forge2DGame {
     // 유리창 경계 생성
     _createGlassBoundaries();
 
-    // 초기 인형 스폰 (약간 지연시켜 경계가 먼저 생성되도록)
+    // 배경 인형 생성 (고정, 물리 연산 없음)
+    _spawnBackgroundDolls();
+
+    // 전경 인형 스폰 (약간 지연시켜 경계가 먼저 생성되도록)
     await Future.delayed(const Duration(milliseconds: 100));
     _spawnInitialDolls();
+    
+    // 얼음땡 전체 타이머 시작: 게임 시작 후 1.5초가 지나면 모든 인형을 비활성화
+    _gameStartTime = 0.0;
+    _freezeAllTimer = dart_async.Timer(const Duration(milliseconds: 1500), () {
+      _freezeAllDolls();
+    });
   }
 
-  /// 유리창 경계 생성 (보이지 않는 벽) - 깊은 U자형 그릇 모양
+  /// 유리창 경계 생성 (보이지 않는 벽) - 원형/타원형 그릇 모양
   void _createGlassBoundaries() {
-    // 유리구슬은 화면 중앙에 있고, 너비는 화면의 약 70%
-    // 깊은 U자 형태의 경계를 만들어 인형이 바닥 중앙으로 모이도록 함
+    // 유리구슬은 화면 중앙에 있고, 원형/타원형 경계를 만들어 인형이 동그란 통 안에 있도록 함
 
     // 게임 좌표계: (0,0)이 왼쪽 상단
     // glassCenterX_px = glassWidth / 2 (화면 중심 X)
     // glassCenterY_px = glassHeight / 2 (화면 중심 Y)
 
-    // 좌우 폭을 좁혀서 유리구슬 안쪽에 인형이 갇히도록 (80% 정도로 좁힘)
-    final innerHalfWidth = (glassWidth / 2) * 0.80;
+    // 좌우 폭을 더 좁혀서 가챠 배경 이미지의 유리구슬과 정확히 일치하도록
+    final innerHalfWidth = (glassWidth / 2) * containerWidthRatio;
 
-    // 상단 Y 위치 (인형이 떨어지는 시작점) - 상단은 뚫려있어야 함
-    final topY = glassHeight * 0.05; // 화면 상단에서 5% 아래
+    // 상단 Y 위치 - 상단 경계를 완전히 막아서 인형이 위에 붙지 않도록
+    final topY = 30.0; // 화면 상단에서 30px 아래 (마진 확보)
 
-    // 하단 Y 위치 (바닥) - 분홍색 받침대 바로 위까지 깊숙하게 내리기
-    // 화면 하단에서 더 깊게 내려가도록 설정
-    final bottomY = glassHeight - 5.0; // 화면 하단에서 5px 위 (더 깊게)
+    // 하단 Y 위치 (바닥) - 아래 20px 마진을 확실히 확보
+    final bottomY = glassHeight - 20.0; // 화면 하단에서 20px 위
 
-    // U자 형태의 경계 점들 생성
+    // 타원형 경계의 중심과 반지름
+    final centerX = glassCenterX_px;
+    final centerY = (topY + bottomY) / 2; // 상단과 하단의 중간
+    final radiusX = innerHalfWidth; // 가로 반지름
+    final radiusY = (bottomY - topY) / 2; // 세로 반지름
+
+    // 원형/타원형 경계 점들 생성
     final List<Vector2> boundaryPoints = [];
+    final segments = 120; // 원형을 더 부드럽게 만들기 위해 세그먼트 수 증가
 
-    // 좌측 벽 (위에서 아래로) - 유리구슬 외곽선을 따라
-    final leftWallSegments = 40;
-    for (int i = 0; i <= leftWallSegments; i++) {
-      final t = i / leftWallSegments; // 0.0 ~ 1.0
-      // 좌측 벽: 약간 곡선 형태로 안쪽으로 휘어짐
-      final curveFactor = sin(t * pi) * 0.05; // 곡선 효과 (5% 정도)
-      final x = glassCenterX_px - innerHalfWidth * (1 - curveFactor);
-      final y = topY + t * (bottomY - topY);
-      boundaryPoints.add(Vector2(x, y));
-    }
-
-    // 바닥 (깊은 U자 곡선) - 좌측에서 우측으로
-    // 중앙이 가장 깊고, 좌우로 올라가는 U자 모양
-    final bottomSegments = 50;
-    for (int i = 0; i <= bottomSegments; i++) {
-      final t = i / bottomSegments; // 0.0 ~ 1.0
-      // U자 곡선: 중앙이 가장 깊고 좌우로 올라감
-      final normalizedX = (t - 0.5) * 2; // -1.0 ~ 1.0
-      final curveHeight = normalizedX * normalizedX; // 포물선 형태 (0.0 ~ 1.0)
+    // 타원형 경계 생성 (시계 방향으로, 상단부터 시작)
+    // 상단과 하단을 평평하게 막아서 인형이 경계 밖으로 나가지 않도록 함
+    final segments = 100;
+    
+    // 상단 평평한 부분 (왼쪽에서 오른쪽으로)
+    final topSegments = 20;
+    for (int i = 0; i <= topSegments; i++) {
+      final t = i / topSegments;
       final x = glassCenterX_px - innerHalfWidth + t * innerHalfWidth * 2;
-      // 바닥 중앙이 가장 깊고, 좌우로 갈수록 올라감 (U자 모양)
-      // 중앙 깊이: bottomY에서 추가로 15% 더 깊게
-      final y = bottomY + curveHeight * (glassHeight * 0.15);
+      final y = topY; // 상단을 평평하게
       boundaryPoints.add(Vector2(x, y));
     }
-
-    // 우측 벽 (아래에서 위로) - 유리구슬 외곽선을 따라
-    final rightWallSegments = 40;
-    for (int i = rightWallSegments; i >= 0; i--) {
-      final t = i / rightWallSegments; // 1.0 ~ 0.0
-      // 우측 벽: 약간 곡선 형태로 안쪽으로 휘어짐
-      final curveFactor = sin(t * pi) * 0.05; // 곡선 효과 (5% 정도)
-      final x = glassCenterX_px + innerHalfWidth * (1 - curveFactor);
-      final y = topY + t * (bottomY - topY);
+    
+    // 우측 벽 (타원형 곡선) - 상단에서 하단까지
+    final rightSegments = 30;
+    for (int i = 1; i <= rightSegments; i++) {
+      final t = i / rightSegments; // 0.0 ~ 1.0
+      // 각도: 0 (우측 상단)부터 -π (우측 하단)까지
+      final angle = -t * pi;
+      final x = centerX + radiusX * cos(angle);
+      final y = centerY + radiusY * sin(angle);
+      // Y 좌표를 상단과 하단 경계 내로 제한
+      final clampedY = y.clamp(topY, bottomY);
+      boundaryPoints.add(Vector2(x, clampedY));
+    }
+    
+    // 하단 평평한 부분 (오른쪽에서 왼쪽으로)
+    final bottomSegments = 20;
+    for (int i = 0; i <= bottomSegments; i++) {
+      final t = i / bottomSegments;
+      final x = glassCenterX_px + innerHalfWidth - t * innerHalfWidth * 2;
+      final y = bottomY; // 하단을 평평하게
       boundaryPoints.add(Vector2(x, y));
+    }
+    
+    // 좌측 벽 (타원형 곡선) - 하단에서 상단까지
+    final leftSegments = 30;
+    for (int i = 1; i <= leftSegments; i++) {
+      final t = i / leftSegments; // 0.0 ~ 1.0
+      // 각도: -π (좌측 하단)부터 -2π (좌측 상단)까지
+      final angle = -pi - t * pi;
+      final x = centerX + radiusX * cos(angle);
+      final y = centerY + radiusY * sin(angle);
+      // Y 좌표를 상단과 하단 경계 내로 제한
+      final clampedY = y.clamp(topY, bottomY);
+      boundaryPoints.add(Vector2(x, clampedY));
     }
 
     // ChainShape로 전체 경계를 하나의 체인으로 생성
@@ -161,16 +198,53 @@ class GachaPhysicsGame extends Forge2DGame {
         position: Vector2.zero(),
       );
 
-      // 벽을 얼음판처럼 미끄럽게 만들기 (friction = 0.0)
+      // 벽을 미끄럽게 만들기 (friction = 0.1)
       final fixtureDef = FixtureDef(edge)
-        ..friction = 0.0 // 완전 미끄러움 (인형이 벽에 달라붙지 않음)
+        ..friction = 0.1 // 미끄러움 (인형이 바닥으로 잘 모이도록)
         ..restitution = 0.0; // 탄성 제거 (튕기지 않음)
 
       world.createBody(bodyDef)..createFixture(fixtureDef);
     }
   }
 
-  /// 초기 인형 스폰 (Timer.periodic을 사용하여 순차적으로 생성)
+  /// 배경 인형 생성 (고정, 물리 연산 없음)
+  void _spawnBackgroundDolls() {
+    final random = Random();
+    // 경계와 동일한 크기로 맞춤
+    final innerHalfWidth = (glassWidth / 2) * containerWidthRatio;
+    final bottomY = glassHeight - 20.0;
+
+    for (int i = 0; i < backgroundDollCount; i++) {
+      // 바닥 근처에 랜덤 배치 (쌓여있는 느낌)
+      // bottomY를 절대 넘지 않도록 인형 크기의 반만큼 여유 공간 확보
+      final dollRadius = dollSize / 2;
+      final maxY = bottomY - dollRadius; // 인형이 bottomY를 넘지 않도록
+      final normalizedY = random.nextDouble(); // 0.0 ~ 1.0
+      final y = maxY - (normalizedY * normalizedY * glassHeight * 0.4); // 바닥에서 위로 분산
+      
+      // X 위치: 좌우로 넓게 분산하여 동그란 통의 왼쪽과 오른쪽에도 인형이 쌓이도록
+      // 경계 내부 전체에 골고루 분산 (좌우 끝까지 포함)
+      final x = glassCenterX_px + (random.nextDouble() - 0.5) * innerHalfWidth * 1.8;
+      
+      // 랜덤 이미지 선택
+      final imageIndex = random.nextInt(dollImages.length);
+      
+      // 랜덤 회전
+      final angle = random.nextDouble() * 2 * pi;
+      
+      // Static 인형 컴포넌트 생성 (물리 연산 없음)
+      final backgroundDoll = StaticDollComponent(
+        position: flame.Vector2(x, y),
+        imagePath: dollImages[imageIndex],
+        size: flame.Vector2.all(dollSize),
+        angle: angle,
+      );
+      
+      add(backgroundDoll);
+    }
+  }
+
+  /// 초기 전경 인형 스폰 (물리 적용, 5개만)
   void _spawnInitialDolls() async {
     // 약간의 지연을 두고 스폰 (경계가 완전히 생성된 후)
     await Future.delayed(const Duration(milliseconds: 200));
@@ -200,24 +274,33 @@ class GachaPhysicsGame extends Forge2DGame {
     final random = Random();
 
     // 인형들이 겹치지 않도록 X축과 Y축으로 분산 배치
-    final innerHalfWidth = (glassWidth / 2) * 0.80;
-    final topY = glassHeight * 0.1; // 상단 10% 영역
-    final spawnHeight = glassHeight * 0.3; // 스폰 영역 높이 (상단 30%)
+    // 경계와 동일한 크기로 맞춤
+    final innerHalfWidth = (glassWidth / 2) * containerWidthRatio;
+    final topY = 30.0; // 상단 30px 마진 (경계와 일치)
+    final bottomY = glassHeight - 20.0; // 하단 20px 마진
 
-    // X 위치: 유리통 너비 전체에 골고루 분산
+    // X 위치: 좌우로 넓게 분산하여 동그란 통의 왼쪽과 오른쪽에도 인형이 쌓이도록
+    // 경계 내부 전체에 골고루 분산 (좌우 끝까지 포함하되 경계를 넘지 않도록)
+    final spawnXRange = innerHalfWidth * 0.9; // 경계를 약간 안쪽으로 제한
     final spawnX =
-        glassCenterX_px + (random.nextDouble() - 0.5) * innerHalfWidth * 1.8;
+        glassCenterX_px + (random.nextDouble() - 0.5) * spawnXRange * 2;
 
-    // Y 위치: 세로로도 간격을 두어 배치 (겹치지 않게)
-    // 생성된 인형 수에 따라 높이 분산
-    final yOffset = (_spawnedCount % 5) * (dollSize * 0.3);
-    final spawnY = topY + (random.nextDouble() * spawnHeight * 0.3) + yOffset;
+    // Y 위치: 무조건 상단에서만 스폰하여 아래로 떨어지게 함
+    // 상단 경계 바로 아래에서 스폰 (topY + 충분한 여유 공간)
+    final spawnMargin = dollSize * 0.5; // 상단 경계에서 충분한 여유 공간
+    final spawnY = topY + spawnMargin; // 상단에서만 스폰 (항상 동일한 높이)
+    
+    // 스폰 위치가 경계 내부인지 확인하고 조정
+    final distanceFromCenter = (spawnX - glassCenterX_px).abs();
+    final finalSpawnX = distanceFromCenter > innerHalfWidth * 0.95
+        ? glassCenterX_px + (spawnX > glassCenterX_px ? 1 : -1) * innerHalfWidth * 0.9
+        : spawnX;
 
     // 랜덤 이미지 선택
     final imageIndex = random.nextInt(dollImages.length);
 
     final doll = DollComponent(
-      position: Vector2(spawnX, spawnY),
+      position: Vector2(finalSpawnX, spawnY),
       imagePath: dollImages[imageIndex],
       size: flame.Vector2.all(dollSize),
     );
@@ -235,17 +318,24 @@ class GachaPhysicsGame extends Forge2DGame {
     // glassCenterY_px는 게임 화면의 중심 Y
 
     // 경계 내부에 스폰하도록 좁힌 폭 사용 (경계와 동일한 폭)
-    final innerHalfWidth = (glassWidth / 2) * 0.80;
+    final innerHalfWidth = (glassWidth / 2) * containerWidthRatio;
 
-    // X: 중심 기준 좌우로 랜덤 분산 (경계 내부)
+    // X: 좌우로 넓게 분산하여 동그란 통의 왼쪽과 오른쪽에도 인형이 쌓이도록
+    // 경계 내부 전체에 골고루 분산 (좌우 끝까지 포함하되 경계를 넘지 않도록)
+    final topY = 30.0; // 상단 30px 마진 (경계와 일치)
+    final spawnXRange = innerHalfWidth * 0.9; // 경계를 약간 안쪽으로 제한
     final spawnX =
-        glassCenterX_px + (random.nextDouble() - 0.5) * innerHalfWidth * 1.6;
+        glassCenterX_px + (random.nextDouble() - 0.5) * spawnXRange * 2;
 
-    // Y: 상단에서 스폰 (인형이 떨어지도록)
-    // 인형들이 위에서 떨어져서 바닥에 쌓이도록 상단에서 스폰
-    final topY = glassHeight * 0.1; // 상단 10% 영역
-    final spawnY =
-        topY + random.nextDouble() * glassHeight * 0.2; // 상단 20% 영역에 랜덤 배치
+    // Y: 무조건 상단에서만 스폰하여 아래로 떨어지게 함
+    final spawnMargin = dollSize * 0.5; // 상단 경계에서 충분한 여유 공간
+    final spawnY = topY + spawnMargin; // 상단에서만 스폰 (항상 동일한 높이)
+    
+    // 스폰 위치가 경계 내부인지 확인하고 조정
+    final distanceFromCenter = (spawnX - glassCenterX_px).abs();
+    final finalSpawnX = distanceFromCenter > innerHalfWidth * 0.95
+        ? glassCenterX_px + (spawnX > glassCenterX_px ? 1 : -1) * innerHalfWidth * 0.9
+        : spawnX;
 
     // 랜덤 이미지 선택
     final imageIndex = random.nextInt(dollImages.length);
@@ -265,15 +355,27 @@ class GachaPhysicsGame extends Forge2DGame {
     _spawnDoll();
   }
 
-  /// 모든 인형 제거
+  /// 모든 인형 제거 (전경 인형만 제거, 배경은 유지)
   void clearDolls() {
     // 스폰 타이머 취소
     _spawnTimer?.cancel();
     _spawnTimer = null;
     _spawnedCount = 0;
+    
+    // 얼음땡 타이머 취소
+    _freezeAllTimer?.cancel();
+    _freezeAllTimer = null;
 
+    // 전경 인형만 제거 (Dynamic Body)
     children.whereType<DollComponent>().forEach((doll) {
       doll.removeFromParent();
+    });
+  }
+  
+  /// 모든 인형을 Static으로 변환 (얼음땡 - 확실한 방법)
+  void _freezeAllDolls() {
+    children.whereType<DollComponent>().forEach((doll) {
+      doll.freeze(); // DollComponent의 freeze 메서드 호출
     });
   }
 
@@ -283,6 +385,7 @@ class GachaPhysicsGame extends Forge2DGame {
     clearDolls();
     _spawnInitialDolls();
   }
+
 }
 
 /// 인형 컴포넌트 (물리 바디 포함)
@@ -290,6 +393,10 @@ class DollComponent extends BodyComponent<GachaPhysicsGame> {
   final String imagePath;
   final flame.Vector2 size;
   SpriteComponent? spriteComponent;
+  
+  // 얼음땡 로직: 정지 시간 추적
+  double _timeSinceStop = 0.0;
+  bool _isFrozen = false; // Static으로 변환되었는지 여부
 
   DollComponent({
     required Vector2 position, // forge2d의 Vector2 (물리 바디 위치)
@@ -300,7 +407,9 @@ class DollComponent extends BodyComponent<GachaPhysicsGame> {
             type: BodyType.dynamic, // 동적 바디 (인형이 떨어지도록)
             position: position,
             angle: Random().nextDouble() * 2 * pi, // 랜덤 회전
-            linearDamping: 0.0, // 공기 저항 없음 (빠르게 떨어지도록)
+            linearDamping: 0.5, // 바닥에 닿은 뒤 미세하게 미끄러지는 힘을 빨리 없애줌
+            angularDamping: 0.5, // 회전 저항 적당히
+            allowSleep: true, // 인형이 정지하면 Sleep 상태로 전환 (지터링 방지)
           ),
           renderBody: false, // 충돌체 시각화 숨기기 (카피바라 이미지만 보이도록)
         );
@@ -344,21 +453,57 @@ class DollComponent extends BodyComponent<GachaPhysicsGame> {
     final shape = CircleShape();
     shape.radius = (size.x / 2) * 0.8;
 
-    // 동적 바디 물리 속성 설정
+    // 동적 바디 물리 속성 설정 (5개를 위한 최적화)
     final fixtureDef = FixtureDef(shape)
-      ..density = 1.0 // 밀도 (묵직하게)
-      ..friction = 0.3 // 마찰력 (인형끼리는 적당히 비벼지면서 쌓이도록)
-      ..restitution = 0.02; // 반발력 (절대 튀어 오르지 않게, 0.0~0.05)
+      ..density = 2.0 // 높은 밀도 (너무 가볍게 날아다니지 않도록)
+      ..friction = 0.3 // 마찰력 (인형끼리는 적당히)
+      ..restitution = 0.05; // 반발력 (거의 안 튀김)
 
     body.createFixture(fixtureDef);
 
-    // 초기 속도 부여 (아래쪽으로 힘을 받게)
-    body.linearVelocity = Vector2(0, 20);
+    // 초기 속도 제거 (바닥에 안정적으로 놓이도록)
+    body.linearVelocity = Vector2.zero();
+    body.angularVelocity = 0.0;
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+
+    // 상단에 떠 있는 인형을 강제로 아래로 내리기
+    if (body.isActive) {
+      final topY = 30.0; // 상단 경계 (30px 마진)
+      final currentY = body.position.y;
+      final dollRadius = size.x / 2;
+      
+      // 인형이 상단 경계 위에 있거나 상단 경계 근처에 붙어있으면 강제로 아래로 내림
+      if (currentY < topY + dollRadius * 2) {
+        // 아래쪽으로 강한 힘을 가해서 떨어지게 함
+        final currentVelocity = body.linearVelocity;
+        // Y 속도를 강제로 아래 방향으로 설정
+        body.linearVelocity = Vector2(currentVelocity.x * 0.5, max(currentVelocity.y, 100.0));
+      }
+    }
+
+    // 얼음땡 로직: 정지한 인형을 비활성화 (지터링 완전 제거)
+    if (!_isFrozen && body.isActive) {
+      final velocity = body.linearVelocity;
+      final speed = velocity.length;
+      final angularSpeed = body.angularVelocity.abs();
+      
+      // 속도가 아주 느려진 상태 (0.2 미만) 체크 (더 빠르게 감지)
+      if (speed < 0.2 && angularSpeed < 0.2) {
+        _timeSinceStop += dt;
+        
+        // 0.2초 이상 정지 상태가 유지되면 Body 비활성화 (더 빠르게 얼음땡)
+        if (_timeSinceStop >= 0.2) {
+          _freezeBody();
+        }
+      } else {
+        // 움직이고 있으면 타이머 리셋
+        _timeSinceStop = 0.0;
+      }
+    }
 
     // 스프라이트를 물리 바디 위치와 동기화
     // spriteComponent가 초기화되었는지 확인 (onLoad가 완료되었는지)
@@ -371,6 +516,81 @@ class DollComponent extends BodyComponent<GachaPhysicsGame> {
         spriteComponent!.angle = body.angle;
       } catch (e) {
         // 위치 동기화 실패 시 무시
+      }
+    }
+  }
+  
+  /// 인형을 비활성화 (얼음땡 - 완전히 고정)
+  /// 외부에서도 호출 가능 (게임 레벨의 전체 타이머에서 사용)
+  void freeze() {
+    if (_isFrozen || !body.isActive) {
+      return;
+    }
+    
+    _freezeBody();
+  }
+  
+  /// 내부 메서드: Body를 비활성화하여 물리 계산에서 제외
+  void _freezeBody() {
+    // 속도 완전히 제거
+    body.linearVelocity = Vector2.zero();
+    body.angularVelocity = 0.0;
+    
+    // Body 비활성화 (물리 엔진이 더 이상 위치를 계산하지 않음)
+    body.setActive(false);
+    _isFrozen = true;
+    
+    // Body가 비활성화되면 물리 엔진이 위치를 업데이트하지 않으므로
+    // 지터링이 완전히 사라짐 (0.0% 움직임)
+  }
+}
+
+/// 배경 인형 컴포넌트 (고정, 물리 연산 없음)
+class StaticDollComponent extends Component with HasGameRef<GachaPhysicsGame> {
+  final String imagePath;
+  final flame.Vector2 size;
+  final flame.Vector2 position;
+  final double angle;
+  SpriteComponent? spriteComponent;
+
+  StaticDollComponent({
+    required this.position,
+    required this.imagePath,
+    required this.size,
+    required this.angle,
+  });
+
+  @override
+  Future<void> onLoad() async {
+    await super.onLoad();
+
+    // 이미지 로드
+    try {
+      final sprite = await gameRef.loadSprite(imagePath);
+      spriteComponent = SpriteComponent(
+        sprite: sprite,
+        size: size,
+        anchor: Anchor.center,
+        position: position,
+        angle: angle,
+      );
+      add(spriteComponent!);
+    } catch (e) {
+      // 이미지 로드 실패 시 에러 처리
+      print('Failed to load background doll image: $imagePath, error: $e');
+      // 기본 아이콘으로 대체 시도
+      try {
+        final fallbackSprite = await gameRef.loadSprite('gacha_doll_1.png');
+        spriteComponent = SpriteComponent(
+          sprite: fallbackSprite,
+          size: size,
+          anchor: Anchor.center,
+          position: position,
+          angle: angle,
+        );
+        add(spriteComponent!);
+      } catch (e2) {
+        print('Failed to load fallback image: $e2');
       }
     }
   }
