@@ -81,7 +81,11 @@ class _GachaPhysicsWidgetState extends State<GachaPhysicsWidget> {
           // 게임은 한 번만 생성하고 재사용
           if (_game == null) {
             _game = GachaPhysicsGame(fixedResolution: _gameSize);
-            _game?.setDollCount(widget.dollCount);
+            // 게임이 완전히 로드된 후에 setDollCount 호출 (비동기로 처리)
+            _game?.onLoad().then((_) {
+              // onLoad 완료 후 setDollCount 호출
+              _game?.setDollCount(widget.dollCount);
+            });
           }
         }
 
