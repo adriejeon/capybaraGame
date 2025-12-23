@@ -5,8 +5,8 @@ import '../../data/collection_manager.dart';
 import '../../utils/constants.dart';
 import '../../sound_manager.dart';
 import '../../services/daily_mission_service.dart';
-import '../widgets/gacha_machine_widget.dart';
 import '../widgets/gacha_physics_widget.dart';
+import '../../utils/gacha_glass_constants.dart';
 
 /// 뽑기통 화면
 /// 뽑기권을 사용해서 캐릭터를 뽑을 수 있는 화면
@@ -341,7 +341,8 @@ class _GachaScreenState extends State<GachaScreen>
             GachaPhysicsWidget(
               isAnimating: _isGachaing,
               shakeAnimation: _isGachaing ? _shakeAnimation : null,
-              dollCount: _currentTickets > 0 ? 25 : 0,
+              dollCount:
+                  _currentTickets > 0 ? GachaGlassConstants.dollCount : 0,
             ),
 
             // 뽑기권 이동 애니메이션

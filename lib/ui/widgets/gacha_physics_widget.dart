@@ -19,7 +19,7 @@ class GachaPhysicsWidget extends StatefulWidget {
     super.key,
     this.isAnimating = false,
     this.shakeAnimation,
-    this.dollCount = 25,
+    this.dollCount = GachaGlassConstants.dollCount,
   });
 
   @override
@@ -44,9 +44,15 @@ class _GachaPhysicsWidgetState extends State<GachaPhysicsWidget> {
       _game!.setDollCount(widget.dollCount);
     }
 
-    // 흔들림 애니메이션이 있으면 게임에 전달
-    if (widget.isAnimating && widget.shakeAnimation != null) {
-      // 흔들림 효과는 게임 내에서 처리할 수 있음
+    // 애니메이션 시작/종료 처리
+    if (_game != null) {
+      if (widget.isAnimating && !oldWidget.isAnimating) {
+        // 애니메이션 시작
+        _game!.startPopcornAnimation();
+      } else if (!widget.isAnimating && oldWidget.isAnimating) {
+        // 애니메이션 종료 및 리셋
+        _game!.resetAnimation();
+      }
     }
   }
 
