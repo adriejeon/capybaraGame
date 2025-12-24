@@ -25,6 +25,9 @@ class GachaPhysicsGame extends FlameGame {
 
   // onLoad() 완료 여부 추적
   bool _isLoaded = false;
+  
+  /// 게임 로드 완료 여부
+  bool get isLoaded => _isLoaded;
 
   // 전경 인형 개수 (물리 적용)
   int dollCount = 1;
@@ -37,12 +40,12 @@ class GachaPhysicsGame extends FlameGame {
   // 이 값을 변경하면 통의 가로 크기가 변경됩니다
   // 0.60 = 좁게, 0.65 = 기본, 0.70 = 넓게, 0.80 = 매우 넓게
   static const double containerWidthRatio =
-      0.75; // 통 가로 크기 증가 (기본 0.65에서 0.75로)
+      0.70; // 통 가로 크기 증가 (기본 0.65에서 0.75로)
 
   // 통 위치 조정 (Y축 오프셋)
   // 양수 = 아래로, 음수 = 위로 이동
   // 통을 위로 올리려면 음수 값을 사용하세요 (예: -20.0)
-  static const double containerOffsetY = 10.0; // 통을 위로 30px 이동
+  static const double containerOffsetY = 13.0; // 통을 위로 30px 이동
 
   // 통 세로 크기 조정 (마진 조정)
   // 이 값을 줄이면 통의 세로 높이가 커집니다 (마진이 줄어듦)
@@ -50,7 +53,7 @@ class GachaPhysicsGame extends FlameGame {
   static const double containerTopMargin =
       15.0; // 상단 마진 (기본 40.0에서 20.0으로 줄여서 높이 증가)
   static const double containerBottomMargin =
-      30.0; // 하단 마진 (기본 20.0에서 10.0으로 줄여서 높이 증가)
+      40.0; // 하단 마진 (기본 20.0에서 10.0으로 줄여서 높이 증가)
 
   // 고정 해상도 (선택적)
   final flame.Vector2? _fixedResolution;
@@ -115,6 +118,12 @@ class GachaPhysicsGame extends FlameGame {
     final topY = _containerTopY;
     final bottomY = _containerBottomY;
     final centerX = glassCenterX_px;
+    
+    // 통 크기/위치 디버그 정보 출력
+    print('Container settings: widthRatio=$containerWidthRatio, topMargin=$containerTopMargin, '
+        'bottomMargin=$containerBottomMargin, offsetY=$containerOffsetY');
+    print('Container area: topY=$topY, bottomY=$bottomY, innerHalfWidth=$innerHalfWidth, '
+        'height=${bottomY - topY}');
 
     // 인형들 간의 최소 거리 (겹치지 않도록)
     final minDistance = dollSize * 0.85;
@@ -122,10 +131,11 @@ class GachaPhysicsGame extends FlameGame {
     // 레이어별로 인형 배치 (바닥부터 위로)
     final layers = <List<StaticDollComponent>>[];
 
+    int successfullyPlaced = 0;
     for (int i = 0; i < dollCount; i++) {
       bool placed = false;
       int attempts = 0;
-      const maxAttempts = 200;
+      const maxAttempts = 500; // 시도 횟수 증가
 
       while (!placed && attempts < maxAttempts) {
         attempts++;
@@ -212,8 +222,18 @@ class GachaPhysicsGame extends FlameGame {
         layers[targetLayer].add(doll);
         add(doll);
         placed = true;
+        successfullyPlaced++;
+      }
+      
+      // 배치 실패 시 로그 출력
+      if (!placed) {
+        print('Warning: Failed to place doll ${i + 1}/${dollCount} after $maxAttempts attempts');
+        print('Container area: topY=$topY, bottomY=$bottomY, innerHalfWidth=$innerHalfWidth');
       }
     }
+
+    // 배치 결과 로그
+    print('Doll placement: $successfullyPlaced/$dollCount dolls placed successfully');
 
     // 모든 인형의 onLoad()가 완료될 때까지 대기
     await Future.delayed(const Duration(milliseconds: 50));
@@ -256,9 +276,22 @@ class GachaPhysicsGame extends FlameGame {
     await _spawnStaticDolls();
   }
 
+  /// 인형 재배치 (통 크기/위치 변경 시 사용)
+  Future<void> reloadDolls() async {
+    // 현재 dollCount로 다시 배치
+    await setDollCount(dollCount);
+  }
+
   /// 팝콘처럼 튀어오르는 애니메이션 시작
   void startPopcornAnimation() {
     final dolls = children.whereType<StaticDollComponent>().toList();
+    print('startPopcornAnimation: found ${dolls.length} dolls');
+    
+    if (dolls.isEmpty) {
+      print('Warning: No dolls found for popcorn animation');
+      return;
+    }
+    
     final random = Random();
 
     // 인형들을 랜덤하게 섞어서 더 자연스러운 순서로 애니메이션 시작
@@ -267,10 +300,12 @@ class GachaPhysicsGame extends FlameGame {
     // 각 인형마다 다른 타이밍으로 애니메이션 시작
     for (int i = 0; i < dolls.length; i++) {
       final doll = dolls[i];
-      // 더 다양한 지연 시간: 0~1.2초 사이에 분산
-      final delay = random.nextDouble() * 1.2;
+      // 더 짧은 지연 시간: 0~0.2초 사이에 분산 (더 빠르게 시작)
+      final delay = random.nextDouble() * 0.2;
       doll.startBounceAnimation(delay: delay);
     }
+    
+    print('Popcorn animation started for ${dolls.length} dolls');
   }
 
   /// 애니메이션 리셋 (원래 위치로 복귀)
@@ -310,12 +345,12 @@ class StaticDollComponent extends flame.Component
   }) {
     // 각 인형마다 랜덤한 애니메이션 속성 설정
     final random = Random();
-    _bounceHeight = random.nextDouble() * 100.0 + 50.0; // 50~150px (더 높게)
-    _horizontalOffset = (random.nextDouble() - 0.5) * 40.0; // -20~20px (더 넓게)
+    _bounceHeight = random.nextDouble() * 80.0 + 40.0; // 40~120px (적당한 높이)
+    _horizontalOffset = (random.nextDouble() - 0.5) * 30.0; // -15~15px (적당한 범위)
     _rotationOffset =
-        (random.nextDouble() - 0.5) * 1.0; // -0.5~0.5 라디안 (더 많이 회전)
-    _animationSpeed = random.nextDouble() * 0.5 + 0.8; // 0.8~1.3배속 (다양한 속도)
-    _bounceCount = random.nextInt(3) + 1; // 1~3회 튀어오르기
+        (random.nextDouble() - 0.5) * 0.6; // -0.3~0.3 라디안 (적당한 회전)
+    _animationSpeed = random.nextDouble() * 0.2 + 0.8; // 0.8~1.0배속 (적당한 속도)
+    _bounceCount = random.nextInt(2) + 1; // 1~2회 튀어오르기 (더 간단하게)
   }
 
   /// 상단 경계 설정 (게임에서 호출)
@@ -363,8 +398,8 @@ class StaticDollComponent extends flame.Component
     super.update(dt);
 
     if (_isAnimating && spriteComponent != null) {
-      // 애니메이션 진행도 업데이트 (속도 적용)
-      _animationProgress += dt * 1.5 * _animationSpeed;
+      // 애니메이션 진행도 업데이트 (속도 적용 - 더 빠르게)
+      _animationProgress += dt * 1.0 * _animationSpeed;
 
       // 지연 시간 고려
       double effectiveProgress = _animationProgress - _delay;
@@ -380,7 +415,7 @@ class StaticDollComponent extends flame.Component
 
       // 애니메이션 완료 체크 (튀어오르는 횟수에 따라 다름)
       final totalDuration =
-          0.8 * _bounceCount + 0.5; // 각 튀어오르기 0.8초 + 떨어지는 시간 0.5초
+          0.8 * _bounceCount + 0.2; // 각 튀어오르기 0.8초 + 떨어지는 시간 0.2초 (더 빠르게)
       if (effectiveProgress > totalDuration) {
         _isAnimating = false;
         _animationProgress = 0.0;
@@ -390,43 +425,49 @@ class StaticDollComponent extends flame.Component
 
       // 여러 번 튀어오르는 효과 계산
       double bounceValue = 0.0;
-      final bounceDuration = 0.8; // 각 튀어오르기 지속 시간
+      final bounceDuration = 0.8; // 각 튀어오르기 지속 시간 (더 빠르게)
       final bounceIndex = (effectiveProgress / bounceDuration).floor();
       final bounceProgress =
           (effectiveProgress % bounceDuration) / bounceDuration;
 
       if (bounceIndex < _bounceCount) {
         // 튀어오르는 단계
-        if (bounceProgress < 0.6) {
-          // 위로 튀어오르기 (0~60%)
-          final t = bounceProgress / 0.6;
+        if (bounceProgress < 0.5) {
+          // 위로 튀어오르기 (0~50%) - 더 부드럽게
+          final t = bounceProgress / 0.5;
           bounceValue =
               _bounceOutCurve(t) * _bounceHeight * (1.0 - bounceIndex * 0.3);
         } else {
-          // 작은 바운스 (60~100%)
-          final t = (bounceProgress - 0.6) / 0.4;
-          bounceValue = _bounceOutCurve(1.0 - t * 0.3) *
-              _bounceHeight *
-              (1.0 - bounceIndex * 0.3) *
-              0.4;
+          // 아래로 떨어지기 (50~100%) - 스무스하게 떨어지도록
+          final t = (bounceProgress - 0.5) / 0.5;
+          // easeIn 커브를 사용하여 자연스럽게 떨어지도록
+          final easeInT = t * t; // 제곱 커브로 가속도 적용
+          final peakHeight = _bounceHeight * (1.0 - bounceIndex * 0.3);
+          bounceValue = peakHeight * (1.0 - easeInT);
         }
       } else {
-        // 마지막 떨어지기
+        // 마지막 떨어지기 - 더 빠르게
         final fallProgress =
-            (effectiveProgress - bounceDuration * _bounceCount) / 0.5;
+            (effectiveProgress - bounceDuration * _bounceCount) / 0.2;
         if (fallProgress < 1.0) {
-          bounceValue = (1.0 - fallProgress) * _bounceHeight * 0.2;
+          // easeIn 커브를 사용하여 자연스럽게 떨어지도록
+          final easeInT = fallProgress * fallProgress; // 제곱 커브로 가속도 적용
+          bounceValue = (1.0 - easeInT) * _bounceHeight * 0.3;
         }
       }
 
-      // 수평 이동 (더 다이나믹한 움직임)
-      final horizontalMovement = sin(effectiveProgress * pi * 3) *
+      // 수평 이동 (더 부드러운 움직임, 떨어질 때 감소)
+      final isFalling = bounceIndex >= _bounceCount || 
+          (bounceIndex < _bounceCount && bounceProgress > 0.5);
+      final fallDamping = isFalling ? (1.0 - (effectiveProgress / totalDuration).clamp(0.0, 1.0)) : 1.0;
+      final horizontalMovement = sin(effectiveProgress * pi * 2) *
           _horizontalOffset *
-          (0.5 + sin(effectiveProgress * pi * 2) * 0.5);
+          (0.5 + sin(effectiveProgress * pi * 1.5) * 0.5) *
+          fallDamping;
 
-      // 회전 효과 (튀는 동안 더 많이 회전)
+      // 회전 효과 (더 부드러운 회전, 떨어질 때 감소)
       final rotationMovement =
-          sin(effectiveProgress * pi * 2) * _rotationOffset * 2.0;
+          sin(effectiveProgress * pi * 1.5) * _rotationOffset * 1.5 * fallDamping;
 
       // 최종 위치 계산
       final newX = position.x + horizontalMovement;

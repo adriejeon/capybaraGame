@@ -105,7 +105,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   @override
   void initState() {
     super.initState();
-    _initializeGame();
+    _initializeGame(); // async지만 await 없이 호출 (초기화는 백그라운드에서)
     _setupAnimations();
     _loadAds();
 
@@ -210,10 +210,10 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     });
   }
 
-  void _initializeGame() {
+  Future<void> _initializeGame() async {
     final level =
         SpotDifferenceDataManager.difficultyToLevel(widget.difficulty);
-    _currentStage = _dataManager.getRandomStage(level);
+    _currentStage = await _dataManager.getRandomStage(level);
 
     if (_currentStage == null) {
       print('[SpotDifference] 스테이지 로드 실패');
@@ -432,7 +432,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     _processTouchWithRelativeCoords(relativeX, relativeY, tapPosition, containerSize, isOriginal, globalTapPosition);
   }
 
-  /// 비율 좌표를 사용하여 스팟 판정 처리
+  /// 비율 좌표를 사용하여 스팟 판정 처리 (Rect 기반)
   void _processTouchWithRelativeCoords(double relativeX, double relativeY, Offset tapPosition,
       Size containerSize, bool isOriginal, Offset globalTapPosition) {
     if (_isGameOver || _currentStage == null) return;
@@ -445,38 +445,66 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       });
     }
 
-    // 전역 터치 반경을 사용하여 가장 가까운 스팟 찾기
-    // (개별 spot.radius 무시, 모든 스팟에 동일한 kDefaultTouchRadius 적용)
-    int closestSpotIndex = -1;
-    double closestDistance = double.infinity;
-    const double touchRadiusSquared = kDefaultTouchRadius * kDefaultTouchRadius;
+    // 터치 포인트 (비율 좌표, 0.0 ~ 1.0)
+    final touchPoint = Offset(relativeX, relativeY);
+
+    // 터치 영역에 포함되는 스팟들을 찾기
+    final List<({int index, double area})> overlappingSpots = [];
 
     for (int i = 0; i < _currentStage!.spots.length; i++) {
-      if (_foundSpots[i]) continue; // 이미 찾은 스팟
+      if (_foundSpots[i]) continue; // 이미 찾은 스팟은 제외
 
       final spot = _currentStage!.spots[i];
-      final distance = _calculateDistance(relativeX, relativeY, spot.x, spot.y);
+      
+      // 스팟의 실제 크기 (비율 좌표, 0.0 ~ 1.0)
+      final spotWidth = spot.actualWidth;
+      final spotHeight = spot.actualHeight;
 
-      print('[SpotDifference] 스팟 $i: 데이터 좌표=(${spot.x.toStringAsFixed(3)}, ${spot.y.toStringAsFixed(3)}), 거리=${distance.toStringAsFixed(6)}');
+      // Padding 추가 (15% 여유 공간)
+      const double paddingFactor = 0.15;
+      final paddedWidth = spotWidth * (1.0 + paddingFactor);
+      final paddedHeight = spotHeight * (1.0 + paddingFactor);
 
-      // 전역 터치 반경 내에 있고, 가장 가까운 스팟인 경우
-      if (distance <= touchRadiusSquared && distance < closestDistance) {
-        closestDistance = distance;
-        closestSpotIndex = i;
+      // Rect 생성 (relative_x, relative_y는 중심점이므로 Rect.fromCenter 사용)
+      // 모든 좌표는 비율 좌표(0.0 ~ 1.0)로 작업
+      final spotRect = Rect.fromCenter(
+        center: Offset(spot.x, spot.y),
+        width: paddedWidth,
+        height: paddedHeight,
+      );
+
+      // 터치 포인트가 Rect 안에 포함되는지 확인
+      if (spotRect.contains(touchPoint)) {
+        // 면적 계산 (비율 좌표 기준)
+        final area = paddedWidth * paddedHeight;
+        overlappingSpots.add((index: i, area: area));
+
+        print('[SpotDifference] 스팟 $i: Rect 포함됨! 면적=${area.toStringAsFixed(6)}');
+        print('[SpotDifference]   중심: (${spot.x.toStringAsFixed(3)}, ${spot.y.toStringAsFixed(3)})');
+        print('[SpotDifference]   크기: ${spotWidth.toStringAsFixed(3)} x ${spotHeight.toStringAsFixed(3)}');
+        print('[SpotDifference]   Padding 후: ${paddedWidth.toStringAsFixed(3)} x ${paddedHeight.toStringAsFixed(3)}');
+        print('[SpotDifference]   Rect: left=${spotRect.left.toStringAsFixed(3)}, top=${spotRect.top.toStringAsFixed(3)}, right=${spotRect.right.toStringAsFixed(3)}, bottom=${spotRect.bottom.toStringAsFixed(3)}');
       }
     }
 
-    if (closestSpotIndex >= 0) {
-      // 정답!
-      final spot = _currentStage!.spots[closestSpotIndex];
-      print('[SpotDifference] ✅ 정답! 스팟 $closestSpotIndex 발견!');
+    // 여러 스팟이 겹치는 경우, 면적이 가장 작은 스팟 선택
+    if (overlappingSpots.isNotEmpty) {
+      // 면적 기준으로 정렬 (작은 것부터)
+      overlappingSpots.sort((a, b) => a.area.compareTo(b.area));
+      
+      final selectedSpot = overlappingSpots.first;
+      final spotIndex = selectedSpot.index;
+      final spot = _currentStage!.spots[spotIndex];
+
+      print('[SpotDifference] ✅ 정답! 스팟 $spotIndex 발견! (면적: ${selectedSpot.area.toStringAsFixed(6)})');
       print('[SpotDifference] 터치 좌표: ($relativeX, $relativeY)');
       print('[SpotDifference] 스팟 좌표: (${spot.x}, ${spot.y})');
-      print('[SpotDifference] 거리: ${closestDistance.toStringAsFixed(6)}');
-      _onCorrectTap(closestSpotIndex, globalTapPosition, containerSize);
+      print('[SpotDifference] 겹치는 스팟 수: ${overlappingSpots.length}');
+      
+      _onCorrectTap(spotIndex, globalTapPosition, containerSize);
     } else {
       // 틀림
-      print('[SpotDifference] ❌ 오답! 가장 가까운 스팟까지의 거리: ${closestDistance == double.infinity ? "무한대" : closestDistance.toStringAsFixed(6)}');
+      print('[SpotDifference] ❌ 오답! 터치 좌표: ($relativeX, $relativeY)');
       _onWrongTap(tapPosition, containerSize, isOriginal);
     }
 
@@ -1017,12 +1045,13 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     );
   }
 
-  void _restartGame() {
+  Future<void> _restartGame() async {
     _gameTimer?.cancel();
     _particleTimer?.cancel();
-    setState(() {
-      _initializeGame();
-    });
+    await _initializeGame();
+    if (mounted) {
+      setState(() {});
+    }
   }
 
   /// 광고 보고 30초 추가

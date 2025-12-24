@@ -1,16 +1,112 @@
 import '../../utils/constants.dart';
+import 'dart:convert';
+import 'package:flutter/services.dart';
 
 /// 틀린그림찾기 스팟 위치 (0.0 ~ 1.0 비율 좌표)
 class DifferenceSpot {
-  final double x; // 0.0 ~ 1.0 (이미지 너비 기준 비율)
-  final double y; // 0.0 ~ 1.0 (이미지 높이 기준 비율)
-  final double radius; // 0.0 ~ 1.0 (터치 허용 반경, 이미지 너비 기준)
+  final double x; // 0.0 ~ 1.0 (이미지 너비 기준 비율, 중심점)
+  final double y; // 0.0 ~ 1.0 (이미지 높이 기준 비율, 중심점)
+  final double radius; // 0.0 ~ 1.0 (터치 허용 반경, 이미지 너비 기준) - 하위 호환성용
+  final double? width; // 0.0 ~ 1.0 (이미지 너비 기준 비율, null이면 radius 기반으로 계산)
+  final double? height; // 0.0 ~ 1.0 (이미지 높이 기준 비율, null이면 radius 기반으로 계산)
 
   const DifferenceSpot({
     required this.x,
     required this.y,
     this.radius = 0.08, // 기본 터치 허용 반경 8%
+    this.width,
+    this.height,
   });
+
+  /// 실제 너비 (비율 좌표) - width가 없으면 radius * 2 사용
+  double get actualWidth => width ?? (radius * 2);
+
+  /// 실제 높이 (비율 좌표) - height가 없으면 radius * 2 사용
+  double get actualHeight => height ?? (radius * 2);
+
+  /// JSON에서 DifferenceSpot 생성 (픽셀 단위를 비율로 자동 변환)
+  /// 
+  /// JSON 데이터 구조:
+  /// - x, y: 좌측 상단 픽셀 좌표
+  /// - width, height: 픽셀 단위 크기
+  /// - center_x, center_y: 중심점 픽셀 좌표
+  /// - relative_x, relative_y: 중심점 비율 좌표 (0.0 ~ 1.0) - 이 값 사용
+  /// - relative_radius: 비율 반경
+  factory DifferenceSpot.fromJson(Map<String, dynamic> json) {
+    // relative_x, relative_y는 이미 비율 좌표 (중심점)이므로 직접 사용
+    final relativeX = (json['relative_x'] as num?)?.toDouble();
+    final relativeY = (json['relative_y'] as num?)?.toDouble();
+    
+    if (relativeX == null || relativeY == null) {
+      throw ArgumentError('relative_x and relative_y are required in JSON');
+    }
+    
+    final relativeRadius = (json['relative_radius'] as num?)?.toDouble() ?? 0.08;
+
+    // width, height 처리 (픽셀 단위를 비율로 변환)
+    double? widthRatio;
+    double? heightRatio;
+
+    if (json['width'] != null) {
+      final widthValue = (json['width'] as num).toDouble();
+      
+      // 값이 1.0보다 크면 픽셀 단위로 간주하고 비율로 변환
+      if (widthValue > 1.0) {
+        // 기준 해상도 역산: center_x / relative_x = baseWidth
+        double baseWidth = 1024.0; // 기본값 (fallback)
+        
+        if (json['center_x'] != null && relativeX > 0) {
+          final centerX = (json['center_x'] as num).toDouble();
+          baseWidth = centerX / relativeX;
+        }
+        
+        widthRatio = widthValue / baseWidth;
+        
+        // 변환 결과가 1.0을 초과하면 안 됨 (검증)
+        if (widthRatio! > 1.0) {
+          print('[Warning] widthRatio > 1.0: $widthRatio, 원본 width: $widthValue, baseWidth: $baseWidth');
+          widthRatio = 1.0; // 최대값으로 제한
+        }
+      } else {
+        // 이미 비율 좌표 (0.0 ~ 1.0)
+        widthRatio = widthValue;
+      }
+    }
+
+    if (json['height'] != null) {
+      final heightValue = (json['height'] as num).toDouble();
+      
+      // 값이 1.0보다 크면 픽셀 단위로 간주하고 비율로 변환
+      if (heightValue > 1.0) {
+        // 기준 해상도 역산: center_y / relative_y = baseHeight
+        double baseHeight = 572.0; // 기본값 (fallback)
+        
+        if (json['center_y'] != null && relativeY > 0) {
+          final centerY = (json['center_y'] as num).toDouble();
+          baseHeight = centerY / relativeY;
+        }
+        
+        heightRatio = heightValue / baseHeight;
+        
+        // 변환 결과가 1.0을 초과하면 안 됨 (검증)
+        if (heightRatio! > 1.0) {
+          print('[Warning] heightRatio > 1.0: $heightRatio, 원본 height: $heightValue, baseHeight: $baseHeight');
+          heightRatio = 1.0; // 최대값으로 제한
+        }
+      } else {
+        // 이미 비율 좌표 (0.0 ~ 1.0)
+        heightRatio = heightValue;
+      }
+    }
+
+    return DifferenceSpot(
+      x: relativeX,
+      y: relativeY,
+      radius: relativeRadius,
+      width: widthRatio,
+      height: heightRatio,
+    );
+  }
 }
 
 /// 틀린그림찾기 스테이지 데이터
@@ -423,15 +519,48 @@ class SpotDifferenceDataManager {
     ],
   };
 
-  /// 스테이지 데이터 가져오기
-  SpotDifferenceStage? getStage(int level, int stage) {
+  /// JSON 파일에서 스팟 데이터 로드
+  Future<List<DifferenceSpot>?> _loadSpotsFromJson(int level, int stage) async {
     final key = '$level-$stage';
-    final spots = _spotData[key];
+    final jsonPath = 'assets/spot_results_v4/$key.json';
+    
+    try {
+      final jsonString = await rootBundle.loadString(jsonPath);
+      final List<dynamic> jsonList = json.decode(jsonString);
+      
+      return jsonList.map((json) => DifferenceSpot.fromJson(json)).toList();
+    } catch (e) {
+      print('[SpotDifference] JSON 파일 로드 실패: $jsonPath - $e');
+      return null;
+    }
+  }
 
+  /// 스테이지 데이터 가져오기 (JSON 우선, 없으면 하드코딩 데이터 사용)
+  Future<SpotDifferenceStage?> getStage(int level, int stage) async {
+    final key = '$level-$stage';
+    
+    // 1. JSON 파일에서 로드 시도
+    final jsonSpots = await _loadSpotsFromJson(level, stage);
+    if (jsonSpots != null && jsonSpots.isNotEmpty) {
+      print('[SpotDifference] JSON에서 로드: $key (${jsonSpots.length}개 스팟)');
+      return SpotDifferenceStage(
+        level: level,
+        stage: stage,
+        originalImage: 'assets/soptTheDifference/$key.png',
+        wrongImage: 'assets/soptTheDifference/$key-wrong.png',
+        spots: jsonSpots,
+        timeLimit: timeLimitByLevel[level] ?? 60,
+        spotCount: spotCountByLevel[level] ?? 3,
+      );
+    }
+    
+    // 2. JSON이 없으면 하드코딩된 데이터 사용 (하위 호환성)
+    final spots = _spotData[key];
     if (spots == null) {
       return null;
     }
-
+    
+    print('[SpotDifference] 하드코딩 데이터 사용: $key (${spots.length}개 스팟)');
     return SpotDifferenceStage(
       level: level,
       stage: stage,
@@ -444,12 +573,12 @@ class SpotDifferenceDataManager {
   }
 
   /// 해당 레벨의 모든 스테이지 가져오기
-  List<SpotDifferenceStage> getStagesByLevel(int level) {
+  Future<List<SpotDifferenceStage>> getStagesByLevel(int level) async {
     final stageCount = stageCountByLevel[level] ?? 0;
     final stages = <SpotDifferenceStage>[];
 
     for (int i = 1; i <= stageCount; i++) {
-      final stage = getStage(level, i);
+      final stage = await getStage(level, i);
       if (stage != null) {
         stages.add(stage);
       }
@@ -459,8 +588,8 @@ class SpotDifferenceDataManager {
   }
 
   /// 해당 레벨의 랜덤 스테이지 가져오기
-  SpotDifferenceStage? getRandomStage(int level) {
-    final stages = getStagesByLevel(level);
+  Future<SpotDifferenceStage?> getRandomStage(int level) async {
+    final stages = await getStagesByLevel(level);
     if (stages.isEmpty) return null;
 
     stages.shuffle();
@@ -483,4 +612,5 @@ class SpotDifferenceDataManager {
     }
   }
 }
+
 

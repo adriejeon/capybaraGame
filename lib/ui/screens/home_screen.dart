@@ -1346,7 +1346,7 @@ class _HomeScreenState extends State<HomeScreen>
               _buildGameTypeButton(
                 context: context,
                 icon: Icons.grid_view_rounded,
-                title: isKorean ? '동일한 카드 짝 맞추기' : 'Card Matching',
+                title: isKorean ? '카드 짝 맞추기' : 'Card Matching',
                 subtitle:
                     isKorean ? '같은 카드를 찾아 짝을 맞추세요' : 'Find matching cards',
                 color: const Color(0xFF4A90E2),

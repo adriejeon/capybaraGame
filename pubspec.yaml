@@ -92,6 +92,7 @@ flutter:
     - assets/theme/
     - assets/toon/
     - assets/soptTheDifference/
+    - assets/spot_results_v4/
 
 # 앱 아이콘 설정
 flutter_launcher_icons:

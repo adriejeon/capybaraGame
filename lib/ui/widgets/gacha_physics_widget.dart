@@ -47,12 +47,37 @@ class _GachaPhysicsWidgetState extends State<GachaPhysicsWidget> {
     // 애니메이션 시작/종료 처리
     if (_game != null) {
       if (widget.isAnimating && !oldWidget.isAnimating) {
-        // 애니메이션 시작
-        _game!.startPopcornAnimation();
+        print('GachaPhysicsWidget: Animation started, isLoaded=${_game!.isLoaded}');
+        // 애니메이션 시작 (게임이 로드되었는지 확인)
+        if (_game!.isLoaded) {
+          _game!.startPopcornAnimation();
+        } else {
+          print('GachaPhysicsWidget: Game not loaded yet, waiting for onLoad...');
+          // 게임이 아직 로드되지 않았으면, 로드 완료 후 애니메이션 시작
+          _game!.onLoad().then((_) {
+            print('GachaPhysicsWidget: Game loaded, starting animation...');
+            if (mounted && widget.isAnimating) {
+              _game?.startPopcornAnimation();
+            }
+          });
+        }
       } else if (!widget.isAnimating && oldWidget.isAnimating) {
+        print('GachaPhysicsWidget: Animation stopped');
         // 애니메이션 종료 및 리셋
-        _game!.resetAnimation();
+        if (_game!.isLoaded) {
+          _game!.resetAnimation();
+        }
       }
+    } else {
+      print('GachaPhysicsWidget: _game is null, cannot start animation');
+    }
+  }
+  
+  /// 통 크기/위치 변경사항을 반영하기 위해 인형 재배치
+  /// 통 크기/위치 상수를 변경한 후 이 메서드를 호출하세요
+  void reloadDolls() {
+    if (_game != null && _game!.isLoaded) {
+      _game!.reloadDolls();
     }
   }
 
@@ -90,9 +115,12 @@ class _GachaPhysicsWidgetState extends State<GachaPhysicsWidget> {
             // 게임이 완전히 로드된 후에 setDollCount 호출 (비동기로 처리)
             _game?.onLoad().then((_) {
               // onLoad 완료 후 setDollCount 호출
+              // 통 크기/위치 상수는 컴파일 타임 상수이므로, 앱 재시작 시 자동 반영됨
               _game?.setDollCount(widget.dollCount);
             });
           }
+          // 주의: build 메서드에서 reloadDolls()를 호출하면 애니메이션 중에 인형이 재배치되어 애니메이션이 방해될 수 있음
+          // 통 크기/위치 변경은 앱 재시작 시 자동 반영되므로, build에서 재배치할 필요 없음
         }
 
         return Stack(

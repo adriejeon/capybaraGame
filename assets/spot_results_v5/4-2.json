@@ -1,0 +1,50 @@
+[
+  {
+    "id": 1,
+    "x": 318,
+    "y": 306,
+    "width": 406,
+    "height": 266,
+    "center_x": 521,
+    "center_y": 439,
+    "relative_x": 0.5088,
+    "relative_y": 0.7675,
+    "relative_radius": 0.1982
+  },
+  {
+    "id": 2,
+    "x": 0,
+    "y": 257,
+    "width": 118,
+    "height": 128,
+    "center_x": 59,
+    "center_y": 321,
+    "relative_x": 0.0576,
+    "relative_y": 0.5612,
+    "relative_radius": 0.0625
+  },
+  {
+    "id": 3,
+    "x": 180,
+    "y": 108,
+    "width": 144,
+    "height": 112,
+    "center_x": 252,
+    "center_y": 164,
+    "relative_x": 0.2461,
+    "relative_y": 0.2867,
+    "relative_radius": 0.0703
+  },
+  {
+    "id": 4,
+    "x": 711,
+    "y": 106,
+    "width": 151,
+    "height": 125,
+    "center_x": 786,
+    "center_y": 168,
+    "relative_x": 0.7681,
+    "relative_y": 0.2946,
+    "relative_radius": 0.0737
+  }
+]

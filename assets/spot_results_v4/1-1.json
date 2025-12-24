@@ -1,0 +1,122 @@
+[
+  {
+    "id": 1,
+    "x": 688,
+    "y": 526,
+    "width": 17,
+    "height": 17,
+    "center_x": 696,
+    "center_y": 534,
+    "relative_x": 0.6802,
+    "relative_y": 0.9344,
+    "relative_radius": 0.0083
+  },
+  {
+    "id": 2,
+    "x": 979,
+    "y": 519,
+    "width": 22,
+    "height": 23,
+    "center_x": 990,
+    "center_y": 530,
+    "relative_x": 0.9668,
+    "relative_y": 0.9274,
+    "relative_radius": 0.0112
+  },
+  {
+    "id": 3,
+    "x": 458,
+    "y": 341,
+    "width": 241,
+    "height": 139,
+    "center_x": 578,
+    "center_y": 410,
+    "relative_x": 0.5649,
+    "relative_y": 0.7177,
+    "relative_radius": 0.1177
+  },
+  {
+    "id": 4,
+    "x": 86,
+    "y": 314,
+    "width": 28,
+    "height": 17,
+    "center_x": 100,
+    "center_y": 322,
+    "relative_x": 0.0977,
+    "relative_y": 0.5638,
+    "relative_radius": 0.0137
+  },
+  {
+    "id": 5,
+    "x": 292,
+    "y": 296,
+    "width": 44,
+    "height": 28,
+    "center_x": 314,
+    "center_y": 310,
+    "relative_x": 0.3066,
+    "relative_y": 0.542,
+    "relative_radius": 0.0215
+  },
+  {
+    "id": 6,
+    "x": 517,
+    "y": 202,
+    "width": 175,
+    "height": 100,
+    "center_x": 604,
+    "center_y": 252,
+    "relative_x": 0.5903,
+    "relative_y": 0.4406,
+    "relative_radius": 0.0854
+  },
+  {
+    "id": 7,
+    "x": 11,
+    "y": 170,
+    "width": 53,
+    "height": 56,
+    "center_x": 37,
+    "center_y": 198,
+    "relative_x": 0.0366,
+    "relative_y": 0.3462,
+    "relative_radius": 0.0273
+  },
+  {
+    "id": 8,
+    "x": 430,
+    "y": 127,
+    "width": 191,
+    "height": 93,
+    "center_x": 525,
+    "center_y": 173,
+    "relative_x": 0.5132,
+    "relative_y": 0.3033,
+    "relative_radius": 0.0933
+  },
+  {
+    "id": 9,
+    "x": 364,
+    "y": 82,
+    "width": 61,
+    "height": 61,
+    "center_x": 394,
+    "center_y": 112,
+    "relative_x": 0.3853,
+    "relative_y": 0.1967,
+    "relative_radius": 0.0298
+  },
+  {
+    "id": 10,
+    "x": 484,
+    "y": 27,
+    "width": 187,
+    "height": 68,
+    "center_x": 577,
+    "center_y": 61,
+    "relative_x": 0.564,
+    "relative_y": 0.1066,
+    "relative_radius": 0.0913
+  }
+]

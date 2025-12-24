@@ -15,7 +15,7 @@ class GachaGlassConstants {
   static const double physicsOffsetY = 0.0; // 상하 조정 (양수: 아래, 음수: 위)
 
   // 인형 설정
-  static const int dollCount = 20; // 원하는 개수로 변경 가능
+  static const int dollCount = 10; // 원하는 개수로 변경 가능
   static const double dollSize = 60.0;
   static const List<String> dollImages = [
     'gacha_doll_1.png',

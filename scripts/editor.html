@@ -1,0 +1,317 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <title>카피바라 하이브리드 레벨 에디터</title>
+    <style>
+        body { font-family: 'Pretendard', sans-serif; background: #222; color: #fff; margin: 0; display: flex; height: 100vh; overflow: hidden; }
+        .sidebar { width: 320px; background: #333; padding: 20px; display: flex; flex-direction: column; gap: 15px; border-right: 1px solid #444; overflow-y: auto; }
+        .main-area { flex: 1; position: relative; display: flex; justify-content: center; align-items: center; background: #1a1a1a; overflow: auto; }
+        
+        h2 { margin: 0 0 10px 0; color: #4CAF50; font-size: 18px; }
+        label { display: block; font-size: 13px; color: #ccc; margin-bottom: 5px; }
+        input[type="file"] { width: 100%; background: #444; padding: 5px; border-radius: 4px; color: white; font-size: 12px; }
+        
+        /* 비교 슬라이더 */
+        .slider-container { background: #444; padding: 10px; border-radius: 8px; text-align: center; }
+        input[type="range"] { width: 100%; cursor: pointer; }
+
+        /* 캔버스 */
+        canvas { box-shadow: 0 0 20px rgba(0,0,0,0.5); cursor: crosshair; }
+
+        /* 데이터 영역 */
+        textarea { width: 100%; height: 150px; background: #222; color: #0f0; border: 1px solid #444; font-family: monospace; font-size: 11px; resize: vertical; }
+        
+        .btn { padding: 10px; border: none; border-radius: 4px; cursor: pointer; font-weight: bold; width: 100%; transition: 0.2s; }
+        .btn-green { background: #4CAF50; color: white; }
+        .btn-green:hover { background: #45a049; }
+        .btn-red { background: #ff5252; color: white; margin-top: 5px; }
+        .btn-red:hover { background: #ff1744; }
+
+        .info-box { background: #444; padding: 10px; border-radius: 4px; font-size: 12px; line-height: 1.4; color: #ddd; }
+        .highlight { color: #4CAF50; font-weight: bold; }
+    </style>
+</head>
+<body>
+
+<div class="sidebar">
+    <h2>🛠️ 레벨 에디터</h2>
+    
+    <div class="info-box">
+        1. <b>원본</b>과 <b>틀린그림</b>을 모두 불러오세요.<br>
+        2. 파이썬이 만든 <b>JSON</b>을 불러오세요 (선택).<br>
+        3. <b>슬라이더</b>를 움직여 비교하세요.<br>
+        4. 박스를 클릭해 <b>선택/삭제</b>하거나, 드래그해서 <b>추가</b>하세요.
+    </div>
+
+    <div>
+        <label>1. 원본 이미지 (Original)</label>
+        <input type="file" id="imgOriginal" accept="image/*">
+    </div>
+    <div>
+        <label>2. 틀린그림 이미지 (Modified)</label>
+        <input type="file" id="imgModified" accept="image/*">
+    </div>
+    <div>
+        <label>3. 파이썬 생성 JSON (Draft)</label>
+        <input type="file" id="jsonLoader" accept=".json">
+    </div>
+
+    <div class="slider-container">
+        <label>👀 이미지 비교 (투명도)</label>
+        <input type="range" id="opacitySlider" min="0" max="1" step="0.01" value="1">
+        <div style="font-size: 11px; margin-top: 5px; display:flex; justify-content:space-between;">
+            <span>원본</span>
+            <span>틀린그림</span>
+        </div>
+    </div>
+
+    <div style="margin-top: auto;">
+        <label>최종 데이터</label>
+        <textarea id="jsonOutput" readonly></textarea>
+        <button class="btn btn-green" onclick="copyJson()">📋 JSON 복사하기</button>
+        <button class="btn btn-red" onclick="deleteSelected()">🗑️ 선택된 박스 삭제 (Del)</button>
+    </div>
+</div>
+
+<div class="main-area">
+    <canvas id="editorCanvas"></canvas>
+</div>
+
+<script>
+    const canvas = document.getElementById('editorCanvas');
+    const ctx = canvas.getContext('2d');
+    const slider = document.getElementById('opacitySlider');
+    const jsonOutput = document.getElementById('jsonOutput');
+
+    let imgOrg = new Image();
+    let imgMod = new Image();
+    let imgOrgLoaded = false;
+    let imgModLoaded = false;
+
+    // 데이터 관리
+    let spots = [];
+    let selectedSpotIndex = -1;
+
+    // 드래그 상태
+    let isDrawing = false;
+    let startX, startY;
+
+    // ==========================================
+    // 1. 파일 로드 핸들러
+    // ==========================================
+    document.getElementById('imgOriginal').addEventListener('change', (e) => loadImg(e, imgOrg, () => { imgOrgLoaded = true; render(); }));
+    document.getElementById('imgModified').addEventListener('change', (e) => loadImg(e, imgMod, () => { imgModLoaded = true; render(); }));
+    
+    document.getElementById('jsonLoader').addEventListener('change', (e) => {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const loadedSpots = JSON.parse(event.target.result);
+                // 기존 데이터 포맷 호환성 처리
+                spots = loadedSpots.map((s, i) => ({
+                    id: i + 1,
+                    x: s.x, y: s.y, width: s.width, height: s.height
+                }));
+                render();
+                updateOutput();
+                alert(`✅ ${spots.length}개의 박스를 불러왔습니다.`);
+            } catch (err) {
+                alert("JSON 파일 형식이 올바르지 않습니다.");
+            }
+        };
+        reader.readAsText(e.target.files[0]);
+    });
+
+    function loadImg(e, imgObj, callback) {
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            imgObj.onload = () => {
+                // 첫 이미지 로드 시 캔버스 크기 맞춤
+                if (canvas.width === 300) { // 기본값일 때
+                    canvas.width = imgObj.width;
+                    canvas.height = imgObj.height;
+                }
+                callback();
+            }
+            imgObj.src = event.target.result;
+        }
+        reader.readAsDataURL(e.target.files[0]);
+    }
+
+    // ==========================================
+    // 2. 렌더링 (핵심: 이미지 겹치기)
+    // ==========================================
+    slider.addEventListener('input', render);
+
+    function render() {
+        ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+        // 1. 원본 그리기
+        if (imgOrgLoaded) {
+            ctx.globalAlpha = 1.0;
+            ctx.drawImage(imgOrg, 0, 0);
+        }
+
+        // 2. 틀린그림 겹쳐 그리기 (투명도 적용)
+        if (imgModLoaded) {
+            ctx.globalAlpha = slider.value;
+            ctx.drawImage(imgMod, 0, 0);
+        }
+
+        // 3. 박스 그리기
+        ctx.globalAlpha = 1.0;
+        spots.forEach((spot, index) => {
+            const isSelected = index === selectedSpotIndex;
+            
+            // 박스 내부 (반투명)
+            ctx.fillStyle = isSelected ? "rgba(255, 0, 0, 0.3)" : "rgba(0, 255, 0, 0.2)";
+            ctx.fillRect(spot.x, spot.y, spot.width, spot.height);
+
+            // 테두리
+            ctx.strokeStyle = isSelected ? "#FF0000" : "#00FF00";
+            ctx.lineWidth = isSelected ? 3 : 2;
+            ctx.strokeRect(spot.x, spot.y, spot.width, spot.height);
+
+            // 번호
+            ctx.fillStyle = "white";
+            ctx.font = "bold 14px Arial";
+            ctx.shadowColor="black";
+            ctx.shadowBlur=3;
+            ctx.fillText(index + 1, spot.x, spot.y - 5);
+            ctx.shadowBlur=0;
+        });
+    }
+
+    // ==========================================
+    // 3. 인터랙션 (그리기, 선택)
+    // ==========================================
+    canvas.addEventListener('mousedown', (e) => {
+        const { x, y } = getMousePos(e);
+        
+        // 클릭한 곳에 박스가 있는지 확인 (선택 모드)
+        const clickedIndex = spots.findIndex(s => 
+            x >= s.x && x <= s.x + s.width && y >= s.y && y <= s.y + s.height
+        );
+
+        if (clickedIndex !== -1) {
+            // 박스를 선택함
+            selectedSpotIndex = clickedIndex;
+            render();
+            return; // 그리기 모드 진입 안 함
+        }
+
+        // 빈 곳을 클릭함 -> 그리기 모드 시작
+        selectedSpotIndex = -1; // 선택 해제
+        isDrawing = true;
+        startX = x;
+        startY = y;
+    });
+
+    canvas.addEventListener('mousemove', (e) => {
+        if (!isDrawing) return;
+        const { x, y } = getMousePos(e);
+        render(); // 기존 화면 복구
+        
+        // 현재 드래그 중인 박스 미리보기 (빨강 점선)
+        const w = x - startX;
+        const h = y - startY;
+        ctx.strokeStyle = "yellow";
+        ctx.lineWidth = 2;
+        ctx.setLineDash([5, 5]);
+        ctx.strokeRect(startX, startY, w, h);
+        ctx.setLineDash([]);
+    });
+
+    canvas.addEventListener('mouseup', (e) => {
+        if (!isDrawing) return;
+        isDrawing = false;
+        
+        const { x, y } = getMousePos(e);
+        let w = x - startX;
+        let h = y - startY;
+
+        // 역방향 드래그 처리
+        let finalX = w < 0 ? x : startX;
+        let finalY = h < 0 ? y : startY;
+        let finalW = Math.abs(w);
+        let finalH = Math.abs(h);
+
+        if (finalW > 10 && finalH > 10) {
+            addSpot(finalX, finalY, finalW, finalH);
+        }
+        render();
+    });
+
+    // 키보드 삭제 (Delete 키)
+    window.addEventListener('keydown', (e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+            deleteSelected();
+        }
+    });
+
+    function getMousePos(evt) {
+        const rect = canvas.getBoundingClientRect();
+        return {
+            x: (evt.clientX - rect.left), // 캔버스 스케일링 고려 안 함 (1:1 가정)
+            y: (evt.clientY - rect.top)
+        };
+    }
+
+    // ==========================================
+    // 4. 데이터 로직
+    // ==========================================
+    function addSpot(x, y, w, h) {
+        spots.push({
+            id: spots.length + 1,
+            x: Math.round(x),
+            y: Math.round(y),
+            width: Math.round(w),
+            height: Math.round(h)
+        });
+        selectedSpotIndex = spots.length - 1; // 방금 만든거 선택
+        updateOutput();
+    }
+
+    function deleteSelected() {
+        if (selectedSpotIndex === -1) return;
+        spots.splice(selectedSpotIndex, 1);
+        selectedSpotIndex = -1;
+        updateOutput();
+        render();
+    }
+
+    function updateOutput() {
+        // 최종 앱용 데이터 포맷으로 변환 및 계산
+        const finalData = spots.map((s, index) => {
+            const centerX = s.x + s.width / 2;
+            const centerY = s.y + s.height / 2;
+            const imgW = canvas.width;
+            const imgH = canvas.height;
+
+            return {
+                id: index + 1,
+                x: s.x,
+                y: s.y,
+                width: s.width,
+                height: s.height,
+                center_x: Math.round(centerX),
+                center_y: Math.round(centerY),
+                relative_x: Number((centerX / imgW).toFixed(4)),
+                relative_y: Number((centerY / imgH).toFixed(4)),
+                relative_radius: Number((Math.max(s.width, s.height) / 2 / imgW).toFixed(4))
+            };
+        });
+        
+        jsonOutput.value = JSON.stringify(finalData, null, 2);
+    }
+
+    function copyJson() {
+        jsonOutput.select();
+        document.execCommand('copy');
+        alert("JSON이 복사되었습니다!");
+    }
+</script>
+</body>
+</html>
+

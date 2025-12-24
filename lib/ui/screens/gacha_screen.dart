@@ -7,6 +7,7 @@ import '../../sound_manager.dart';
 import '../../services/daily_mission_service.dart';
 import '../widgets/gacha_physics_widget.dart';
 import '../../utils/gacha_glass_constants.dart';
+import 'collection_screen.dart';
 
 /// 뽑기통 화면
 /// 뽑기권을 사용해서 캐릭터를 뽑을 수 있는 화면
@@ -127,7 +128,7 @@ class _GachaScreenState extends State<GachaScreen>
       await _shakeController.reverse();
     }
 
-    // 4. 캐릭터 뽑기 (랜덤 단계별 희귀도 적용)
+    // 4. 캐릭터 뽑기 (랜덤 단계별 희귀도 적용) - 지연 없이 바로 실행
     final result = await _collectionManager.addRandomCard();
 
     // 데일리 미션 업데이트
@@ -439,13 +440,13 @@ class _GachaScreenState extends State<GachaScreen>
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
     final result = _gachaResult!;
 
-    return GestureDetector(
-      onTap: _closeResult,
-      child: Container(
-        color: Colors.black.withOpacity(0.7),
-        child: Center(
-          child: ScaleTransition(
-            scale: _resultPopAnimation,
+    return Container(
+      color: Colors.black.withOpacity(0.7),
+      child: Center(
+        child: ScaleTransition(
+          scale: _resultPopAnimation,
+          child: GestureDetector(
+            onTap: () {}, // 배경 탭으로 닫히지 않도록
             child: Container(
               margin: const EdgeInsets.all(40),
               padding: const EdgeInsets.all(30),
@@ -550,15 +551,60 @@ class _GachaScreenState extends State<GachaScreen>
                       ),
                     ),
                   ),
-                  const SizedBox(height: 24),
+                  const SizedBox(height: 32),
 
-                  // 닫기 안내
-                  Text(
-                    isKorean ? '탭하여 닫기' : 'Tap to close',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[500],
-                    ),
+                  // 버튼들 (각각 50% 너비)
+                  Row(
+                    children: [
+                      // 닫기 버튼 (왼쪽, 50%)
+                      Expanded(
+                        child: TextButton(
+                          onPressed: _closeResult,
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.grey[600],
+                            padding: const EdgeInsets.symmetric(vertical: 16),
+                          ),
+                          child: Text(
+                            isKorean ? '닫기' : 'Close',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // 컬렉션 보러가기 버튼 (오른쪽, 50%)
+                      Expanded(
+                        child: ElevatedButton(
+                          onPressed: () async {
+                            _closeResult();
+                            await Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const CollectionScreen(),
+                              ),
+                            );
+                          },
+                          style: ElevatedButton.styleFrom(
+                            backgroundColor: const Color(0xFF4A90E2),
+                            foregroundColor: Colors.white,
+                            padding: const EdgeInsets.symmetric(vertical: 14),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(20),
+                            ),
+                            elevation: 2,
+                          ),
+                          child: Text(
+                            isKorean ? '컬렉션 보러가기' : 'View Collection',
+                            style: const TextStyle(
+                              fontSize: 16,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
@@ -569,3 +615,4 @@ class _GachaScreenState extends State<GachaScreen>
     );
   }
 }
+
