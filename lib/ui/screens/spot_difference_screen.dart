@@ -39,7 +39,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   bool _isGameWon = false;
   bool _hasUsedHint = false;
   bool _isShowingHint = false;
-  int _wrongTaps = 0; // 틀린 터치 횟수
 
   // 디버그 모드 (개발 중에만 true로 설정)
   static const bool _debugMode = false;
@@ -216,7 +215,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     _currentStage = await _dataManager.getRandomStage(level);
 
     if (_currentStage == null) {
-      print('[SpotDifference] 스테이지 로드 실패');
       return;
     }
 
@@ -226,7 +224,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     _isGameWon = false;
     _hasUsedHint = false;
     _isShowingHint = false;
-    _wrongTaps = 0;
     _particles.clear();
     _currentScale = 1.0;
     _lastFoundSpotIndex = null;
@@ -285,7 +282,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           _remainingTime--;
         });
       } else if (_remainingTime <= 0 && !_isGameOver) {
-        // 시간초과 시 광고 보고 시간 추가 옵션 제공
+        // 시간초과 시 타이머 중지 후 광고 보고 시간 추가 옵션 제공
+        _gameTimer?.cancel();
         _showTimeUpDialog();
       }
     });
@@ -310,23 +308,23 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   }
 
   /// BoxFit.fitWidth로 렌더링될 때 실제 이미지 영역 계산
-  /// BoxFit.fitWidth는 width에 맞추고 height는 이미지 비율에 맞게 조정 (상하 여백 가능)
+  /// BoxFit.fitWidth는 width에 맞추고 height는 이미지 비율에 맞게 조정
+  /// Alignment.topCenter를 사용하므로 상단 중앙 정렬
   /// 반환값: (실제 이미지 너비, 실제 이미지 높이, X 오프셋, Y 오프셋)
   ({double width, double height, double offsetX, double offsetY}) _calculateActualImageRect(Size containerSize) {
     // BoxFit.fitWidth: width에 맞추고 height는 이미지 비율에 맞게 조정
+    // 이미지의 실제 렌더링 크기 (100% width로 표시)
     final actualWidth = containerSize.width;
     final actualHeight = containerSize.width * _imageAspectRatio;
     
-    // 상하 여백 계산 (이미지가 컨테이너보다 작을 경우)
-    final offsetY = actualHeight < containerSize.height 
-        ? (containerSize.height - actualHeight) / 2 
-        : 0.0;
-    
+    // Alignment.topCenter: 상단 중앙 정렬
+    // - offsetX: 중앙 정렬이므로 항상 0 (width가 컨테이너와 같으므로)
+    // - offsetY: 상단 정렬이므로 항상 0
     return (
       width: actualWidth,
       height: actualHeight,
       offsetX: 0.0,
-      offsetY: offsetY,
+      offsetY: 0.0,
     );
   }
 
@@ -342,12 +340,9 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     final containerBox = containerKey.currentContext?.findRenderObject() as RenderBox?;
     
     if (imageBox == null || containerBox == null) {
-      print('[SpotDifference] RenderBox를 찾을 수 없습니다.');
       return (width: 0, height: 0, offsetX: 0, offsetY: 0, success: false);
     }
     
-    // Image 위젯의 실제 크기
-    final imageSize = imageBox.size;
     // Container의 크기
     final containerSize = containerBox.size;
     
@@ -374,9 +369,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       offsetY = relativePosition.dy + (containerSize.height - actualHeight) / 2;
     }
     
-    print('[SpotDifference] RenderBox 기반 계산: 이미지 크기=${imageSize.width}x${imageSize.height}, 컨테이너=${containerSize.width}x${containerSize.height}');
-    print('[SpotDifference] 실제 렌더링 영역: ${actualWidth}x${actualHeight}, 오프셋=($offsetX, $offsetY)');
-    
     return (width: actualWidth, height: actualHeight, offsetX: offsetX, offsetY: offsetY, success: true);
   }
 
@@ -399,12 +391,9 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       (tapPosition.dy - translation.y) / scale,
     );
 
-    // BoxFit.cover로 인한 실제 이미지 렌더링 영역 계산 (여백 없음)
+    // BoxFit.fitWidth로 인한 실제 이미지 렌더링 영역 계산
+    // width에 100% 맞추고 height는 이미지 비율에 맞게 조정 (상하 여백 가능)
     final actualImageRect = _calculateActualImageRect(containerSize);
-    
-    // ClipRect로 인한 크롭 오프셋 고려 (widthFactor: 0.92, heightFactor: 0.92)
-    // Align이 topLeft이므로 크롭된 부분은 우측 하단
-    // 좌표 계산은 컨테이너 전체 기준이므로 크롭 오프셋은 필요 없음
     
     // 터치 위치에서 이미지 영역의 오프셋을 빼서 순수 이미지 내 좌표로 변환
     final touchInImageX = adjustedTapPosition.dx - actualImageRect.offsetX;
@@ -413,21 +402,12 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     // 이미지 영역 밖이면 무시
     if (touchInImageX < 0 || touchInImageX > actualImageRect.width ||
         touchInImageY < 0 || touchInImageY > actualImageRect.height) {
-      print('[SpotDifference] 터치가 이미지 영역 밖입니다. (${touchInImageX.toStringAsFixed(1)}, ${touchInImageY.toStringAsFixed(1)}) / (${actualImageRect.width.toStringAsFixed(1)}, ${actualImageRect.height.toStringAsFixed(1)})');
       return;
     }
 
     // 비율 좌표로 변환 (0.0 ~ 1.0)
     final relativeX = touchInImageX / actualImageRect.width;
     final relativeY = touchInImageY / actualImageRect.height;
-
-    print('[SpotDifference] ========== 터치 좌표 계산 ==========');
-    print('[SpotDifference] 원본 터치: (${tapPosition.dx.toStringAsFixed(1)}, ${tapPosition.dy.toStringAsFixed(1)})');
-    print('[SpotDifference] 역변환 후: (${adjustedTapPosition.dx.toStringAsFixed(1)}, ${adjustedTapPosition.dy.toStringAsFixed(1)})');
-    print('[SpotDifference] 이미지 영역: ${actualImageRect.width.toStringAsFixed(1)}x${actualImageRect.height.toStringAsFixed(1)}, 오프셋: (${actualImageRect.offsetX.toStringAsFixed(1)}, ${actualImageRect.offsetY.toStringAsFixed(1)})');
-    print('[SpotDifference] 이미지 내 좌표: (${touchInImageX.toStringAsFixed(1)}, ${touchInImageY.toStringAsFixed(1)})');
-    print('[SpotDifference] 비율 좌표: ($relativeX, $relativeY)');
-    print('[SpotDifference] ======================================');
 
     _processTouchWithRelativeCoords(relativeX, relativeY, tapPosition, containerSize, isOriginal, globalTapPosition);
   }
@@ -478,12 +458,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         // 면적 계산 (비율 좌표 기준)
         final area = paddedWidth * paddedHeight;
         overlappingSpots.add((index: i, area: area));
-
-        print('[SpotDifference] 스팟 $i: Rect 포함됨! 면적=${area.toStringAsFixed(6)}');
-        print('[SpotDifference]   중심: (${spot.x.toStringAsFixed(3)}, ${spot.y.toStringAsFixed(3)})');
-        print('[SpotDifference]   크기: ${spotWidth.toStringAsFixed(3)} x ${spotHeight.toStringAsFixed(3)}');
-        print('[SpotDifference]   Padding 후: ${paddedWidth.toStringAsFixed(3)} x ${paddedHeight.toStringAsFixed(3)}');
-        print('[SpotDifference]   Rect: left=${spotRect.left.toStringAsFixed(3)}, top=${spotRect.top.toStringAsFixed(3)}, right=${spotRect.right.toStringAsFixed(3)}, bottom=${spotRect.bottom.toStringAsFixed(3)}');
       }
     }
 
@@ -494,17 +468,10 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       
       final selectedSpot = overlappingSpots.first;
       final spotIndex = selectedSpot.index;
-      final spot = _currentStage!.spots[spotIndex];
-
-      print('[SpotDifference] ✅ 정답! 스팟 $spotIndex 발견! (면적: ${selectedSpot.area.toStringAsFixed(6)})');
-      print('[SpotDifference] 터치 좌표: ($relativeX, $relativeY)');
-      print('[SpotDifference] 스팟 좌표: (${spot.x}, ${spot.y})');
-      print('[SpotDifference] 겹치는 스팟 수: ${overlappingSpots.length}');
       
       _onCorrectTap(spotIndex, globalTapPosition, containerSize);
     } else {
       // 틀림
-      print('[SpotDifference] ❌ 오답! 터치 좌표: ($relativeX, $relativeY)');
       _onWrongTap(tapPosition, containerSize, isOriginal);
     }
 
@@ -541,14 +508,11 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         _checkboxAnimationControllers[spotIndex]?.forward(from: 0.0);
       }
     });
-
-    final spot = _currentStage!.spots[spotIndex];
-    print('[SpotDifference] 스팟 $spotIndex 발견! (스팟: ${spot.x}, ${spot.y})');
   }
 
   /// 오답 처리
   void _onWrongTap(Offset tapPosition, Size containerSize, bool isOriginal) {
-    _wrongTaps++;
+    // 오답 카운트 제거됨
 
     // 진동 피드백 (더 강하게)
     HapticFeedback.mediumImpact();
@@ -565,8 +529,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
     // 화면 흔들림 애니메이션
     _shakeController.forward(from: 0.0);
-
-    print('[SpotDifference] 틀림! 총 $_wrongTaps회');
   }
 
   /// 입자 애니메이션 시작 (특정 체크박스로)
@@ -662,7 +624,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         isWin: true,
         foundCount: _foundSpots.where((f) => f).length,
         totalCount: _currentStage?.spots.length ?? 0,
-        wrongTaps: _wrongTaps,
         canEarnTicket: canEarn,
         remainingTickets: _ticketManager.remainingDailyTickets,
         onClaimTicket: () async {
@@ -1066,39 +1027,33 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         onRewarded: (rewardItem) {
           rewarded = true;
         },
-      );
+        onAdDismissed: () {
+          if (rewarded && mounted) {
+            // 30초 추가하고 타이머 재시작
+            setState(() {
+              _remainingTime += 30;
+            });
+            _startTimer();
 
-      if (rewarded && mounted) {
-        // 30초 추가
-        setState(() {
-          _remainingTime += 30;
-        });
-        _startTimer();
-
-        // 성공 메시지
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(
-              content: Text(
-                isKorean ? '30초가 추가되었습니다!' : '30 seconds added!',
-                style: const TextStyle(fontSize: 16),
+            // 성공 메시지
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  isKorean ? '30초가 추가되었습니다!' : '30 seconds added!',
+                  style: const TextStyle(fontSize: 16),
+                ),
+                backgroundColor: Colors.green,
+                duration: const Duration(seconds: 2),
               ),
-              backgroundColor: Colors.green,
-              duration: const Duration(seconds: 2),
-            ),
-          );
-        }
-
-        // 다음 광고 로드
-        await _adMobHandler.loadRewardedAd();
-      } else {
-        // 광고를 끝까지 보지 않음 - 게임 종료
-        if (mounted) {
-          _endGame(false);
-        }
-      }
+            );
+          } else if (mounted) {
+            // 광고를 끝까지 보지 않음 - 시간 초과 다이얼로그 다시 표시
+            _showTimeUpDialog();
+          }
+        },
+      );
     } else {
-      // 광고가 로드되지 않음 - 게임 종료
+      // 광고가 로드되지 않음 - 시간 초과 다이얼로그 다시 표시
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
@@ -1111,8 +1066,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           ),
         );
 
-        // 게임 종료
-        _endGame(false);
+        // 시간 초과 다이얼로그 다시 표시
+        _showTimeUpDialog();
       }
     }
   }
@@ -1197,9 +1152,16 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   @override
   Widget build(BuildContext context) {
     if (_currentStage == null) {
+      final isKorean = Localizations.localeOf(context).languageCode == 'ko';
       return Scaffold(
-        appBar: AppBar(title: const Text('틀린그림찾기')),
-        body: const Center(child: Text('스테이지를 불러올 수 없습니다.')),
+        appBar: AppBar(
+          title: Text(isKorean ? '틀린그림찾기' : 'Spot the Difference'),
+        ),
+        body: Center(
+          child: Text(
+            isKorean ? '스테이지를 불러올 수 없습니다.' : 'Failed to load stage.',
+          ),
+        ),
       );
     }
 
@@ -1209,10 +1171,16 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         title: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text('${_getDifficultyText()} - 틀린그림찾기'),
+            Text(
+              Localizations.localeOf(context).languageCode == 'ko'
+                  ? '${_getDifficultyText()} - 틀린그림찾기'
+                  : '${_getDifficultyText()} - Spot the Difference',
+            ),
             if (_debugMode && _currentStage != null)
               Text(
-                '스테이지: ${_currentStage!.level}-${_currentStage!.stage}',
+                Localizations.localeOf(context).languageCode == 'ko'
+                    ? '스테이지: ${_currentStage!.level}-${_currentStage!.stage}'
+                    : 'Stage: ${_currentStage!.level}-${_currentStage!.stage}',
                 style: const TextStyle(fontSize: 12, color: Colors.grey),
               ),
           ],
@@ -1320,28 +1288,28 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         mainAxisSize: MainAxisSize.min,
         children: [
           Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            crossAxisAlignment: CrossAxisAlignment.center,
             children: [
-              // 시간 표시
-              _buildInfoItem(
-                  isKorean ? '시간' : 'Time', _formatTime(_remainingTime)),
+              // 시간 표시 (고정 너비)
+              SizedBox(
+                width: 70, // 고정 너비 설정
+                child: _buildInfoItem(
+                    isKorean ? '시간' : 'Time', _formatTime(_remainingTime)),
+              ),
+              
+              const SizedBox(width: 16), // 시간과 체크박스 사이 간격
 
-              // 체크박스들
+              // 체크박스들 (한 줄에 맞는 만큼만, 넘치면 아래로)
               Expanded(
-                child: Center(
-                  child: Wrap(
-                    spacing: 6,
-                    runSpacing: 4,
-                    alignment: WrapAlignment.center,
-                    children: List.generate(totalCount, (index) {
-                      return _buildCheckbox(index);
-                    }),
-                  ),
+                child: Wrap(
+                  spacing: 6,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.start, // 왼쪽 정렬
+                  children: List.generate(totalCount, (index) {
+                    return _buildCheckbox(index);
+                  }),
                 ),
               ),
-
-              // 오답 횟수
-              _buildInfoItem(isKorean ? '오답' : 'Wrong', '$_wrongTaps'),
             ],
           ),
           // 디버그 모드: 터치 좌표 및 이미지 비율 표시
@@ -1546,28 +1514,31 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         ),
         const SizedBox(height: 4),
         // 이미지 (InteractiveViewer로 감싸서 확대/축소 가능)
-        Expanded(
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 이미지 프레임의 실제 높이 계산 (라벨과 SizedBox 제외)
-              final frameHeight = constraints.maxHeight;
-              print('[SpotDifference] 이미지 프레임 높이: ${frameHeight.toStringAsFixed(1)}px');
-              
-              return Container(
-                key: key,
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(12),
-                  border: Border.all(
-                    color: const Color(0xFF4A90E2),
-                    width: 2,
-                  ),
+        LayoutBuilder(
+          builder: (context, constraints) {
+            // 이미지의 실제 높이 계산 (width에 맞춰서 비율에 따라)
+            final imageWidth = constraints.maxWidth;
+            final imageActualHeight = imageWidth * _imageAspectRatio;
+            
+            return Container(
+              key: key,
+              width: imageWidth,
+              height: imageActualHeight,
+              decoration: BoxDecoration(
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(
+                  color: const Color(0xFF4A90E2),
+                  width: 2,
                 ),
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(10),
+                child: SizedBox(
+                  width: imageWidth,
+                  height: imageActualHeight,
                   child: LayoutBuilder(
                     builder: (context, innerConstraints) {
-                      final imageWidth = innerConstraints.maxWidth;
-                      final imageHeight = innerConstraints.maxHeight;
+                      final imageHeight = imageActualHeight;
 
                   return InteractiveViewer(
                     transformationController: _transformationController,
@@ -1611,17 +1582,12 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                       child: Stack(
                         fit: StackFit.expand,
                         children: [
-                          // 이미지 (반응형으로 프레임 width에 100% 맞춤, 우측 하단 시그니처 크롭)
-                          // Transform.scale로 약간 확대하여 우측 하단이 잘리도록 (시그니처 숨김)
-                          ClipRect(
-                            child: Transform.scale(
-                              scale: 1.087, // 약 8.7% 확대하여 우측 하단이 잘리도록 (1/0.92 ≈ 1.087)
-                              alignment: Alignment.topLeft, // 상단 좌측 기준으로 확대
-                              child: Image.asset(
-                                imagePath,
-                                key: isOriginal ? _originalImageWidgetKey : _wrongImageWidgetKey,
-                                fit: BoxFit.fitWidth, // 프레임의 width에 100% 맞춤 (반응형)
-                                alignment: Alignment.topLeft, // 이미지 정렬
+                          // 이미지 (반응형으로 프레임 width에 100% 맞춤, 이미지가 잘리지 않도록)
+                          Image.asset(
+                            imagePath,
+                            key: isOriginal ? _originalImageWidgetKey : _wrongImageWidgetKey,
+                            fit: BoxFit.fitWidth, // 프레임의 width에 100% 맞춤 (반응형)
+                            alignment: Alignment.topCenter, // 상단 중앙 정렬
                             errorBuilder: (context, error, stackTrace) {
                               return Container(
                                 color: Colors.grey[300],
@@ -1645,8 +1611,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                                 ),
                               );
                             },
-                            ),
-                            ),
                           ),
 
                           // 찾은 스팟 표시 (테두리만 있는 연한 초록색 동그라미)
@@ -1672,9 +1636,9 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                     },
                   ),
                 ),
-              );
-            },
-          ),
+              ),
+            );
+          },
         ),
       ],
     );
@@ -2017,7 +1981,6 @@ class _GameResultDialog extends StatelessWidget {
   final bool isWin;
   final int foundCount;
   final int totalCount;
-  final int wrongTaps;
   final bool canEarnTicket;
   final int remainingTickets;
   final VoidCallback onClaimTicket;
@@ -2028,7 +1991,6 @@ class _GameResultDialog extends StatelessWidget {
     required this.isWin,
     required this.foundCount,
     required this.totalCount,
-    required this.wrongTaps,
     required this.canEarnTicket,
     required this.remainingTickets,
     required this.onClaimTicket,
@@ -2086,17 +2048,6 @@ class _GameResultDialog extends StatelessWidget {
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text(isKorean ? '오답 횟수' : 'Wrong Taps'),
-                      Text(
-                        '$wrongTaps',
-                        style: const TextStyle(fontWeight: FontWeight.bold),
-                      ),
-                    ],
-                  ),
                 ],
               ),
             ),
@@ -2142,8 +2093,8 @@ class _GameResultDialog extends StatelessWidget {
                     const SizedBox(height: 12),
                     Text(
                       isKorean
-                          ? '뽑기권 1개를 받을 수 있어요!'
-                          : 'You can get 1 Gacha Ticket!',
+                          ? '아래 버튼을 클릭해서 뽑기권을 1개 얻을 수 있어요!'
+                          : 'Click the button below to get 1 Gacha Ticket!',
                       style: const TextStyle(
                         fontSize: 14,
                         fontWeight: FontWeight.bold,

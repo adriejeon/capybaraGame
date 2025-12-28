@@ -25,7 +25,7 @@ class GachaPhysicsGame extends FlameGame {
 
   // onLoad() 완료 여부 추적
   bool _isLoaded = false;
-  
+
   /// 게임 로드 완료 여부
   bool get isLoaded => _isLoaded;
 
@@ -118,11 +118,13 @@ class GachaPhysicsGame extends FlameGame {
     final topY = _containerTopY;
     final bottomY = _containerBottomY;
     final centerX = glassCenterX_px;
-    
+
     // 통 크기/위치 디버그 정보 출력
-    print('Container settings: widthRatio=$containerWidthRatio, topMargin=$containerTopMargin, '
+    print(
+        'Container settings: widthRatio=$containerWidthRatio, topMargin=$containerTopMargin, '
         'bottomMargin=$containerBottomMargin, offsetY=$containerOffsetY');
-    print('Container area: topY=$topY, bottomY=$bottomY, innerHalfWidth=$innerHalfWidth, '
+    print(
+        'Container area: topY=$topY, bottomY=$bottomY, innerHalfWidth=$innerHalfWidth, '
         'height=${bottomY - topY}');
 
     // 인형들 간의 최소 거리 (겹치지 않도록)
@@ -224,16 +226,19 @@ class GachaPhysicsGame extends FlameGame {
         placed = true;
         successfullyPlaced++;
       }
-      
+
       // 배치 실패 시 로그 출력
       if (!placed) {
-        print('Warning: Failed to place doll ${i + 1}/${dollCount} after $maxAttempts attempts');
-        print('Container area: topY=$topY, bottomY=$bottomY, innerHalfWidth=$innerHalfWidth');
+        print(
+            'Warning: Failed to place doll ${i + 1}/${dollCount} after $maxAttempts attempts');
+        print(
+            'Container area: topY=$topY, bottomY=$bottomY, innerHalfWidth=$innerHalfWidth');
       }
     }
 
     // 배치 결과 로그
-    print('Doll placement: $successfullyPlaced/$dollCount dolls placed successfully');
+    print(
+        'Doll placement: $successfullyPlaced/$dollCount dolls placed successfully');
 
     // 모든 인형의 onLoad()가 완료될 때까지 대기
     await Future.delayed(const Duration(milliseconds: 50));
@@ -286,12 +291,12 @@ class GachaPhysicsGame extends FlameGame {
   void startPopcornAnimation() {
     final dolls = children.whereType<StaticDollComponent>().toList();
     print('startPopcornAnimation: found ${dolls.length} dolls');
-    
+
     if (dolls.isEmpty) {
       print('Warning: No dolls found for popcorn animation');
       return;
     }
-    
+
     final random = Random();
 
     // 인형들을 랜덤하게 섞어서 더 자연스러운 순서로 애니메이션 시작
@@ -304,7 +309,7 @@ class GachaPhysicsGame extends FlameGame {
       final delay = random.nextDouble() * 0.2;
       doll.startBounceAnimation(delay: delay);
     }
-    
+
     print('Popcorn animation started for ${dolls.length} dolls');
   }
 
@@ -457,17 +462,21 @@ class StaticDollComponent extends flame.Component
       }
 
       // 수평 이동 (더 부드러운 움직임, 떨어질 때 감소)
-      final isFalling = bounceIndex >= _bounceCount || 
+      final isFalling = bounceIndex >= _bounceCount ||
           (bounceIndex < _bounceCount && bounceProgress > 0.5);
-      final fallDamping = isFalling ? (1.0 - (effectiveProgress / totalDuration).clamp(0.0, 1.0)) : 1.0;
+      final fallDamping = isFalling
+          ? (1.0 - (effectiveProgress / totalDuration).clamp(0.0, 1.0))
+          : 1.0;
       final horizontalMovement = sin(effectiveProgress * pi * 2) *
           _horizontalOffset *
           (0.5 + sin(effectiveProgress * pi * 1.5) * 0.5) *
           fallDamping;
 
       // 회전 효과 (더 부드러운 회전, 떨어질 때 감소)
-      final rotationMovement =
-          sin(effectiveProgress * pi * 1.5) * _rotationOffset * 1.5 * fallDamping;
+      final rotationMovement = sin(effectiveProgress * pi * 1.5) *
+          _rotationOffset *
+          1.5 *
+          fallDamping;
 
       // 최종 위치 계산
       final newX = position.x + horizontalMovement;
