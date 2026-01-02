@@ -377,27 +377,17 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       Offset tapPosition, Size containerSize, bool isOriginal, Offset globalTapPosition) {
     if (_isGameOver || _currentStage == null) return;
 
-    // InteractiveViewer의 변환 행렬 (줌 + 팬)
-    final matrix = _transformationController.value;
-    
-    // Matrix4에서 스케일과 translation 추출
-    final scale = matrix.getMaxScaleOnAxis();
-    final translation = matrix.getTranslation();
-    
-    // 역변환 계산: (localPos - translation) / scale
-    // 이는 Matrix4.inverted()를 사용한 것과 동일한 결과
-    final adjustedTapPosition = Offset(
-      (tapPosition.dx - translation.x) / scale,
-      (tapPosition.dy - translation.y) / scale,
-    );
+    // GestureDetector가 InteractiveViewer의 child 안에 있으므로
+    // tapPosition은 이미 원본 좌표계(확대되지 않은 child의 로컬 좌표)입니다.
+    // 따라서 역변환이 필요 없습니다.
 
     // BoxFit.fitWidth로 인한 실제 이미지 렌더링 영역 계산
     // width에 100% 맞추고 height는 이미지 비율에 맞게 조정 (상하 여백 가능)
     final actualImageRect = _calculateActualImageRect(containerSize);
     
     // 터치 위치에서 이미지 영역의 오프셋을 빼서 순수 이미지 내 좌표로 변환
-    final touchInImageX = adjustedTapPosition.dx - actualImageRect.offsetX;
-    final touchInImageY = adjustedTapPosition.dy - actualImageRect.offsetY;
+    final touchInImageX = tapPosition.dx - actualImageRect.offsetX;
+    final touchInImageY = tapPosition.dy - actualImageRect.offsetY;
     
     // 이미지 영역 밖이면 무시
     if (touchInImageX < 0 || touchInImageX > actualImageRect.width ||
@@ -440,8 +430,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       final spotWidth = spot.actualWidth;
       final spotHeight = spot.actualHeight;
 
-      // Padding 추가 (15% 여유 공간)
-      const double paddingFactor = 0.15;
+      // Padding 추가 (50% 여유 공간 - 히트박스를 더 크게)
+      const double paddingFactor = 0.50;
       final paddedWidth = spotWidth * (1.0 + paddingFactor);
       final paddedHeight = spotHeight * (1.0 + paddingFactor);
 
@@ -1561,7 +1551,30 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                       });
                     },
                     child: GestureDetector(
-                      onTapDown: (details) {
+                      // 더블탭으로 확대/축소 (시뮬레이터 테스트용)
+                      onDoubleTapDown: (details) {
+                        if (_currentScale == 1.0) {
+                          // 확대: 더블탭한 위치를 중심으로 2배 확대
+                          final tapPosition = details.localPosition;
+                          final double scale = 2.0;
+                          
+                          // 탭한 위치가 화면 중앙에 오도록 translation 계산
+                          final double dx = -tapPosition.dx * (scale - 1.0);
+                          final double dy = -tapPosition.dy * (scale - 1.0);
+                          
+                          setState(() {
+                            _transformationController.value = Matrix4.identity()
+                              ..translate(dx, dy)
+                              ..scale(scale);
+                            _currentScale = scale;
+                          });
+                        } else {
+                          // 축소: 원래대로
+                          _resetZoom();
+                        }
+                      },
+                      // onTapUp 사용: 드래그가 아닌 실제 탭만 감지
+                      onTapUp: (details) {
                         if (!_isGameOver) {
                           // Global position 계산
                           final RenderBox? box =
