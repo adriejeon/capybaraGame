@@ -128,7 +128,7 @@ class _GachaPhysicsWidgetState extends State<GachaPhysicsWidget> {
           children: [
             // 배경: 가챠 기계 이미지
             Image.asset(
-              'assets/images/gacha.png',
+              'assets/images/gacha.webp',
               width: imageWidth,
               height: imageHeight,
               fit: BoxFit.contain,

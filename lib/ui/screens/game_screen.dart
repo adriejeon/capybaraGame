@@ -486,7 +486,7 @@ class _GameScreenState extends State<GameScreen>
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image.asset(
-                  'assets/images/gacha_coin.png',
+                  'assets/images/gacha_coin.webp',
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
@@ -2766,7 +2766,7 @@ class _TicketRewardDialogState extends State<_TicketRewardDialog>
                         ClipRRect(
                           borderRadius: BorderRadius.circular(16),
                           child: Image.asset(
-                            'assets/images/gacha_coin.png',
+                            'assets/images/gacha_coin.webp',
                             width: 80,
                             height: 80,
                             fit: BoxFit.cover,

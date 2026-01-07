@@ -39,9 +39,9 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
   static const int _dollCount = GachaGlassConstants.dollCount;
   static const double _dollSize = GachaGlassConstants.dollSize;
   static const List<String> _dollImages = [
-    'assets/images/gacha_doll_1.png',
-    'assets/images/gacha_doll_2.png',
-    'assets/images/gacha_doll_3.png',
+    'assets/images/gacha_doll_1.webp',
+    'assets/images/gacha_doll_2.webp',
+    'assets/images/gacha_doll_3.webp',
   ];
 
   // 애니메이션 설정
@@ -220,7 +220,7 @@ class _GachaMachineWidgetState extends State<GachaMachineWidget>
           children: [
             // 배경: 가챠 기계 이미지
             Image.asset(
-              'assets/images/gacha.png',
+              'assets/images/gacha.webp',
               width: imageWidth,
               height: imageHeight,
               fit: BoxFit.contain,

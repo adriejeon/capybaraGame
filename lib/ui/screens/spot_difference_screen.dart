@@ -6,6 +6,7 @@ import '../../game/models/spot_difference_data.dart';
 import '../../utils/constants.dart';
 import '../../ads/admob_handler.dart';
 import '../../data/ticket_manager.dart';
+import '../../data/spot_progress_manager.dart';
 import '../../services/daily_mission_service.dart';
 import '../../sound_manager.dart';
 import '../../l10n/app_localizations.dart';
@@ -13,10 +14,14 @@ import '../../l10n/app_localizations.dart';
 /// 틀린그림찾기 게임 화면
 class SpotDifferenceScreen extends StatefulWidget {
   final GameDifficulty difficulty;
+  final String? stageId; // 특정 스테이지 ID (예: "2-3")
+  final bool isSequentialMode; // 순차 진행 모드 여부
 
   const SpotDifferenceScreen({
     super.key,
     required this.difficulty,
+    this.stageId,
+    this.isSequentialMode = false,
   });
 
   @override
@@ -210,9 +215,22 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   }
 
   Future<void> _initializeGame() async {
-    final level =
-        SpotDifferenceDataManager.difficultyToLevel(widget.difficulty);
-    _currentStage = await _dataManager.getRandomStage(level);
+    // 순차 모드이고 stageId가 지정된 경우 해당 스테이지 로드
+    if (widget.isSequentialMode && widget.stageId != null) {
+      final parts = widget.stageId!.split('-');
+      if (parts.length == 2) {
+        final level = int.tryParse(parts[0]);
+        final stage = int.tryParse(parts[1]);
+        if (level != null && stage != null) {
+          _currentStage = await _dataManager.getStage(level, stage);
+        }
+      }
+    } else {
+      // 기존 랜덤 스테이지 로드
+      final level =
+          SpotDifferenceDataManager.difficultyToLevel(widget.difficulty);
+      _currentStage = await _dataManager.getRandomStage(level);
+    }
 
     if (_currentStage == null) {
       return;
@@ -603,9 +621,25 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   void _showWinDialog() async {
     if (!mounted) return;
 
+    // 순차 모드일 경우 진행 상태 저장
+    if (widget.isSequentialMode && widget.stageId != null) {
+      await SpotProgressManager.setStageCompleted(widget.stageId!, true);
+      
+      // 다음 스테이지로 자동 진행
+      final nextStageId = SpotProgressManager.getNextStageId(widget.stageId!);
+      if (nextStageId != null) {
+        await SpotProgressManager.saveCurrentStage(nextStageId);
+      }
+    }
+
     // 뽑기권 획득 시도
     await _ticketManager.initialize();
     final canEarn = _ticketManager.canEarnTicketToday;
+
+    // 다음 스테이지 ID 확인
+    final String? nextStageId = widget.isSequentialMode && widget.stageId != null
+        ? SpotProgressManager.getNextStageId(widget.stageId!)
+        : null;
 
     showDialog(
       context: context,
@@ -616,6 +650,9 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         totalCount: _currentStage?.spots.length ?? 0,
         canEarnTicket: canEarn,
         remainingTickets: _ticketManager.remainingDailyTickets,
+        isSequentialMode: widget.isSequentialMode,
+        currentStageId: widget.stageId,
+        nextStageId: nextStageId,
         onClaimTicket: () async {
           Navigator.of(context).pop();
           await _claimTicketWithAd();
@@ -628,6 +665,24 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
           Navigator.of(context).pop();
           _restartGame();
         },
+        onNextStage: nextStageId != null
+            ? () async {
+                Navigator.of(context).pop();
+                if (context.mounted) {
+                  // 다음 스테이지로 이동
+                  await Navigator.pushReplacement(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => SpotDifferenceScreen(
+                        difficulty: widget.difficulty,
+                        stageId: nextStageId,
+                        isSequentialMode: true,
+                      ),
+                    ),
+                  );
+                }
+              }
+            : null,
       ),
     );
   }
@@ -697,7 +752,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
               ClipRRect(
                 borderRadius: BorderRadius.circular(20),
                 child: Image.asset(
-                  'assets/images/gacha_coin.png',
+                  'assets/images/gacha_coin.webp',
                   width: 100,
                   height: 100,
                   fit: BoxFit.cover,
@@ -1389,10 +1444,15 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
               color: Colors.white,
               size: 18,
             )
-          : const Icon(
-              Icons.help_outline,
-              color: Color(0xFFBDBDBD),
-              size: 16,
+          : const Center(
+              child: Text(
+                '?',
+                style: TextStyle(
+                  color: Color(0xFFBDBDBD),
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
     );
   }
@@ -1999,6 +2059,10 @@ class _GameResultDialog extends StatelessWidget {
   final VoidCallback onClaimTicket;
   final VoidCallback onHome;
   final VoidCallback onReplay;
+  final bool isSequentialMode;
+  final String? currentStageId;
+  final String? nextStageId;
+  final VoidCallback? onNextStage;
 
   const _GameResultDialog({
     required this.isWin,
@@ -2009,6 +2073,10 @@ class _GameResultDialog extends StatelessWidget {
     required this.onClaimTicket,
     required this.onHome,
     required this.onReplay,
+    this.isSequentialMode = false,
+    this.currentStageId,
+    this.nextStageId,
+    this.onNextStage,
   });
 
   @override
@@ -2082,7 +2150,7 @@ class _GameResultDialog extends StatelessWidget {
                     ClipRRect(
                       borderRadius: BorderRadius.circular(12),
                       child: Image.asset(
-                        'assets/images/gacha_coin.png',
+                        'assets/images/gacha_coin.webp',
                         width: 60,
                         height: 60,
                         fit: BoxFit.cover,
@@ -2166,44 +2234,95 @@ class _GameResultDialog extends StatelessWidget {
               const SizedBox(height: 16),
             ],
 
-            // 홈/다시하기 버튼
-            Row(
-              children: [
-                Expanded(
-                  child: TextButton(
-                    onPressed: onHome,
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF4A90E2),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
+            // 순차 모드: 다음 단계 버튼 (있으면 표시)
+            if (isSequentialMode && nextStageId != null && onNextStage != null) ...[
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: onNextStage,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4CAF50),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
-                    child: Text(
-                      isKorean ? '홈으로' : 'Home',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                    elevation: 0,
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        isKorean ? '다음 단계' : 'Next Stage',
+                        style: const TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      const Icon(Icons.arrow_forward, size: 20),
+                    ],
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            
+            // 순차 모드가 아니거나 마지막 스테이지인 경우 홈/다시하기 버튼 표시
+            if (!isSequentialMode || nextStageId == null)
+              Row(
+                children: [
+                  Expanded(
+                    child: TextButton(
+                      onPressed: onHome,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A90E2),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text(
+                        isKorean ? '홈으로' : 'Home',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: TextButton(
-                    onPressed: onReplay,
-                    style: TextButton.styleFrom(
-                      foregroundColor: const Color(0xFF4A90E2),
-                      padding: const EdgeInsets.symmetric(vertical: 14),
-                    ),
-                    child: Text(
-                      isKorean ? '다시하기' : 'Play Again',
-                      style: const TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: TextButton(
+                      onPressed: onReplay,
+                      style: TextButton.styleFrom(
+                        foregroundColor: const Color(0xFF4A90E2),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                      child: Text(
+                        isKorean ? '다시하기' : 'Play Again',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
+                ],
+              )
+            else
+              // 순차 모드에서 다음 단계가 있을 때는 홈 버튼만 표시
+              TextButton(
+                onPressed: onHome,
+                style: TextButton.styleFrom(
+                  foregroundColor: const Color(0xFF4A90E2),
+                  padding: const EdgeInsets.symmetric(vertical: 14),
                 ),
-              ],
-            ),
+                child: Text(
+                  isKorean ? '홈으로' : 'Home',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ),
           ],
         ),
       ),

@@ -546,8 +546,8 @@ class SpotDifferenceDataManager {
       return SpotDifferenceStage(
         level: level,
         stage: stage,
-        originalImage: 'assets/soptTheDifference/$key.png',
-        wrongImage: 'assets/soptTheDifference/$key-wrong.png',
+        originalImage: 'assets/soptTheDifference/$key.webp',
+        wrongImage: 'assets/soptTheDifference/$key-wrong.webp',
         spots: jsonSpots,
         timeLimit: timeLimitByLevel[level] ?? 60,
         spotCount: spotCountByLevel[level] ?? 3,
@@ -564,8 +564,8 @@ class SpotDifferenceDataManager {
     return SpotDifferenceStage(
       level: level,
       stage: stage,
-      originalImage: 'assets/soptTheDifference/$key.png',
-      wrongImage: 'assets/soptTheDifference/$key-wrong.png',
+      originalImage: 'assets/soptTheDifference/$key.webp',
+      wrongImage: 'assets/soptTheDifference/$key-wrong.webp',
       spots: spots,
       timeLimit: timeLimitByLevel[level] ?? 60,
       spotCount: spotCountByLevel[level] ?? 3,

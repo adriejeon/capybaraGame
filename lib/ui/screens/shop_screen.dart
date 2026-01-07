@@ -404,7 +404,7 @@ class _ShopScreenState extends State<ShopScreen>
                     alignment: Alignment.center,
                     children: [
                       Image.asset(
-                        'assets/images/gacha_coin.png',
+                        'assets/images/gacha_coin.webp',
                         width: 40,
                         height: 40,
                         errorBuilder: (context, error, stackTrace) {

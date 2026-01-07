@@ -284,7 +284,7 @@ class _GachaScreenState extends State<GachaScreen>
           ClipRRect(
             borderRadius: BorderRadius.circular(10),
             child: Image.asset(
-              'assets/images/gacha_coin.png',
+              'assets/images/gacha_coin.webp',
               width: 40,
               height: 40,
               fit: BoxFit.cover,

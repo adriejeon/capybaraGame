@@ -14,6 +14,7 @@ import 'collection_screen.dart';
 import 'spot_difference_screen.dart';
 import 'gacha_screen.dart';
 import '../../data/ticket_manager.dart';
+import '../../data/spot_progress_manager.dart';
 import 'shop_screen.dart';
 import '../widgets/sound_settings_dialog.dart';
 import '../widgets/daily_mission_modal.dart';
@@ -649,7 +650,7 @@ class _HomeScreenState extends State<HomeScreen>
                   child: Column(
                     children: [
                       const SizedBox(height: 12),
-                      _buildLevelSelector(context),
+                      _buildStartButton(context),
                       const SizedBox(height: 48),
                       Expanded(
                         child: Column(
@@ -812,7 +813,7 @@ class _HomeScreenState extends State<HomeScreen>
               mainAxisSize: MainAxisSize.min,
               children: [
                 Image.asset(
-                  'assets/images/gacha_coin.png',
+                  'assets/images/gacha_coin.webp',
                   width: 34,
                   height: 34,
                   errorBuilder: (context, error, stackTrace) {
@@ -1069,228 +1070,60 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 레벨 선택 위젯 (중앙 버튼 + 양옆 arrow)
-  Widget _buildLevelSelector(BuildContext context) {
+  /// 게임 시작 버튼
+  Widget _buildStartButton(BuildContext context) {
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
-    // 화살표 버튼: 화면 너비의 12% (최소 50px, 최대 80px)
-    final arrowSize = (screenWidth * 0.12).clamp(50.0, 80.0);
-    // 상단 버튼과 동일한 마진: 화면 너비의 2%
-    final sidePadding = (screenWidth * 0.02).clamp(12.0, 20.0);
+    
+    // 버튼 크기 계산 (레벨 버튼보다 약간 크게)
+    final buttonWidth = (screenWidth * 0.65).clamp(200.0, 400.0);
+    final buttonHeight = (buttonWidth * 0.34).clamp(screenHeight * 0.12, screenHeight * 0.18);
 
-    return Padding(
-      padding: EdgeInsets.symmetric(horizontal: sidePadding),
-      child: Row(
-        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: [
-          // 왼쪽 arrow (왼쪽 끝에 배치)
-          _buildArrowButton(
-            isBack: true,
-            enabled: _currentLevelIndex > 0,
-            size: arrowSize,
-            onTap: () {
-              if (_currentLevelIndex > 0) {
-                setState(() {
-                  _currentLevelIndex--;
-                });
-              }
-            },
-          ),
-
-          // 중앙 레벨 버튼 (유연한 크기)
-          Flexible(
-            child: LayoutBuilder(
-              builder: (context, constraints) {
-                // 사용 가능한 너비 계산 (전체 너비 - 화살표 버튼 2개 - 간격)
-                final spacing = screenWidth * 0.02; // 화면 너비의 2% 간격
-                final availableWidth =
-                    constraints.maxWidth - (arrowSize * 2) - spacing;
-                // 사용 가능한 공간의 95% 사용, 화면 너비의 50-60% 범위로 줄임
-                final buttonWidth = (availableWidth * 0.95)
-                    .clamp(screenWidth * 0.50, screenWidth * 0.60);
-                // 높이는 너비의 34% 또는 화면 높이의 12-18%로 줄임
-                final buttonHeight = (buttonWidth * 0.34)
-                    .clamp(screenHeight * 0.12, screenHeight * 0.18);
-
-                return _buildLevelButton(
-                  context,
-                  _levels[_currentLevelIndex],
-                  buttonWidth,
-                  buttonHeight,
-                );
-              },
-            ),
-          ),
-
-          // 오른쪽 arrow (오른쪽 끝에 배치)
-          _buildArrowButton(
-            isBack: false,
-            enabled: _currentLevelIndex < _levels.length - 1,
-            size: arrowSize,
-            onTap: () {
-              if (_currentLevelIndex < _levels.length - 1) {
-                setState(() {
-                  _currentLevelIndex++;
-                });
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// Arrow 버튼 생성
-  Widget _buildArrowButton({
-    required bool isBack,
-    required bool enabled,
-    required double size,
-    required VoidCallback onTap,
-  }) {
-    // 이미지 경로 결정
-    final imagePath = isBack
-        ? (enabled
-            ? 'assets/images/arrow-back-active.webp'
-            : 'assets/images/arrow-back-disabled.webp')
-        : (enabled
-            ? 'assets/images/arrow-front-active.webp'
-            : 'assets/images/arrow-front-disabled.webp');
-
-    return GestureDetector(
-      onTap: enabled ? onTap : null,
-      child: Container(
-        width: size,
-        height: size,
-        decoration: BoxDecoration(
-          borderRadius: BorderRadius.circular(12),
-          boxShadow: enabled
-              ? [
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.15),
-                    blurRadius: 6,
-                    offset: const Offset(0, 3),
-                  ),
-                ]
-              : [],
-        ),
-        child: ClipRRect(
-          borderRadius: BorderRadius.circular(12),
-          child: Image.asset(
-            imagePath,
-            width: size,
-            height: size,
-            fit: BoxFit.contain,
-            errorBuilder: (context, error, stackTrace) {
-              // 이미지 로드 실패 시 기본 아이콘 표시
-              return Container(
-                decoration: BoxDecoration(
-                  color: enabled
-                      ? Colors.white.withOpacity(0.9)
-                      : Colors.grey[300],
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  isBack ? Icons.arrow_back_ios_new : Icons.arrow_forward_ios,
-                  color: enabled ? const Color(0xFF4A90E2) : Colors.grey,
-                  size: size * 0.5,
-                ),
-              );
-            },
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 레벨 버튼 생성
-  Widget _buildLevelButton(
-    BuildContext context,
-    GameDifficulty difficulty,
-    double width,
-    double height,
-  ) {
     return Consumer<LocaleState>(
       builder: (context, localeState, child) {
         final isEnglish = localeState.currentLocale.languageCode == 'en';
-
-        // 레벨에 따른 이미지 경로
-        String imagePath;
-        switch (difficulty) {
-          case GameDifficulty.level1:
-            imagePath = 'assets/images/button-level1.webp';
-            break;
-          case GameDifficulty.level2:
-            imagePath = 'assets/images/button-level2.webp';
-            break;
-          case GameDifficulty.level3:
-            imagePath = 'assets/images/button-level3.webp';
-            break;
-          case GameDifficulty.level4:
-            imagePath = 'assets/images/button-level4.webp';
-            break;
-          case GameDifficulty.level5:
-            imagePath = 'assets/images/button-level5.webp';
-            break;
-        }
-
-        // 영어 모드일 때 -en 접미사 추가
-        if (isEnglish) {
-          final dotIndex = imagePath.lastIndexOf('.');
-          if (dotIndex != -1) {
-            imagePath =
-                '${imagePath.substring(0, dotIndex)}-en${imagePath.substring(dotIndex)}';
-          }
-        }
+        final imagePath = isEnglish
+            ? 'assets/images/button-start-en.webp'
+            : 'assets/images/button-start.webp';
 
         return GestureDetector(
-          onTap: () => _startGame(context, difficulty),
+          onTap: () => _showGameTypeSelectionModal(context),
           child: Container(
-            width: width,
-            height: height,
+            width: buttonWidth,
+            height: buttonHeight,
             decoration: BoxDecoration(
               borderRadius: BorderRadius.circular(20),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.15),
+                  blurRadius: 8,
+                  offset: const Offset(0, 4),
+                ),
+              ],
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(20),
               child: Image.asset(
                 imagePath,
                 fit: BoxFit.contain,
-                width: width,
-                height: height,
+                width: buttonWidth,
+                height: buttonHeight,
                 errorBuilder: (context, error, stackTrace) {
-                  // 영어 이미지가 없으면 기본 이미지 사용
-                  if (isEnglish) {
-                    final koreanPath = imagePath.replaceAll('-en', '');
-                    return Image.asset(
-                      koreanPath,
-                      fit: BoxFit.contain,
-                      width: width,
-                      height: height,
-                      errorBuilder: (_, __, ___) {
-                        return Container(
-                          decoration: BoxDecoration(
-                            color: Colors.grey[300],
-                            borderRadius: BorderRadius.circular(20),
-                          ),
-                          child: const Icon(
-                            Icons.image_not_supported,
-                            color: Colors.grey,
-                            size: 40,
-                          ),
-                        );
-                      },
-                    );
-                  }
+                  // 이미지 로드 실패 시 기본 버튼 표시
                   return Container(
                     decoration: BoxDecoration(
-                      color: Colors.grey[300],
+                      color: const Color(0xFF4A90E2),
                       borderRadius: BorderRadius.circular(20),
                     ),
-                    child: const Icon(
-                      Icons.image_not_supported,
-                      color: Colors.grey,
-                      size: 40,
+                    child: Center(
+                      child: Text(
+                        isEnglish ? 'START GAME' : '게임 시작',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
                   );
                 },
@@ -1302,193 +1135,14 @@ class _HomeScreenState extends State<HomeScreen>
     );
   }
 
-  /// 게임 시작 - 게임 종류 선택 모달 표시
-  void _startGame(BuildContext context, GameDifficulty difficulty) async {
-    // 게임 종류 선택 모달 표시
-    _showGameTypeSelectionModal(context, difficulty);
-  }
-
-  /// 게임 종류 선택 모달
-  void _showGameTypeSelectionModal(
-      BuildContext context, GameDifficulty difficulty) {
-    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
-
+  /// 게임 선택 모달 표시
+  void _showGameTypeSelectionModal(BuildContext context) {
     showDialog(
       context: context,
-      builder: (context) => Dialog(
-        backgroundColor: Colors.transparent,
-        child: Container(
-          padding: const EdgeInsets.all(24),
-          decoration: BoxDecoration(
-            gradient: const LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFE8F4F8), Color(0xFFD6EBF5)],
-            ),
-            borderRadius: BorderRadius.circular(30),
-            border: Border.all(color: const Color(0xFF4A90E2), width: 3),
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              // 타이틀
-              Text(
-                isKorean ? '게임 선택' : 'Select Game',
-                style: const TextStyle(
-                  fontSize: 24,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF4A90E2),
-                ),
-              ),
-              const SizedBox(height: 24),
-
-              // 카드 짝 맞추기 버튼
-              _buildGameTypeButton(
-                context: context,
-                icon: Icons.grid_view_rounded,
-                title: isKorean ? '카드 짝 맞추기' : 'Card Matching',
-                subtitle:
-                    isKorean ? '같은 카드를 찾아 짝을 맞추세요' : 'Find matching cards',
-                color: const Color(0xFF4A90E2),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await GameCounter.incrementGameCount();
-                  _navigateToGame(context, difficulty);
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 틀린그림찾기 버튼
-              _buildGameTypeButton(
-                context: context,
-                icon: Icons.search_rounded,
-                title: isKorean ? '틀린그림 찾기' : 'Spot the Difference',
-                subtitle: isKorean
-                    ? '두 그림의 다른 부분을 찾으세요'
-                    : 'Find differences between images',
-                color: const Color(0xFFFF9800),
-                onTap: () async {
-                  Navigator.of(context).pop();
-                  await GameCounter.incrementGameCount();
-                  _navigateToSpotDifference(context, difficulty);
-                },
-              ),
-              const SizedBox(height: 16),
-
-              // 취소 버튼
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text(
-                  isKorean ? '취소' : 'Cancel',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.grey,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
+      builder: (context) => const _GameSelectionModal(),
     );
   }
 
-  /// 게임 종류 버튼 위젯
-  Widget _buildGameTypeButton({
-    required BuildContext context,
-    required IconData icon,
-    required String title,
-    required String subtitle,
-    required Color color,
-    required VoidCallback onTap,
-  }) {
-    return GestureDetector(
-      onTap: onTap,
-      child: Container(
-        width: double.infinity,
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: color, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(icon, color: color, size: 32),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    title,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: color,
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    subtitle,
-                    style: TextStyle(
-                      fontSize: 12,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            Icon(Icons.arrow_forward_ios, color: color, size: 20),
-          ],
-        ),
-      ),
-    );
-  }
-
-  /// 틀린그림찾기 게임 화면으로 이동
-  void _navigateToSpotDifference(
-      BuildContext context, GameDifficulty difficulty) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => SpotDifferenceScreen(difficulty: difficulty),
-      ),
-    );
-
-    // 게임 화면에서 돌아온 후 코인, 뽑기권 리로드
-    await _loadCoins();
-    await _loadTickets();
-  }
-
-  /// 게임 화면으로 이동
-  void _navigateToGame(BuildContext context, GameDifficulty difficulty) async {
-    await Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (context) => GameScreen(difficulty: difficulty),
-      ),
-    );
-
-    // 게임 화면에서 돌아온 후 코인, 뽑기권 리로드
-    await _loadCoins();
-    await _loadTickets();
-  }
 
   /// 컬렉션 화면 열기
   void _openCollection(BuildContext context) async {
@@ -1812,4 +1466,352 @@ class _SpeechBubbleTailPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(covariant CustomPainter oldDelegate) => false;
+}
+
+/// 게임 선택 다단계 모달
+class _GameSelectionModal extends StatefulWidget {
+  const _GameSelectionModal();
+
+  @override
+  State<_GameSelectionModal> createState() => _GameSelectionModalState();
+}
+
+enum _ModalStep {
+  gameType, // 게임 종류 선택
+  cardDifficulty, // 카드 짝 맞추기 난이도 선택
+  spotMode, // 틀린그림찾기 모드 선택
+}
+
+class _GameSelectionModalState extends State<_GameSelectionModal> {
+  _ModalStep _currentStep = _ModalStep.gameType;
+
+  @override
+  Widget build(BuildContext context) {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      child: Container(
+        padding: const EdgeInsets.all(24),
+        decoration: BoxDecoration(
+          gradient: const LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [Color(0xFFE8F4F8), Color(0xFFD6EBF5)],
+          ),
+          borderRadius: BorderRadius.circular(30),
+          border: Border.all(color: const Color(0xFF4A90E2), width: 3),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            // 상단 바 (뒤로가기 버튼 + 타이틀)
+            Row(
+              children: [
+                if (_currentStep != _ModalStep.gameType)
+                  IconButton(
+                    icon: const Icon(Icons.arrow_back,
+                        color: Color(0xFF4A90E2)),
+                    onPressed: () {
+                      setState(() {
+                        _currentStep = _ModalStep.gameType;
+                      });
+                    },
+                  )
+                else
+                  const SizedBox(width: 48),
+                Expanded(
+                  child: Text(
+                    _getTitle(isKorean),
+                    style: const TextStyle(
+                      fontSize: 24,
+                      fontWeight: FontWeight.bold,
+                      color: Color(0xFF4A90E2),
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(width: 48),
+              ],
+            ),
+            const SizedBox(height: 24),
+
+            // 내용
+            _buildContent(context, isKorean),
+
+            // 취소 버튼 (게임 선택 단계에서만 표시)
+            if (_currentStep == _ModalStep.gameType) ...[
+              const SizedBox(height: 16),
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(),
+                child: Text(
+                  isKorean ? '취소' : 'Cancel',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.grey,
+                  ),
+                ),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _getTitle(bool isKorean) {
+    switch (_currentStep) {
+      case _ModalStep.gameType:
+        return isKorean ? '게임 선택' : 'Select Game';
+      case _ModalStep.cardDifficulty:
+        return isKorean ? '난이도 선택' : 'Select Difficulty';
+      case _ModalStep.spotMode:
+        return isKorean ? '게임 모드' : 'Game Mode';
+    }
+  }
+
+  Widget _buildContent(BuildContext context, bool isKorean) {
+    switch (_currentStep) {
+      case _ModalStep.gameType:
+        return _buildGameTypeSelection(context, isKorean);
+      case _ModalStep.cardDifficulty:
+        return _buildCardDifficultySelection(context, isKorean);
+      case _ModalStep.spotMode:
+        return _buildSpotModeSelection(context, isKorean);
+    }
+  }
+
+  /// 게임 종류 선택
+  Widget _buildGameTypeSelection(BuildContext context, bool isKorean) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildGameTypeButton(
+          context: context,
+          icon: Icons.grid_view_rounded,
+          title: isKorean ? '카드 짝 맞추기' : 'Card Matching',
+          subtitle:
+              isKorean ? '같은 카드를 찾아 짝을 맞추세요' : 'Find matching cards',
+          color: const Color(0xFF4A90E2),
+          onTap: () {
+            setState(() {
+              _currentStep = _ModalStep.cardDifficulty;
+            });
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildGameTypeButton(
+          context: context,
+          icon: Icons.search_rounded,
+          title: isKorean ? '틀린그림 찾기' : 'Spot the Difference',
+          subtitle: isKorean
+              ? '두 그림의 다른 부분을 찾으세요'
+              : 'Find differences between images',
+          color: const Color(0xFFFF9800),
+          onTap: () {
+            setState(() {
+              _currentStep = _ModalStep.spotMode;
+            });
+          },
+        ),
+      ],
+    );
+  }
+
+  /// 카드 난이도 선택
+  Widget _buildCardDifficultySelection(BuildContext context, bool isKorean) {
+    final difficulties = [
+      GameDifficulty.level1,
+      GameDifficulty.level2,
+      GameDifficulty.level3,
+      GameDifficulty.level4,
+      GameDifficulty.level5,
+    ];
+
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: difficulties.map((difficulty) {
+        final levelNumber = difficulties.indexOf(difficulty) + 1;
+        return Padding(
+          padding: const EdgeInsets.only(bottom: 12),
+          child: _buildGameTypeButton(
+            context: context,
+            icon: Icons.stars,
+            title: isKorean ? '$levelNumber단계' : 'Level $levelNumber',
+            subtitle: '',
+            color: const Color(0xFF4A90E2),
+            onTap: () async {
+              Navigator.of(context).pop();
+              await GameCounter.incrementGameCount();
+              if (context.mounted) {
+                await Navigator.push(
+                  context,
+                  MaterialPageRoute(
+                    builder: (context) => GameScreen(difficulty: difficulty),
+                  ),
+                );
+              }
+            },
+          ),
+        );
+      }).toList(),
+    );
+  }
+
+  /// 틀린그림찾기 모드 선택
+  Widget _buildSpotModeSelection(BuildContext context, bool isKorean) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildGameTypeButton(
+          context: context,
+          icon: Icons.restart_alt,
+          title: isKorean ? '처음부터 다시하기' : 'Start from Beginning',
+          subtitle:
+              isKorean ? '1-1 스테이지부터 시작' : 'Start from stage 1-1',
+          color: const Color(0xFFFF9800),
+          onTap: () async {
+            Navigator.of(context).pop();
+            await GameCounter.incrementGameCount();
+            if (context.mounted) {
+              // 1-1 스테이지부터 순차 진행
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const SpotDifferenceScreen(
+                    difficulty: GameDifficulty.level1,
+                    stageId: '1-1',
+                    isSequentialMode: true,
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildGameTypeButton(
+          context: context,
+          icon: Icons.play_arrow,
+          title: isKorean ? '이어서 하기' : 'Continue',
+          subtitle:
+              isKorean ? '저장된 진행 상황부터 계속' : 'Continue from saved progress',
+          color: const Color(0xFF4CAF50),
+          onTap: () async {
+            Navigator.of(context).pop();
+            await GameCounter.incrementGameCount();
+            if (context.mounted) {
+              // 저장된 진행 상황 불러오기
+              final currentStageId = await SpotProgressManager.getCurrentStage();
+              final parts = currentStageId.split('-');
+              
+              // stageId에서 difficulty 계산 (1-6: level1, 7-12: level2, ...)
+              GameDifficulty difficulty = GameDifficulty.level1;
+              if (parts.length == 2) {
+                final level = int.tryParse(parts[0]);
+                if (level != null) {
+                  switch (level) {
+                    case 1:
+                      difficulty = GameDifficulty.level1;
+                      break;
+                    case 2:
+                      difficulty = GameDifficulty.level2;
+                      break;
+                    case 3:
+                      difficulty = GameDifficulty.level3;
+                      break;
+                    case 4:
+                      difficulty = GameDifficulty.level4;
+                      break;
+                    case 5:
+                      difficulty = GameDifficulty.level5;
+                      break;
+                  }
+                }
+              }
+              
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => SpotDifferenceScreen(
+                    difficulty: difficulty,
+                    stageId: currentStageId,
+                    isSequentialMode: true,
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  Widget _buildGameTypeButton({
+    required BuildContext context,
+    required IconData icon,
+    required String title,
+    required String subtitle,
+    required Color color,
+    required VoidCallback onTap,
+  }) {
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        width: double.infinity,
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: color, width: 2),
+          boxShadow: [
+            BoxShadow(
+              color: color.withOpacity(0.2),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Row(
+          children: [
+            Container(
+              width: 60,
+              height: 60,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(15),
+              ),
+              child: Icon(icon, color: color, size: 32),
+            ),
+            const SizedBox(width: 16),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    title,
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      color: color,
+                    ),
+                  ),
+                  if (subtitle.isNotEmpty) ...[
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ),
+            Icon(Icons.arrow_forward_ios, color: color, size: 20),
+          ],
+        ),
+      ),
+    );
+  }
 }
