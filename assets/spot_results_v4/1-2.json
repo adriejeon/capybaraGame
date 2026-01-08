@@ -37,18 +37,6 @@
   },
   {
     "id": 4,
-    "x": 352,
-    "y": 40,
-    "width": 104,
-    "height": 128,
-    "center_x": 404,
-    "center_y": 104,
-    "relative_x": 0.3945,
-    "relative_y": 0.1818,
-    "relative_radius": 0.0625
-  },
-  {
-    "id": 5,
     "x": 464,
     "y": 275,
     "width": 223,
@@ -58,5 +46,17 @@
     "relative_x": 0.562,
     "relative_y": 0.6556,
     "relative_radius": 0.1089
+  },
+  {
+    "id": 5,
+    "x": 354,
+    "y": 65,
+    "width": 103,
+    "height": 133,
+    "center_x": 406,
+    "center_y": 132,
+    "relative_x": 0.396,
+    "relative_y": 0.2299,
+    "relative_radius": 0.0649
   }
 ]

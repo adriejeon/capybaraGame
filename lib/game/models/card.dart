@@ -8,6 +8,7 @@ class GameCard {
   CardState state;
   bool isFlipped;
   bool isMatched;
+  bool isRemoving; // 카드가 사라지는 애니메이션 중인지
 
   GameCard({
     required this.id,
@@ -16,6 +17,7 @@ class GameCard {
     this.state = CardState.hidden,
     this.isFlipped = false,
     this.isMatched = false,
+    this.isRemoving = false,
   });
 
   /// 카드 뒤집기
@@ -32,10 +34,16 @@ class GameCard {
     state = CardState.matched;
   }
 
+  /// 카드 제거 시작
+  void startRemoving() {
+    isRemoving = true;
+  }
+
   /// 카드 리셋
   void reset() {
     isFlipped = false;
     isMatched = false;
+    isRemoving = false;
     state = CardState.hidden;
   }
 
@@ -47,6 +55,7 @@ class GameCard {
     CardState? state,
     bool? isFlipped,
     bool? isMatched,
+    bool? isRemoving,
   }) {
     return GameCard(
       id: id ?? this.id,
@@ -55,6 +64,7 @@ class GameCard {
       state: state ?? this.state,
       isFlipped: isFlipped ?? this.isFlipped,
       isMatched: isMatched ?? this.isMatched,
+      isRemoving: isRemoving ?? this.isRemoving,
     );
   }
 
@@ -69,7 +79,7 @@ class GameCard {
 
   @override
   String toString() {
-    return 'GameCard(id: $id, pairId: $pairId, state: $state, isFlipped: $isFlipped, isMatched: $isMatched)';
+    return 'GameCard(id: $id, pairId: $pairId, state: $state, isFlipped: $isFlipped, isMatched: $isMatched, isRemoving: $isRemoving)';
   }
 }
 

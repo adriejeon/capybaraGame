@@ -175,7 +175,7 @@ class SpotDifferenceDataManager {
 
   /// 레벨별 스테이지 개수
   static const Map<int, int> stageCountByLevel = {
-    1: 7, // 1-1 ~ 1-7
+    1: 6, // 1-1 ~ 1-6 (1-7 제외)
     2: 6, // 2-1 ~ 2-6
     3: 6, // 3-1 ~ 3-6
     4: 6, // 4-1 ~ 4-6
@@ -250,14 +250,6 @@ class SpotDifferenceDataManager {
       const DifferenceSpot(x: 0.9673, y: 0.4852, radius: 0.2000),
       const DifferenceSpot(x: 0.4185, y: 0.2205, radius: 0.2000),
       const DifferenceSpot(x: 0.0796, y: 0.0712, radius: 0.2000),
-    ],
-    '1-6': [
-      const DifferenceSpot(x: 0.3662, y: 0.4635, radius: 0.2000),
-      const DifferenceSpot(x: 0.1338, y: 0.0955, radius: 0.1464),
-      const DifferenceSpot(x: 0.0947, y: 0.5052, radius: 0.1464),
-      const DifferenceSpot(x: 0.9492, y: 0.5990, radius: 0.1464),
-      const DifferenceSpot(x: 0.8701, y: 0.3802, radius: 0.1464),
-      const DifferenceSpot(x: 0.5879, y: 0.2274, radius: 0.1464),
     ],
     '1-7': [
       const DifferenceSpot(x: 0.5527, y: 0.2135, radius: 0.1464),

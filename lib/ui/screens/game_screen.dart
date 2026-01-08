@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'dart:async';
 import 'dart:math';
+import 'package:vibration/vibration.dart';
 import '../../l10n/app_localizations.dart';
 import '../../utils/constants.dart';
 import '../../utils/helpers.dart';
@@ -319,11 +320,14 @@ class _GameScreenState extends State<GameScreen>
     }
   }
 
-  void _handleMatch(GameCard card1, GameCard card2) {
+  void _handleMatch(GameCard card1, GameCard card2) async {
     _comboCount++;
 
     // 카드 매칭 성공 시 사운드 재생
     _soundManager.playMatchSuccessSound();
+
+    // 진동 효과
+    _triggerVibration();
 
     setState(() {
       card1.markAsMatched();
@@ -337,9 +341,34 @@ class _GameScreenState extends State<GameScreen>
       _isProcessing = false;
     });
 
-    // 게임 완료 체크
-    if (_gameBoard.isGameComplete()) {
-      _endGame(true);
+    // 카드 제거 애니메이션 시작
+    await Future.delayed(const Duration(milliseconds: 300));
+    
+    if (mounted) {
+      setState(() {
+        card1.startRemoving();
+        card2.startRemoving();
+      });
+
+      // 애니메이션 완료 후 게임 완료 체크
+      await Future.delayed(const Duration(milliseconds: 600));
+      
+      if (mounted && _gameBoard.isGameComplete()) {
+        _endGame(true);
+      }
+    }
+  }
+
+  /// 진동 효과 트리거
+  Future<void> _triggerVibration() async {
+    try {
+      final hasVibrator = await Vibration.hasVibrator() ?? false;
+      if (hasVibrator) {
+        await Vibration.vibrate(duration: 50);
+      }
+    } catch (e) {
+      // 진동 실패 시 무시
+      print('진동 실패: $e');
     }
   }
 
@@ -2625,57 +2654,10 @@ class _TicketRewardDialog extends StatefulWidget {
   State<_TicketRewardDialog> createState() => _TicketRewardDialogState();
 }
 
-class _TicketRewardDialogState extends State<_TicketRewardDialog>
-    with SingleTickerProviderStateMixin {
-  late AnimationController _shakeController;
-  late Animation<double> _shakeAnimation;
-
+class _TicketRewardDialogState extends State<_TicketRewardDialog> {
   @override
   void initState() {
     super.initState();
-    _setupShakeAnimation();
-    _startShakeAnimation();
-  }
-
-  void _setupShakeAnimation() {
-    _shakeController = AnimationController(
-      duration: const Duration(milliseconds: 300),
-      vsync: this,
-    );
-
-    _shakeAnimation = TweenSequence<double>([
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.0, end: -0.1)
-            .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 1,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: -0.1, end: 0.1)
-            .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 2,
-      ),
-      TweenSequenceItem(
-        tween: Tween<double>(begin: 0.1, end: 0.0)
-            .chain(CurveTween(curve: Curves.easeInOut)),
-        weight: 1,
-      ),
-    ]).animate(_shakeController);
-  }
-
-  void _startShakeAnimation() async {
-    await Future.delayed(const Duration(milliseconds: 200));
-
-    while (mounted) {
-      await _shakeController.forward();
-      _shakeController.reset();
-      await Future.delayed(const Duration(milliseconds: 1500));
-    }
-  }
-
-  @override
-  void dispose() {
-    _shakeController.dispose();
-    super.dispose();
   }
 
   @override
@@ -2741,100 +2723,88 @@ class _TicketRewardDialogState extends State<_TicketRewardDialog>
 
               // 뽑기권 획득 영역
               if (widget.canEarnTicket) ...[
-                AnimatedBuilder(
-                  animation: _shakeAnimation,
-                  builder: (context, child) {
-                    return Transform.translate(
-                      offset: Offset(_shakeAnimation.value * 10, 0),
-                      child: Transform.rotate(
-                        angle: _shakeAnimation.value * 0.3,
-                        child: child,
-                      ),
-                    );
-                  },
-                  child: Container(
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFFFF8E1),
-                      borderRadius: BorderRadius.circular(20),
-                      border:
-                          Border.all(color: const Color(0xFFFFD699), width: 2),
-                    ),
-                    child: Column(
-                      children: [
-                        // 뽑기권 이미지
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(16),
-                          child: Image.asset(
-                            'assets/images/gacha_coin.webp',
-                            width: 80,
-                            height: 80,
-                            fit: BoxFit.cover,
-                            errorBuilder: (context, error, stackTrace) {
-                              return Container(
-                                width: 80,
-                                height: 80,
-                                decoration: BoxDecoration(
-                                  color: Colors.grey[400],
-                                  borderRadius: BorderRadius.circular(16),
-                                  border: Border.all(
-                                      color: Colors.grey[600]!, width: 2),
-                                ),
-                                child: const Center(
-                                  child: Column(
-                                    mainAxisAlignment: MainAxisAlignment.center,
-                                    children: [
-                                      Icon(
-                                        Icons.confirmation_number,
-                                        size: 36,
+                Container(
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFFFF8E1),
+                    borderRadius: BorderRadius.circular(20),
+                    border:
+                        Border.all(color: const Color(0xFFFFD699), width: 2),
+                  ),
+                  child: Column(
+                    children: [
+                      // 뽑기권 이미지
+                      ClipRRect(
+                        borderRadius: BorderRadius.circular(16),
+                        child: Image.asset(
+                          'assets/images/gacha_coin.webp',
+                          width: 80,
+                          height: 80,
+                          fit: BoxFit.cover,
+                          errorBuilder: (context, error, stackTrace) {
+                            return Container(
+                              width: 80,
+                              height: 80,
+                              decoration: BoxDecoration(
+                                color: Colors.grey[400],
+                                borderRadius: BorderRadius.circular(16),
+                                border: Border.all(
+                                    color: Colors.grey[600]!, width: 2),
+                              ),
+                              child: const Center(
+                                child: Column(
+                                  mainAxisAlignment: MainAxisAlignment.center,
+                                  children: [
+                                    Icon(
+                                      Icons.confirmation_number,
+                                      size: 36,
+                                      color: Colors.white,
+                                    ),
+                                    Text(
+                                      '뽑기권',
+                                      style: TextStyle(
+                                        fontSize: 10,
+                                        fontWeight: FontWeight.bold,
                                         color: Colors.white,
                                       ),
-                                      Text(
-                                        '뽑기권',
-                                        style: TextStyle(
-                                          fontSize: 10,
-                                          fontWeight: FontWeight.bold,
-                                          color: Colors.white,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
+                                    ),
+                                  ],
                                 ),
-                              );
-                            },
-                          ),
+                              ),
+                            );
+                          },
                         ),
-                        const SizedBox(height: 16),
-                        Text(
-                          isKorean
-                              ? '뽑기권 1개를 받을 수 있어요!'
-                              : 'You can get 1 Gacha Ticket!',
-                          style: const TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        isKorean
+                            ? '뽑기권 1개를 받을 수 있어요!'
+                            : 'You can get 1 Gacha Ticket!',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
                         ),
-                        const SizedBox(height: 8),
-                        Text(
-                          isKorean
-                              ? '현재 보유: ${widget.currentTicketCount}개'
-                              : 'Current: ${widget.currentTicketCount}',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[600],
-                          ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        isKorean
+                            ? '현재 보유: ${widget.currentTicketCount}개'
+                            : 'Current: ${widget.currentTicketCount}',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: Colors.grey[600],
                         ),
-                        Text(
-                          isKorean
-                              ? '오늘 남은 획득 횟수: ${widget.remainingTickets}회'
-                              : 'Remaining today: ${widget.remainingTickets}',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: Colors.grey[500],
-                          ),
+                      ),
+                      Text(
+                        isKorean
+                            ? '오늘 남은 획득 횟수: ${widget.remainingTickets}회'
+                            : 'Remaining today: ${widget.remainingTickets}',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.grey[500],
                         ),
-                      ],
-                    ),
+                      ),
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),

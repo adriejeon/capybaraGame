@@ -1075,9 +1075,9 @@ class _HomeScreenState extends State<HomeScreen>
     final screenWidth = MediaQuery.of(context).size.width;
     final screenHeight = MediaQuery.of(context).size.height;
     
-    // 버튼 크기 계산 (레벨 버튼보다 약간 크게)
-    final buttonWidth = (screenWidth * 0.65).clamp(200.0, 400.0);
-    final buttonHeight = (buttonWidth * 0.34).clamp(screenHeight * 0.12, screenHeight * 0.18);
+    // 버튼 크기 계산 (적당한 크기로 조정)
+    final buttonWidth = (screenWidth * 0.55).clamp(180.0, 320.0);
+    final buttonHeight = (buttonWidth * 0.34).clamp(screenHeight * 0.09, screenHeight * 0.13);
 
     return Consumer<LocaleState>(
       builder: (context, localeState, child) {
