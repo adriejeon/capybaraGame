@@ -26,6 +26,7 @@ class _GameCardWidgetState extends State<GameCardWidget>
   late Animation<double> _shakeAnimation;
   late Animation<double> _scaleAnimation;
   late Animation<double> _opacityAnimation;
+  bool _hasStartedRemoving = false;
 
   @override
   void initState() {
@@ -83,13 +84,15 @@ class _GameCardWidgetState extends State<GameCardWidget>
   void didUpdateWidget(GameCardWidget oldWidget) {
     super.didUpdateWidget(oldWidget);
     // 카드가 제거 상태로 변경되면 애니메이션 시작
-    if (!oldWidget.card.isRemoving && widget.card.isRemoving) {
-      _removeController.forward().then((_) {
-        // 애니메이션 완료 후 상태 업데이트를 위해 setState 호출
-        if (mounted) {
-          setState(() {});
-        }
-      });
+    if (!oldWidget.card.isRemoving && widget.card.isRemoving && !_hasStartedRemoving) {
+      _startRemovingAnimation();
+    }
+  }
+  
+  void _startRemovingAnimation() {
+    if (!_hasStartedRemoving && !_removeController.isAnimating) {
+      _hasStartedRemoving = true;
+      _removeController.forward();
     }
   }
 
@@ -101,8 +104,22 @@ class _GameCardWidgetState extends State<GameCardWidget>
 
   @override
   Widget build(BuildContext context) {
+    // 제거 중이면 애니메이션 시작
+    if (widget.card.isRemoving && !_hasStartedRemoving) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _startRemovingAnimation();
+        }
+      });
+    }
+    
     // 제거 중이 아니면 일반 카드 표시
     if (!widget.card.isRemoving) {
+      // 제거 상태가 해제되면 플래그 리셋
+      if (_hasStartedRemoving) {
+        _hasStartedRemoving = false;
+        _removeController.reset();
+      }
       return GestureDetector(
         onTap: widget.onTap,
         child: _buildCard(context),

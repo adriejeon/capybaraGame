@@ -223,6 +223,25 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
         final stage = int.tryParse(parts[1]);
         if (level != null && stage != null) {
           _currentStage = await _dataManager.getStage(level, stage);
+          
+          // 스테이지가 존재하지 않는 경우 (삭제된 스테이지 등), 유효한 스테이지로 리다이렉트
+          if (_currentStage == null && mounted) {
+            // 첫 번째 유효한 스테이지로 이동
+            final validStageId = '1-1';
+            await SpotProgressManager.saveCurrentStage(validStageId);
+            if (mounted) {
+              Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (context) => SpotDifferenceScreen(
+                    difficulty: widget.difficulty,
+                    stageId: validStageId,
+                    isSequentialMode: true,
+                  ),
+                ),
+              );
+            }
+            return;
+          }
         }
       }
     } else {
@@ -728,6 +747,11 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
   /// 뽑기권 획득 다이얼로그
   void _showTicketEarnedDialog() {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+    
+    // 다음 스테이지 ID 확인
+    final String? nextStageId = widget.isSequentialMode && widget.stageId != null
+        ? SpotProgressManager.getNextStageId(widget.stageId!)
+        : null;
 
     showDialog(
       context: context,
@@ -835,16 +859,31 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
                   const SizedBox(width: 12),
                   Expanded(
                     child: TextButton(
-                      onPressed: () {
+                      onPressed: () async {
                         Navigator.of(context).pop();
-                        _restartGame();
+                        if (nextStageId != null && context.mounted) {
+                          // 다음 스테이지로 이동
+                          await Navigator.pushReplacement(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => SpotDifferenceScreen(
+                                difficulty: widget.difficulty,
+                                stageId: nextStageId,
+                                isSequentialMode: true,
+                              ),
+                            ),
+                          );
+                        } else {
+                          // 다음 스테이지가 없으면 홈으로
+                          Navigator.of(context).pop();
+                        }
                       },
                       style: TextButton.styleFrom(
                         foregroundColor: const Color(0xFF4A90E2),
                         padding: const EdgeInsets.symmetric(vertical: 16),
                       ),
                       child: Text(
-                        isKorean ? '다시하기' : 'Play Again',
+                        isKorean ? '다음 단계' : 'Next Stage',
                         style: const TextStyle(
                           fontSize: 16,
                           fontWeight: FontWeight.bold,
@@ -1164,6 +1203,21 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     });
   }
 
+  /// 전체 순서 번호 계산 (1-1 = 1, 1-2 = 2, ..., 2-1 = 7, ...)
+  int _getStageNumber(int level, int stage) {
+    int totalStageNumber = 0;
+    
+    // 이전 레벨들의 스테이지 개수 합산
+    for (int l = 1; l < level; l++) {
+      totalStageNumber += SpotDifferenceDataManager.stageCountByLevel[l] ?? 6;
+    }
+    
+    // 현재 레벨의 스테이지 번호 추가
+    totalStageNumber += stage;
+    
+    return totalStageNumber;
+  }
+
   String _getDifficultyText() {
     final localizations = AppLocalizations.of(context);
     if (localizations == null) {
@@ -1210,25 +1264,16 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
       );
     }
 
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
+    // 전체 순서 번호 계산
+    final stageNumber = _getStageNumber(_currentStage!.level, _currentStage!.stage);
     return Scaffold(
       backgroundColor: const Color(0xFFF0F8FF),
       appBar: AppBar(
-        title: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Text(
-              Localizations.localeOf(context).languageCode == 'ko'
-                  ? '${_getDifficultyText()} - 틀린그림찾기'
-                  : '${_getDifficultyText()} - Spot the Difference',
-            ),
-            if (_debugMode && _currentStage != null)
-              Text(
-                Localizations.localeOf(context).languageCode == 'ko'
-                    ? '스테이지: ${_currentStage!.level}-${_currentStage!.stage}'
-                    : 'Stage: ${_currentStage!.level}-${_currentStage!.stage}',
-                style: const TextStyle(fontSize: 12, color: Colors.grey),
-              ),
-          ],
+        title: Text(
+          isKorean
+              ? '$stageNumber 스테이지'
+              : 'Stage $stageNumber',
         ),
         backgroundColor: Colors.white,
         elevation: 0,

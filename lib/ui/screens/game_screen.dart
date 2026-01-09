@@ -291,6 +291,9 @@ class _GameScreenState extends State<GameScreen>
     // 카드 선택 시 사운드 재생
     _soundManager.playCardFlipSound();
 
+    // 카드 선택 시 진동 효과
+    _triggerVibration();
+
     setState(() {
       card.flip();
       _selectedCards.add(card);
@@ -326,9 +329,6 @@ class _GameScreenState extends State<GameScreen>
     // 카드 매칭 성공 시 사운드 재생
     _soundManager.playMatchSuccessSound();
 
-    // 진동 효과
-    _triggerVibration();
-
     setState(() {
       card1.markAsMatched();
       card2.markAsMatched();
@@ -351,7 +351,7 @@ class _GameScreenState extends State<GameScreen>
       });
 
       // 애니메이션 완료 후 게임 완료 체크
-      await Future.delayed(const Duration(milliseconds: 600));
+      await Future.delayed(const Duration(milliseconds: 800));
       
       if (mounted && _gameBoard.isGameComplete()) {
         _endGame(true);
@@ -2051,17 +2051,18 @@ class _GameScreenState extends State<GameScreen>
   }
 
   String _getDifficultyText() {
+    final isKorean = Localizations.localeOf(context).languageCode == 'ko';
     switch (widget.difficulty) {
       case GameDifficulty.level1:
-        return AppLocalizations.of(context)!.level1;
+        return isKorean ? '1단계' : 'Level 1';
       case GameDifficulty.level2:
-        return AppLocalizations.of(context)!.level2;
+        return isKorean ? '2단계' : 'Level 2';
       case GameDifficulty.level3:
-        return AppLocalizations.of(context)!.level3;
+        return isKorean ? '3단계' : 'Level 3';
       case GameDifficulty.level4:
-        return AppLocalizations.of(context)!.level4;
+        return isKorean ? '4단계' : 'Level 4';
       case GameDifficulty.level5:
-        return AppLocalizations.of(context)!.level5;
+        return isKorean ? '5단계' : 'Level 5';
     }
   }
 }

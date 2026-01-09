@@ -13,10 +13,41 @@ class SpotProgressManager {
   }
 
   /// 현재 진행 중인 스테이지 불러오기
-  /// 저장된 값이 없으면 "1-1" 반환
+  /// 저장된 값이 없거나 유효하지 않으면 "1-1" 반환
   static Future<String> getCurrentStage() async {
     final prefs = await SharedPreferences.getInstance();
-    return prefs.getString(_keyCurrentStage) ?? '1-1';
+    final savedStage = prefs.getString(_keyCurrentStage);
+    
+    if (savedStage == null) {
+      return '1-1';
+    }
+    
+    // 저장된 스테이지가 유효한지 확인
+    if (_isValidStageId(savedStage)) {
+      return savedStage;
+    }
+    
+    // 유효하지 않은 스테이지면 1-1로 리셋
+    await prefs.setString(_keyCurrentStage, '1-1');
+    return '1-1';
+  }
+  
+  /// 스테이지 ID가 유효한지 확인
+  static bool _isValidStageId(String stageId) {
+    final parts = stageId.split('-');
+    if (parts.length != 2) return false;
+    
+    final level = int.tryParse(parts[0]);
+    final stage = int.tryParse(parts[1]);
+    
+    if (level == null || stage == null) return false;
+    if (level < 1 || level > 5) return false;
+    
+    // 레벨별 최대 스테이지 개수 확인
+    final maxStage = SpotDifferenceDataManager.stageCountByLevel[level] ?? 6;
+    if (stage < 1 || stage > maxStage) return false;
+    
+    return true;
   }
 
   /// 특정 스테이지 완료 여부 저장
@@ -70,14 +101,18 @@ class SpotProgressManager {
 
     if (level == null || stage == null) return null;
     if (level < 1 || level > 5) return null;
-    if (stage < 1 || stage > 6) return null;
+
+    // 레벨별 최대 스테이지 개수 가져오기
+    final maxStage = SpotDifferenceDataManager.stageCountByLevel[level] ?? 6;
+    if (stage < 1 || stage > maxStage) return null;
 
     if (stage > 1) {
       // 같은 레벨 내에서 이전 스테이지
       return '$level-${stage - 1}';
     } else if (level > 1) {
       // 이전 레벨의 마지막 스테이지
-      return '${level - 1}-6';
+      final prevLevelMaxStage = SpotDifferenceDataManager.stageCountByLevel[level - 1] ?? 6;
+      return '${level - 1}-$prevLevelMaxStage';
     } else {
       // 첫 번째 스테이지 (1-1)
       return null;
