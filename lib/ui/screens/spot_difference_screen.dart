@@ -1203,19 +1203,10 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     });
   }
 
-  /// 전체 순서 번호 계산 (1-1 = 1, 1-2 = 2, ..., 2-1 = 7, ...)
+  /// 전체 순서 번호 계산 (1-1 = 1, 1-2 = 2, ..., 1-7 = 6, 2-1 = 7, ...)
   int _getStageNumber(int level, int stage) {
-    int totalStageNumber = 0;
-    
-    // 이전 레벨들의 스테이지 개수 합산
-    for (int l = 1; l < level; l++) {
-      totalStageNumber += SpotDifferenceDataManager.stageCountByLevel[l] ?? 6;
-    }
-    
-    // 현재 레벨의 스테이지 번호 추가
-    totalStageNumber += stage;
-    
-    return totalStageNumber;
+    final stageId = '$level-$stage';
+    return SpotDifferenceDataManager.getGlobalStageNumber(stageId);
   }
 
   String _getDifficultyText() {

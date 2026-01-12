@@ -43,9 +43,10 @@ class SpotProgressManager {
     if (level == null || stage == null) return false;
     if (level < 1 || level > 5) return false;
     
-    // 레벨별 최대 스테이지 개수 확인
-    final maxStage = SpotDifferenceDataManager.stageCountByLevel[level] ?? 6;
-    if (stage < 1 || stage > maxStage) return false;
+    // 레벨별 실제 스테이지 번호 목록 확인
+    final stageNumbers = SpotDifferenceDataManager.stageNumbersByLevel[level];
+    if (stageNumbers == null) return false;
+    if (!stageNumbers.contains(stage)) return false;
     
     return true;
   }
@@ -63,7 +64,7 @@ class SpotProgressManager {
   }
 
   /// 다음 스테이지 ID 계산
-  /// 현재: "1-1", 다음: "1-2" ... "1-6" 다음: "2-1" ... "5-7" 다음: null
+  /// 실제 스테이지 구조 반영: 1-1 → 1-2 → ... → 1-5 → 1-7 → 2-1 → ... → 5-7 → null
   static String? getNextStageId(String currentStageId) {
     final parts = currentStageId.split('-');
     if (parts.length != 2) return null;
@@ -74,17 +75,24 @@ class SpotProgressManager {
     if (level == null || stage == null) return null;
     if (level < 1 || level > 5) return null;
 
-    // 레벨별 최대 스테이지 개수 가져오기
-    final maxStage = SpotDifferenceDataManager.stageCountByLevel[level] ?? 6;
-    
-    if (stage < 1 || stage > maxStage) return null;
+    // 레벨별 실제 스테이지 번호 목록 가져오기
+    final stageNumbers = SpotDifferenceDataManager.stageNumbersByLevel[level];
+    if (stageNumbers == null || !stageNumbers.contains(stage)) return null;
+
+    // 현재 스테이지의 인덱스 찾기
+    final currentIndex = stageNumbers.indexOf(stage);
+    if (currentIndex == -1) return null;
 
     // 같은 레벨 내에서 다음 스테이지가 있는지 확인
-    if (stage < maxStage) {
-      return '$level-${stage + 1}';
+    if (currentIndex < stageNumbers.length - 1) {
+      return '$level-${stageNumbers[currentIndex + 1]}';
     } else if (level < 5) {
       // 다음 레벨의 첫 번째 스테이지
-      return '${level + 1}-1';
+      final nextLevelStages = SpotDifferenceDataManager.stageNumbersByLevel[level + 1];
+      if (nextLevelStages != null && nextLevelStages.isNotEmpty) {
+        return '${level + 1}-${nextLevelStages[0]}';
+      }
+      return null;
     } else {
       // 마지막 스테이지 (5-7) 완료
       return null;
@@ -92,6 +100,7 @@ class SpotProgressManager {
   }
 
   /// 이전 스테이지 ID 계산
+  /// 실제 스테이지 구조 반영: 1-7 → 1-5 → ... → 1-2 → 1-1 → null
   static String? getPreviousStageId(String currentStageId) {
     final parts = currentStageId.split('-');
     if (parts.length != 2) return null;
@@ -102,17 +111,24 @@ class SpotProgressManager {
     if (level == null || stage == null) return null;
     if (level < 1 || level > 5) return null;
 
-    // 레벨별 최대 스테이지 개수 가져오기
-    final maxStage = SpotDifferenceDataManager.stageCountByLevel[level] ?? 6;
-    if (stage < 1 || stage > maxStage) return null;
+    // 레벨별 실제 스테이지 번호 목록 가져오기
+    final stageNumbers = SpotDifferenceDataManager.stageNumbersByLevel[level];
+    if (stageNumbers == null || !stageNumbers.contains(stage)) return null;
 
-    if (stage > 1) {
+    // 현재 스테이지의 인덱스 찾기
+    final currentIndex = stageNumbers.indexOf(stage);
+    if (currentIndex == -1) return null;
+
+    if (currentIndex > 0) {
       // 같은 레벨 내에서 이전 스테이지
-      return '$level-${stage - 1}';
+      return '$level-${stageNumbers[currentIndex - 1]}';
     } else if (level > 1) {
       // 이전 레벨의 마지막 스테이지
-      final prevLevelMaxStage = SpotDifferenceDataManager.stageCountByLevel[level - 1] ?? 6;
-      return '${level - 1}-$prevLevelMaxStage';
+      final prevLevelStages = SpotDifferenceDataManager.stageNumbersByLevel[level - 1];
+      if (prevLevelStages != null && prevLevelStages.isNotEmpty) {
+        return '${level - 1}-${prevLevelStages.last}';
+      }
+      return null;
     } else {
       // 첫 번째 스테이지 (1-1)
       return null;
@@ -120,16 +136,16 @@ class SpotProgressManager {
   }
 
   /// 진행률 계산 (%)
-  /// 레벨별 스테이지 개수: 레벨1=6, 레벨2=6, 레벨3=6, 레벨4=6, 레벨5=7 (총 31개)
+  /// 레벨별 스테이지 개수: 레벨1=6 (1-1~1-5, 1-7), 레벨2=6, 레벨3=6, 레벨4=6, 레벨5=7 (총 31개)
   static Future<double> getProgress() async {
     int completedCount = 0;
     int totalStages = 0;
 
     for (int level = 1; level <= 5; level++) {
-      final stageCount = SpotDifferenceDataManager.stageCountByLevel[level] ?? 6;
-      totalStages += stageCount;
+      final stageNumbers = SpotDifferenceDataManager.stageNumbersByLevel[level] ?? [];
+      totalStages += stageNumbers.length;
       
-      for (int stage = 1; stage <= stageCount; stage++) {
+      for (final stage in stageNumbers) {
         final stageId = '$level-$stage';
         final completed = await isStageCompleted(stageId);
         if (completed) {
@@ -148,10 +164,10 @@ class SpotProgressManager {
     // 현재 스테이지를 1-1로 리셋
     await prefs.setString(_keyCurrentStage, '1-1');
     
-    // 모든 스테이지 완료 상태 제거 (레벨별 스테이지 개수 고려)
+    // 모든 스테이지 완료 상태 제거 (실제 스테이지 번호 목록 사용)
     for (int level = 1; level <= 5; level++) {
-      final stageCount = SpotDifferenceDataManager.stageCountByLevel[level] ?? 6;
-      for (int stage = 1; stage <= stageCount; stage++) {
+      final stageNumbers = SpotDifferenceDataManager.stageNumbersByLevel[level] ?? [];
+      for (final stage in stageNumbers) {
         final stageId = '$level-$stage';
         await prefs.remove('$_keyPrefix$stageId');
       }

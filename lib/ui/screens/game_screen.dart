@@ -446,12 +446,25 @@ class _GameScreenState extends State<GameScreen>
         currentTicketCount: _ticketManager.ticketCount,
         onClaimTicket: () => _claimTicket(context),
         onHome: () {
-          Navigator.of(context).pop();
-          Navigator.of(context).pop();
+          // 모든 다이얼로그를 먼저 닫기
+          if (mounted) {
+            // 다이얼로그가 열려있는 동안 계속 닫기
+            while (Navigator.of(context).canPop()) {
+              final route = ModalRoute.of(context);
+              // 게임 화면(첫 번째 라우트)에 도달하면 중단
+              if (route == null || route.isFirst) {
+                break;
+              }
+              Navigator.of(context).pop();
+            }
+            // 게임 화면도 닫기 (홈으로 이동)
+            if (Navigator.of(context).canPop()) {
+              Navigator.of(context).pop();
+            }
+          }
         },
         onReplay: () {
-          Navigator.of(context).pop();
-          _restartGame();
+          // 사용하지 않음 (다시하기 버튼 제거됨)
         },
       ),
     );
@@ -607,48 +620,44 @@ class _GameScreenState extends State<GameScreen>
                 ),
               ),
               const SizedBox(height: 30),
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: () {
+              // 홈으로 버튼만 표시
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: () {
+                    // 모든 다이얼로그를 먼저 닫기
+                    if (mounted) {
+                      // 다이얼로그가 열려있는 동안 계속 닫기
+                      while (Navigator.of(context).canPop()) {
+                        final route = ModalRoute.of(context);
+                        // 게임 화면(첫 번째 라우트)에 도달하면 중단
+                        if (route == null || route.isFirst) {
+                          break;
+                        }
                         Navigator.of(context).pop();
+                      }
+                      // 게임 화면도 닫기 (홈으로 이동)
+                      if (Navigator.of(context).canPop()) {
                         Navigator.of(context).pop();
-                      },
-                      child: Text(
-                        isKorean ? '홈으로' : 'Home',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          color: Color(0xFF4A90E2),
-                        ),
-                      ),
+                      }
+                    }
+                  },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton(
-                      onPressed: () {
-                        Navigator.of(context).pop();
-                        _restartGame();
-                      },
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: const Color(0xFF4A90E2),
-                        foregroundColor: Colors.white,
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(20),
-                        ),
-                      ),
-                      child: Text(
-                        isKorean ? '다시하기' : 'Play Again',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  child: Text(
+                    isKorean ? '홈으로' : 'Home',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
+                ),
               ),
             ],
           ),
@@ -1202,6 +1211,24 @@ class _GameScreenState extends State<GameScreen>
     await GameCounter.incrementGameCount();
 
     print('게임 재시작 - 광고 없이 바로 재시작');
+    
+    // 모든 열린 다이얼로그 닫기 (게임 완료 모달 등)
+    // 다이얼로그만 닫고 게임 화면은 유지
+    if (mounted) {
+      // 다이얼로그만 닫기 - popUntil을 사용하여 게임 화면까지는 유지
+      // popUntil은 조건이 true를 반환할 때까지 모든 라우트를 닫음
+      // 게임 화면에 도달하면 true를 반환하여 중단하고 게임 화면은 유지
+      Navigator.of(context).popUntil((route) {
+        // 첫 번째 라우트(게임 화면)에 도달하면 true를 반환하여 중단
+        // 이렇게 하면 게임 화면은 유지되고 다이얼로그만 닫힘
+        final isFirst = route.isFirst;
+        if (isFirst) {
+          print('게임 화면에 도달했으므로 다이얼로그 닫기 중단');
+        }
+        return isFirst; // 게임 화면에 도달하면 true를 반환하여 중단
+      });
+    }
+    
     // 게임 완료 후 다시 플레이 시에는 광고 없이 바로 재시작
     _restartGameDirectly();
   }
@@ -2865,43 +2892,27 @@ class _TicketRewardDialogState extends State<_TicketRewardDialog> {
 
               const SizedBox(height: 16),
 
-              // 홈/다시하기 버튼
-              Row(
-                children: [
-                  Expanded(
-                    child: TextButton(
-                      onPressed: widget.onHome,
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF4A90E2),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: Text(
-                        isKorean ? '홈으로' : 'Home',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+              // 홈으로 버튼만 표시
+              SizedBox(
+                width: double.infinity,
+                child: ElevatedButton(
+                  onPressed: widget.onHome,
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: const Color(0xFF4A90E2),
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(vertical: 16),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(20),
                     ),
                   ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: TextButton(
-                      onPressed: widget.onReplay,
-                      style: TextButton.styleFrom(
-                        foregroundColor: const Color(0xFF4A90E2),
-                        padding: const EdgeInsets.symmetric(vertical: 16),
-                      ),
-                      child: Text(
-                        isKorean ? '다시하기' : 'Play Again',
-                        style: const TextStyle(
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
+                  child: Text(
+                    isKorean ? '홈으로' : 'Home',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
                     ),
                   ),
-                ],
+                ),
               ),
             ],
           ),

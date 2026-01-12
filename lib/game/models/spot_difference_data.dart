@@ -175,12 +175,71 @@ class SpotDifferenceDataManager {
 
   /// 레벨별 스테이지 개수
   static const Map<int, int> stageCountByLevel = {
-    1: 6, // 1-1 ~ 1-6 (1-7 제외)
+    1: 6, // 1-1, 1-2, 1-3, 1-4, 1-5, 1-7 (1-6 없음)
     2: 6, // 2-1 ~ 2-6
     3: 6, // 3-1 ~ 3-6
     4: 6, // 4-1 ~ 4-6
     5: 7, // 5-1 ~ 5-7
   };
+
+  /// 레벨별 실제 스테이지 번호 목록 (순서대로)
+  static const Map<int, List<int>> stageNumbersByLevel = {
+    1: [1, 2, 3, 4, 5, 7], // 1-6 없음
+    2: [1, 2, 3, 4, 5, 6],
+    3: [1, 2, 3, 4, 5, 6],
+    4: [1, 2, 3, 4, 5, 6],
+    5: [1, 2, 3, 4, 5, 6, 7],
+  };
+
+  /// 스테이지 ID를 전체 순서 번호로 변환 (1-1 = 1, 1-2 = 2, ..., 1-7 = 6, 2-1 = 7, ...)
+  static int getGlobalStageNumber(String stageId) {
+    final parts = stageId.split('-');
+    if (parts.length != 2) return 0;
+
+    final level = int.tryParse(parts[0]);
+    final stage = int.tryParse(parts[1]);
+
+    if (level == null || stage == null) return 0;
+    if (level < 1 || level > 5) return 0;
+
+    int globalNumber = 0;
+
+    // 이전 레벨들의 스테이지 개수 합산
+    for (int l = 1; l < level; l++) {
+      globalNumber += stageCountByLevel[l] ?? 6;
+    }
+
+    // 현재 레벨에서의 순서 찾기
+    final stageNumbers = stageNumbersByLevel[level] ?? [];
+    final index = stageNumbers.indexOf(stage);
+    if (index == -1) return 0; // 유효하지 않은 스테이지
+
+    globalNumber += index + 1;
+
+    return globalNumber;
+  }
+
+  /// 전체 순서 번호를 스테이지 ID로 변환
+  static String? getStageIdFromGlobalNumber(int globalNumber) {
+    if (globalNumber < 1) return null;
+
+    int currentNumber = 0;
+    for (int level = 1; level <= 5; level++) {
+      final stageCount = stageCountByLevel[level] ?? 6;
+      if (currentNumber + stageCount >= globalNumber) {
+        // 이 레벨에 속함
+        final stageNumbers = stageNumbersByLevel[level] ?? [];
+        final index = globalNumber - currentNumber - 1;
+        if (index >= 0 && index < stageNumbers.length) {
+          return '$level-${stageNumbers[index]}';
+        }
+        return null;
+      }
+      currentNumber += stageCount;
+    }
+
+    return null; // 범위를 벗어남
+  }
 
   /// 레벨별 시간 제한
   static const Map<int, int> timeLimitByLevel = {
@@ -566,11 +625,11 @@ class SpotDifferenceDataManager {
 
   /// 해당 레벨의 모든 스테이지 가져오기
   Future<List<SpotDifferenceStage>> getStagesByLevel(int level) async {
-    final stageCount = stageCountByLevel[level] ?? 0;
+    final stageNumbers = stageNumbersByLevel[level] ?? [];
     final stages = <SpotDifferenceStage>[];
 
-    for (int i = 1; i <= stageCount; i++) {
-      final stage = await getStage(level, i);
+    for (final stageNumber in stageNumbers) {
+      final stage = await getStage(level, stageNumber);
       if (stage != null) {
         stages.add(stage);
       }
