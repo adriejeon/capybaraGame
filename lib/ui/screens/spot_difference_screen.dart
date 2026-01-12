@@ -38,6 +38,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
   SpotDifferenceStage? _currentStage;
   List<bool> _foundSpots = []; // 각 스팟 찾음 여부
+  int _foundCount = 0; // 찾은 틀린 영역 개수 (체크박스 표시용)
   int _remainingTime = 0;
   Timer? _gameTimer;
   bool _isGameOver = false;
@@ -256,6 +257,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     }
 
     _foundSpots = List.filled(_currentStage!.spots.length, false);
+    _foundCount = 0; // 찾은 개수 초기화
     _remainingTime = _currentStage!.timeLimit;
     _isGameOver = false;
     _isGameWon = false;
@@ -510,8 +512,12 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
   /// 정답 처리
   void _onCorrectTap(int spotIndex, Offset globalTapPosition, Size containerSize) {
+    // 이미 찾은 스팟이면 무시
+    if (_foundSpots[spotIndex]) return;
+
     setState(() {
       _foundSpots[spotIndex] = true;
+      _foundCount++; // 찾은 개수 증가
       _lastFoundSpotIndex = spotIndex;
     });
 
@@ -526,13 +532,15 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     _spotAnimationControllers[spotIndex]?.forward(from: 0.0);
 
     // 입자 애니메이션 시작 (정답 위치에서 상단 체크박스로)
-    _startParticleAnimation(globalTapPosition, spotIndex);
+    // 이제는 찾은 개수에 해당하는 체크박스로 이동 (앞에서부터)
+    final checkboxIndex = _foundCount - 1; // 0부터 시작하므로 -1
+    _startParticleAnimation(globalTapPosition, checkboxIndex);
 
     // 체크박스 애니메이션 (입자 도착 후 시작)
-    _createCheckboxAnimationController(spotIndex);
+    _createCheckboxAnimationController(checkboxIndex);
     Future.delayed(const Duration(milliseconds: 400), () {
       if (mounted) {
-        _checkboxAnimationControllers[spotIndex]?.forward(from: 0.0);
+        _checkboxAnimationControllers[checkboxIndex]?.forward(from: 0.0);
       }
     });
   }
@@ -621,7 +629,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     return ((x1 - x2) * (x1 - x2) + (y1 - y2) * (y1 - y2));
   }
 
-  void _endGame(bool isWin) {
+  void _endGame(bool isWin) async {
     _gameTimer?.cancel();
     setState(() {
       _isGameOver = true;
@@ -630,6 +638,10 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
     if (isWin) {
       _soundManager.playGameCompleteSound();
+      
+      // 데일리 미션: 게임 완료 업데이트
+      await _missionService.completeGame();
+      
       _showWinDialog();
     } else {
       _showLoseDialog();
@@ -726,9 +738,6 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     if (!mounted) return;
 
     if (earned) {
-      // 데일리 미션 업데이트
-      await _missionService.completeGame();
-
       _showTicketEarnedDialog();
     } else {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -1433,7 +1442,8 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
 
   /// 개별 체크박스 위젯
   Widget _buildCheckbox(int index) {
-    final isFound = _foundSpots[index];
+    // 찾은 개수에 따라 앞에서부터 체크 표시
+    final isFound = index < _foundCount;
     final animation = _checkboxAnimations[index];
     final hasAnimation = animation != null && isFound;
 

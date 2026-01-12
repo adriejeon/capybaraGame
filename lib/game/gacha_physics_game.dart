@@ -383,7 +383,7 @@ class StaticDollComponent extends flame.Component
       print('Failed to load background doll image: $imagePath, error: $e');
       // 기본 아이콘으로 대체 시도
       try {
-        final fallbackSprite = await gameRef.loadSprite('gacha_doll_1.png');
+        final fallbackSprite = await gameRef.loadSprite('gacha_doll_1.webp');
         spriteComponent = flame.SpriteComponent(
           sprite: fallbackSprite,
           size: size,

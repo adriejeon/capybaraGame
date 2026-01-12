@@ -70,22 +70,22 @@ class IAPService {
   static const List<IAPProduct> products = [
     IAPProduct(
       id: coinPack5Id,
-      titleKo: '가챠 코인 5개',
-      titleEn: '5 Gacha Coins',
-      descriptionKo: '가챠 코인 5개를 획득합니다',
-      descriptionEn: 'Get 5 Gacha Coins',
+      titleKo: '뽑기권 5개',
+      titleEn: '5 Gacha Tickets',
+      descriptionKo: '가챠 이용 횟수 5번 추가',
+      descriptionEn: 'Add 5 gacha attempts',
       coinAmount: 5,
       priceKo: '₩1,500',
       priceEn: '\$0.99',
     ),
     IAPProduct(
       id: coinPack20Id,
-      titleKo: '가챠 코인 20개',
-      titleEn: '20 Gacha Coins',
-      descriptionKo: '20개 + 보너스 5개!',
-      descriptionEn: '20 + 5 Bonus!',
-      coinAmount: 20,
-      bonusAmount: 5,
+      titleKo: '뽑기권 25개',
+      titleEn: '25 Gacha Tickets',
+      descriptionKo: '가챠 이용 횟수 25번 추가',
+      descriptionEn: 'Add 25 gacha attempts',
+      coinAmount: 25,
+      bonusAmount: 0,
       priceKo: '₩4,900',
       priceEn: '\$3.99',
       isFeatured: true,
@@ -93,10 +93,10 @@ class IAPService {
     ),
     IAPProduct(
       id: coinPack60Id,
-      titleKo: '가챠 코인 60개',
-      titleEn: '60 Gacha Coins',
-      descriptionKo: '대량 구매 팩',
-      descriptionEn: 'Bulk Pack',
+      titleKo: '뽑기권 60개',
+      titleEn: '60 Gacha Tickets',
+      descriptionKo: '가챠 이용 횟수 60번 추가',
+      descriptionEn: 'Add 60 gacha attempts',
       coinAmount: 60,
       priceKo: '₩12,000',
       priceEn: '\$9.99',
@@ -259,17 +259,17 @@ class IAPService {
     final productId = purchaseDetails.productID;
 
     if (productId == coinPack5Id) {
-      // 가챠 코인 5개 지급 (소비성 상품)
+      // 뽑기권 5개 지급 (소비성 상품)
       await _ticketManager.addTickets(5);
-      print('[IAP] 가챠 코인 5개 지급 완료');
+      print('[IAP] 뽑기권 5개 지급 완료');
     } else if (productId == coinPack20Id) {
-      // 가챠 코인 25개 지급 (20 + 5 보너스, 소비성 상품)
+      // 뽑기권 25개 지급 (소비성 상품)
       await _ticketManager.addTickets(25);
-      print('[IAP] 가챠 코인 25개 지급 완료');
+      print('[IAP] 뽑기권 25개 지급 완료');
     } else if (productId == coinPack60Id) {
-      // 가챠 코인 60개 지급 (소비성 상품)
+      // 뽑기권 60개 지급 (소비성 상품)
       await _ticketManager.addTickets(60);
-      print('[IAP] 가챠 코인 60개 지급 완료');
+      print('[IAP] 뽑기권 60개 지급 완료');
     } else if (productId == removeAdsId) {
       // 광고 제거 (비소비성 상품)
       await AdmobHandler().setAdsRemoved(true);

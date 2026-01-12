@@ -481,9 +481,6 @@ class _GameScreenState extends State<GameScreen>
     final earned = await _ticketManager.earnTicket();
 
     if (earned) {
-      // 데일리 미션 업데이트
-      await _missionService.completeGame();
-
       Navigator.of(dialogContext).pop();
       _showTicketEarnedDialog();
     } else {

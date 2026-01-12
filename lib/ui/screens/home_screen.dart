@@ -631,10 +631,10 @@ class _HomeScreenState extends State<HomeScreen>
                   mainAxisAlignment: MainAxisAlignment.spaceBetween,
                   crossAxisAlignment: CrossAxisAlignment.center,
                   children: [
-                    // 코인 표시 (왼쪽)
-                    _buildCoinDisplay(context),
-                    // 뽑기통 버튼 (중앙)
-                    _buildGachaButton(context),
+                    // 뽑기 개수 표시 (왼쪽, 클릭 가능)
+                    _buildTicketDisplay(context),
+                    // 공간 채우기
+                    const Spacer(),
                     // 설정 버튼 (오른쪽)
                     _buildSettingsButton(context),
                   ],
@@ -705,70 +705,73 @@ class _HomeScreenState extends State<HomeScreen>
     return Size(buttonWidth, buttonHeight);
   }
 
-  /// 코인 표시 위젯 (상단 왼쪽)
-  Widget _buildCoinDisplay(BuildContext context) {
+  /// 뽑기 개수 표시 위젯 (상단 왼쪽, 클릭 가능)
+  Widget _buildTicketDisplay(BuildContext context) {
     final borderRadius = BorderRadius.circular(24);
 
-    return ClipRRect(
-      borderRadius: borderRadius,
-      child: BackdropFilter(
-        filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
-          decoration: BoxDecoration(
-            borderRadius: borderRadius,
-            border: Border.all(
-              color: Colors.white.withOpacity(0.85),
-              width: 2,
-            ),
-            gradient: LinearGradient(
-              begin: Alignment.topLeft,
-              end: Alignment.bottomRight,
-              colors: [
-                Colors.white.withOpacity(0.35),
-                Colors.white.withOpacity(0.15),
+    return GestureDetector(
+      onTap: () => _openGacha(context),
+      child: ClipRRect(
+        borderRadius: borderRadius,
+        child: BackdropFilter(
+          filter: ImageFilter.blur(sigmaX: 10, sigmaY: 10),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 10),
+            decoration: BoxDecoration(
+              borderRadius: borderRadius,
+              border: Border.all(
+                color: Colors.white.withOpacity(0.85),
+                width: 2,
+              ),
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  Colors.white.withOpacity(0.35),
+                  Colors.white.withOpacity(0.15),
+                ],
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.white.withOpacity(0.25),
+                  blurRadius: 12,
+                  offset: const Offset(0, 6),
+                ),
               ],
             ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.white.withOpacity(0.25),
-                blurRadius: 12,
-                offset: const Offset(0, 6),
-              ),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Image.asset(
-                'assets/images/coin.webp',
-                width: 34,
-                height: 34,
-                errorBuilder: (context, error, stackTrace) {
-                  return const Icon(
-                    Icons.monetization_on,
-                    color: Colors.amber,
-                    size: 34,
-                  );
-                },
-              ),
-              const SizedBox(width: 10),
-              Text(
-                _currentCoins.toString(),
-                style: const TextStyle(
-                  fontSize: 22,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.white,
-                  shadows: [
-                    Shadow(
-                      color: Colors.black26,
-                      offset: Offset(0, 1),
-                      blurRadius: 2,
-                    ),
-                  ],
+            child: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Image.asset(
+                  'assets/images/gacha_coin.webp',
+                  width: 34,
+                  height: 34,
+                  errorBuilder: (context, error, stackTrace) {
+                    return const Icon(
+                      Icons.confirmation_number,
+                      color: Colors.white,
+                      size: 34,
+                    );
+                  },
                 ),
-              ),
-            ],
+                const SizedBox(width: 10),
+                Text(
+                  '$_currentTickets',
+                  style: const TextStyle(
+                    fontSize: 22,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                    shadows: [
+                      Shadow(
+                        color: Colors.black26,
+                        offset: Offset(0, 1),
+                        blurRadius: 2,
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
           ),
         ),
       ),

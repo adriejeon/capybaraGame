@@ -172,7 +172,7 @@ class _ShopScreenState extends State<ShopScreen>
     );
   }
 
-  /// 코인 충전소 탭 (가챠 코인 구매)
+  /// 코인 충전소 탭 (뽑기권 구매)
   Widget _buildCoinShop() {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
 
@@ -197,7 +197,7 @@ class _ShopScreenState extends State<ShopScreen>
                 ),
                 const SizedBox(width: 8),
                 Text(
-                  isKorean ? '가챠 코인 구매' : 'Gacha Coins',
+                  isKorean ? '뽑기권 구매' : 'Gacha Tickets',
                   style: const TextStyle(
                     fontSize: 20,
                     fontWeight: FontWeight.bold,
@@ -321,7 +321,7 @@ class _ShopScreenState extends State<ShopScreen>
 
   /// 티켓 보유량 표시 위젯
   ///
-  /// 흰색 테두리만으로 보유 가챠 코인을 가로 배치하여 중앙 정렬하여 표시합니다.
+  /// 흰색 테두리만으로 보유 뽑기권을 가로 배치하여 중앙 정렬하여 표시합니다.
   Widget _buildTicketDisplay() {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
 
@@ -342,7 +342,7 @@ class _ShopScreenState extends State<ShopScreen>
           crossAxisAlignment: CrossAxisAlignment.center,
           children: [
             Text(
-              isKorean ? '현재 보유 중인 가챠 코인' : 'Current Gacha Coins',
+              isKorean ? '현재 보유 중인 뽑기권' : 'Current Gacha Tickets',
               style: const TextStyle(
                 fontSize: 14,
                 color: Color(0xFF666666),
@@ -390,6 +390,7 @@ class _ShopScreenState extends State<ShopScreen>
           ],
         ),
         child: Stack(
+          clipBehavior: Clip.none,
           children: [
             Row(
               children: [
@@ -526,7 +527,7 @@ class _ShopScreenState extends State<ShopScreen>
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
                   decoration: BoxDecoration(
-                    color: const Color(0xFFFFB74D),
+                    color: const Color(0xFFFF1493),
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(

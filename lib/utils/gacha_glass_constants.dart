@@ -18,8 +18,8 @@ class GachaGlassConstants {
   static const int dollCount = 10; // 원하는 개수로 변경 가능
   static const double dollSize = 60.0;
   static const List<String> dollImages = [
-    'gacha_doll_1.png',
-    'gacha_doll_2.png',
-    'gacha_doll_3.png',
+    'gacha_doll_1.webp',
+    'gacha_doll_2.webp',
+    'gacha_doll_3.webp',
   ];
 }

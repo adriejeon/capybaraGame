@@ -8,7 +8,7 @@ class DailyMissionService {
   static const String _missionsKey = 'daily_missions';
   static const String _lastResetDateKey = 'daily_missions_last_reset';
   static const String _missionVersionKey = 'daily_missions_version';
-  static const int _currentMissionVersion = 2; // 새 미션 추가 시 증가
+  static const int _currentMissionVersion = 3; // 미션 텍스트 업데이트 (2024)
 
   static final DailyMissionService _instance = DailyMissionService._internal();
   factory DailyMissionService() => _instance;

@@ -32,6 +32,9 @@ void main() async {
   // AdMob 초기화
   final AdmobHandler adMobHandler = AdmobHandler();
   await adMobHandler.initialize();
+  
+  // 광고 제거 구매 상태 로드 (이전에 구매한 경우 배너/전면 광고 비활성화)
+  await adMobHandler.loadAdsRemovedStatus();
 
   // LocaleState 초기화
   final localeState = LocaleState();

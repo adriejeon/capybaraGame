@@ -16,14 +16,20 @@ class AdmobHandler {
   // 상태 업데이트 콜백
   void Function()? _onBannerStateChanged;
 
-  // 광고 활성화 여부
+  // 광고 활성화 여부 (전체 광고 on/off)
   static bool isAdEnabled = true;
 
-  // 광고 제거 여부
+  // 광고 제거 여부 (배너/전면 광고만 제거, 보상형 광고는 유지)
   static const String _adsRemovedKey = 'ads_removed';
   bool _adsRemoved = false;
 
   bool get adsRemoved => _adsRemoved;
+
+  /// 배너/전면 광고 활성화 여부 (광고 제거 시 false)
+  bool get isBannerAndInterstitialEnabled => isAdEnabled && !_adsRemoved;
+
+  /// 보상형 광고 활성화 여부 (광고 제거해도 유지)
+  bool get isRewardedAdEnabled => isAdEnabled;
 
   // Ad Unit IDs - 테스트 광고 ID
   static const String _androidBannerTestId =
@@ -70,27 +76,39 @@ class AdmobHandler {
   }
 
   /// 광고 제거 상태 로드
+  /// 
+  /// 광고 제거 구매 상태를 로드합니다.
+  /// 배너/전면 광고는 비활성화되지만, 보상형 광고는 유지됩니다.
   Future<void> loadAdsRemovedStatus() async {
     final prefs = await SharedPreferences.getInstance();
     _adsRemoved = prefs.getBool(_adsRemovedKey) ?? false;
     if (_adsRemoved) {
-      isAdEnabled = false;
-      print('[AdMob] 광고 제거 상태 로드됨 - 광고 비활성화');
+      // 주의: isAdEnabled는 변경하지 않음 (보상형 광고 유지를 위해)
+      print('[AdMob] 광고 제거 상태 로드됨 - 배너/전면 광고 비활성화 (보상형 광고는 유지)');
     }
   }
 
   /// 광고 제거 설정
+  /// 
+  /// 광고 제거 구매 시 배너/전면 광고만 제거하고, 보상형 광고는 유지합니다.
   Future<void> setAdsRemoved(bool removed) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setBool(_adsRemovedKey, removed);
     _adsRemoved = removed;
-    isAdEnabled = !removed;
+    // 주의: isAdEnabled는 변경하지 않음 (보상형 광고 유지를 위해)
 
     if (removed) {
-      // 기존 배너 광고 제거
+      // 기존 배너 광고만 제거 (전면 광고는 로드하지 않으면 됨)
       _bannerAd?.dispose();
       _bannerAd = null;
-      print('[AdMob] 광고 제거 완료 - 광고 비활성화');
+      _isBannerAdInWidgetTree = false;
+      
+      // 전면 광고도 제거
+      _interstitialAd?.dispose();
+      _interstitialAd = null;
+      _isInterstitialAdLoaded = false;
+      
+      print('[AdMob] 광고 제거 완료 - 배너/전면 광고 비활성화 (보상형 광고는 유지)');
     }
   }
 
@@ -230,8 +248,8 @@ class AdmobHandler {
 
   // 배너 광고 위젯
   Widget getBannerAd() {
-    // 광고가 비활성화되었거나 로드되지 않았으면 아무것도 표시하지 않음
-    if (!isAdEnabled) {
+    // 광고가 비활성화되었거나 광고 제거를 구매한 경우 아무것도 표시하지 않음
+    if (!isBannerAndInterstitialEnabled) {
       return const SizedBox.shrink();
     }
 
@@ -301,9 +319,9 @@ class AdmobHandler {
       }
     }
 
-    if (!isAdEnabled || !_isSupported || _isBannerLoading) {
+    if (!isBannerAndInterstitialEnabled || !_isSupported || _isBannerLoading) {
       print(
-          'AdMob: 배너 광고 로드 조건 불만족 - isAdEnabled: $isAdEnabled, _isSupported: $_isSupported, _isBannerLoading: $_isBannerLoading');
+          'AdMob: 배너 광고 로드 조건 불만족 - isBannerAndInterstitialEnabled: $isBannerAndInterstitialEnabled, _isSupported: $_isSupported, _isBannerLoading: $_isBannerLoading');
       return;
     }
 
@@ -452,8 +470,9 @@ class AdmobHandler {
       }
     }
 
-    if (!isAdEnabled) {
-      print('AdMob: 광고 비활성화됨 - 전면 광고 로드 건너뜀');
+    // 광고 제거 구매 시 전면 광고 로드 건너뜀
+    if (!isBannerAndInterstitialEnabled) {
+      print('AdMob: 광고 제거됨 - 전면 광고 로드 건너뜀');
       return;
     }
 
@@ -496,9 +515,10 @@ class AdmobHandler {
     }
   }
 
-  // 다음 광고 미리 로드 (대기하지 않음)
+  // 다음 전면 광고 미리 로드 (대기하지 않음)
   Future<void> preloadNextAd() async {
-    if (!isAdEnabled) return;
+    // 광고 제거 구매 시 전면 광고 로드 건너뜀
+    if (!isBannerAndInterstitialEnabled) return;
 
     final adUnitId = await _interstitialAdUnitId;
 
@@ -529,8 +549,9 @@ class AdmobHandler {
       }
     }
 
-    if (!isAdEnabled) {
-      print('AdMob: 광고 비활성화됨 - 전면 광고 표시 건너뜀');
+    // 광고 제거 구매 시 전면 광고 표시 건너뜀
+    if (!isBannerAndInterstitialEnabled) {
+      print('AdMob: 광고 제거됨 - 전면 광고 표시 건너뜀');
       return;
     }
 
@@ -558,6 +579,7 @@ class AdmobHandler {
   }
 
   // 보상형 광고 로드
+  // 광고 제거를 구매해도 보상형 광고는 유지됨
   Future<void> loadRewardedAd() async {
     if (!_isInitialized) {
       print('AdMob: 초기화되지 않음 - 보상형 광고 로드 시도 중...');
@@ -569,7 +591,8 @@ class AdmobHandler {
       }
     }
 
-    if (!isAdEnabled) {
+    // 보상형 광고는 광고 제거와 상관없이 isAdEnabled만 체크
+    if (!isRewardedAdEnabled) {
       print('AdMob: 광고 비활성화됨 - 보상형 광고 로드 건너뜀');
       return;
     }
@@ -615,8 +638,9 @@ class AdmobHandler {
   }
 
   // 다음 보상형 광고 미리 로드 (대기하지 않음)
+  // 광고 제거를 구매해도 보상형 광고는 유지됨
   Future<void> preloadNextRewardedAd() async {
-    if (!isAdEnabled) return;
+    if (!isRewardedAdEnabled) return;
 
     final adUnitId = await _rewardedAdUnitId;
 
@@ -638,6 +662,7 @@ class AdmobHandler {
   }
 
   // 보상형 광고 표시
+  // 광고 제거를 구매해도 보상형 광고는 유지됨
   Future<void> showRewardedAd({
     required Function(RewardItem) onRewarded,
     Function()? onAdDismissed,
@@ -652,7 +677,8 @@ class AdmobHandler {
       }
     }
 
-    if (!isAdEnabled) {
+    // 보상형 광고는 광고 제거와 상관없이 isAdEnabled만 체크
+    if (!isRewardedAdEnabled) {
       print('AdMob: 광고 비활성화됨 - 보상형 광고 표시 건너뜀');
       return;
     }
