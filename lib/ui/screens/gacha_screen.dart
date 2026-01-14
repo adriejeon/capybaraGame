@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'dart:async';
 import '../../data/ticket_manager.dart';
 import '../../data/collection_manager.dart';
@@ -122,19 +123,23 @@ class _GachaScreenState extends State<GachaScreen>
     // 2. 뽑기권이 뽑기통으로 이동하는 애니메이션
     await _ticketMoveController.forward();
 
-    // 3. 뽑기통 흔들림 애니메이션 (반복)
+    // 3. 애니메이션과 동시에 캐릭터 뽑기 시작 (병렬 처리로 지연 최소화)
+    final resultFuture = _collectionManager.addRandomCard();
+    final missionFuture = _missionService.collectCharacter();
+
+    // 4. 뽑기통 흔들림 애니메이션 (반복) + 진동
     for (int i = 0; i < 15; i++) {
+      // 진동 효과 추가 (손맛 향상)
+      HapticFeedback.lightImpact();
       await _shakeController.forward();
       await _shakeController.reverse();
     }
 
-    // 4. 캐릭터 뽑기 (랜덤 단계별 희귀도 적용) - 지연 없이 바로 실행
-    final result = await _collectionManager.addRandomCard();
+    // 5. DB 작업 완료 대기 (대부분 이미 완료됨)
+    final result = await resultFuture;
+    await missionFuture;
 
-    // 데일리 미션 업데이트
-    await _missionService.collectCharacter();
-
-    // 5. 결과 표시
+    // 6. 결과 표시
     setState(() {
       _gachaResult = result;
       _showResult = true;
@@ -143,7 +148,7 @@ class _GachaScreenState extends State<GachaScreen>
     _soundManager.playMatchSuccessSound();
     await _resultPopController.forward();
 
-    // 6. 애니메이션 리셋
+    // 7. 애니메이션 리셋
     _ticketMoveController.reset();
 
     setState(() {

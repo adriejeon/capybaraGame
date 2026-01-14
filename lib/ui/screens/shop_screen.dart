@@ -370,6 +370,20 @@ class _ShopScreenState extends State<ShopScreen>
     );
   }
 
+  /// 상품 ID에 맞는 썸네일 이미지 경로 반환
+  String _getProductThumbnail(String productId) {
+    switch (productId) {
+      case IAPService.coinPack5Id:
+        return 'assets/images/ticket_05.png';
+      case IAPService.coinPack20Id:
+        return 'assets/images/ticket_25.png';
+      case IAPService.coinPack60Id:
+        return 'assets/images/ticket_60.png';
+      default:
+        return 'assets/images/gacha_coin.webp';
+    }
+  }
+
   /// 코인 팩 카드
   Widget _buildCoinPackCard(IAPProduct product) {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
@@ -401,29 +415,29 @@ class _ShopScreenState extends State<ShopScreen>
           children: [
             Row(
               children: [
-                // 코인 아이콘
-                Container(
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFFF8E1),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Stack(
-                    alignment: Alignment.center,
-                    children: [
-                      Image.asset(
-                        'assets/images/gacha_coin.webp',
-                        width: 40,
-                        height: 40,
-                        errorBuilder: (context, error, stackTrace) {
-                          return const Icon(
-                            Icons.confirmation_number,
-                            color: Color(0xFFFFB74D),
-                            size: 40,
-                          );
-                        },
-                      ),
-                    ],
+                // 상품 썸네일 이미지
+                ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: Image.asset(
+                    _getProductThumbnail(product.id),
+                    width: 64,
+                    height: 64,
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFFFF8E1),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Icon(
+                          Icons.confirmation_number,
+                          color: Color(0xFFFFB74D),
+                          size: 40,
+                        ),
+                      );
+                    },
                   ),
                 ),
                 const SizedBox(width: 16),
@@ -433,14 +447,35 @@ class _ShopScreenState extends State<ShopScreen>
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
+                      // 베스트 배지
+                      if (product.isFeatured)
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF1493),
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            isKorean ? '베스트' : 'BEST',
+                            style: const TextStyle(
+                              fontSize: 11,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      if (product.isFeatured) const SizedBox(height: 4),
                       Row(
                         children: [
-                          Text(
-                            isKorean ? product.titleKo : product.titleEn,
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
-                              color: Color(0xFF333333),
+                          Flexible(
+                            child: Text(
+                              isKorean ? product.titleKo : product.titleEn,
+                              style: const TextStyle(
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF333333),
+                              ),
                             ),
                           ),
                           if (product.bonusAmount > 0) ...[
@@ -479,74 +514,55 @@ class _ShopScreenState extends State<ShopScreen>
                 ),
 
                 // 가격 버튼
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-                  decoration: BoxDecoration(
-                    color: product.isFeatured
-                        ? const Color(0xFF4A90E2)
-                        : const Color(0xFFF5F5F5),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Text(
-                    price,
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      color: product.isFeatured
-                          ? Colors.white
-                          : const Color(0xFF333333),
+                Stack(
+                  clipBehavior: Clip.none,
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: product.isFeatured
+                            ? const Color(0xFF4A90E2)
+                            : const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        price,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: product.isFeatured
+                              ? Colors.white
+                              : const Color(0xFF333333),
+                        ),
+                      ),
                     ),
-                  ),
+                    // 할인 배지 (가격 버튼의 오른쪽 상단)
+                    if (product.discountPercent > 0)
+                      Positioned(
+                        top: -16,
+                        right: -4,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 4),
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFFF5252),
+                            borderRadius: BorderRadius.circular(999),
+                          ),
+                          child: Text(
+                            '-${product.discountPercent}%',
+                            style: const TextStyle(
+                              fontSize: 12,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                            ),
+                          ),
+                        ),
+                      ),
+                  ],
                 ),
               ],
             ),
-
-            // 할인 배지
-            if (product.discountPercent > 0)
-              Positioned(
-                top: -4,
-                right: -4,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF5252),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    '-${product.discountPercent}%',
-                    style: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
-
-            // 주력 상품 배지
-            if (product.isFeatured)
-              Positioned(
-                top: -4,
-                left: -4,
-                child: Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFFF1493),
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Text(
-                    isKorean ? '베스트' : 'BEST',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
-                  ),
-                ),
-              ),
           ],
         ),
       ),

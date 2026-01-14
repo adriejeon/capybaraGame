@@ -1132,16 +1132,16 @@ class CollectionManager {
     final roll = random.nextDouble() * 100;
     GameDifficulty selectedDifficulty;
 
-    if (roll < 40) {
-      selectedDifficulty = GameDifficulty.level1; // 40%
-    } else if (roll < 65) {
-      selectedDifficulty = GameDifficulty.level2; // 25%
-    } else if (roll < 85) {
-      selectedDifficulty = GameDifficulty.level3; // 20%
-    } else if (roll < 95) {
-      selectedDifficulty = GameDifficulty.level4; // 10%
+    if (roll < 57.8) {
+      selectedDifficulty = GameDifficulty.level1; // 57.8%
+    } else if (roll < 87.8) {
+      selectedDifficulty = GameDifficulty.level2; // 30%
+    } else if (roll < 97.8) {
+      selectedDifficulty = GameDifficulty.level3; // 10%
+    } else if (roll < 99.8) {
+      selectedDifficulty = GameDifficulty.level4; // 2%
     } else {
-      selectedDifficulty = GameDifficulty.level5; // 5%
+      selectedDifficulty = GameDifficulty.level5; // 0.2%
     }
 
     print(
@@ -1196,6 +1196,43 @@ class CollectionManager {
 
     // 예외 상황: 아무 카드도 없는 경우 (첫 카드 뽑기)
     return await _drawNewCard(selectedDifficulty, allPossibleCards, random);
+  }
+
+  /// IAP 상품 구매 시 보장된 새 캐릭터 뽑기
+  /// 무조건 해당 난이도의 미보유 캐릭터를 지급
+  Future<CollectionResult?> addGuaranteedNewCard(GameDifficulty difficulty) async {
+    // 컬렉션이 비어있다면 초기화
+    if (_collection.isEmpty) {
+      await initializeCollection();
+    }
+
+    final random = Random();
+
+    // 해당 난이도의 모든 가능한 카드 이미지 경로 생성
+    final allPossibleCards = _getAllPossibleCardsForDifficulty(difficulty);
+
+    // 이미 잠금 해제된 카드들의 이미지 경로 목록
+    final unlockedImagePaths = _collection
+        .where((item) => item.isUnlocked && item.imagePath.isNotEmpty)
+        .map((item) => item.imagePath)
+        .toSet();
+
+    // 아직 수집하지 않은 카드만 필터링
+    final availableNewCards = allPossibleCards
+        .where((path) => !unlockedImagePaths.contains(path))
+        .toList();
+
+    print(
+        '[IAP 보장 뽑기] 난이도: ${difficulty.name}, 사용 가능한 새 카드 수: ${availableNewCards.length}');
+
+    // 미보유 카드가 없으면 null 반환
+    if (availableNewCards.isEmpty) {
+      print('[IAP 보장 뽑기] 해당 난이도의 모든 카드를 이미 보유 중입니다.');
+      return null;
+    }
+
+    // 무조건 새 카드 뽑기
+    return await _drawNewCard(difficulty, availableNewCards, random);
   }
 
   /// 게임 완료 시 새 카드 추가 (기존 메서드 - 호환성 유지)

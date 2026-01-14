@@ -2,7 +2,9 @@ import 'dart:async';
 import 'package:in_app_purchase/in_app_purchase.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../data/ticket_manager.dart';
+import '../data/collection_manager.dart';
 import '../ads/admob_handler.dart';
+import '../utils/constants.dart';
 
 /// 인앱결제 상품 정보
 class IAPProduct {
@@ -18,6 +20,7 @@ class IAPProduct {
   final bool isFeatured; // 주력 상품 여부
   final int discountPercent; // 할인율 (0이면 할인 없음)
   final bool isAdRemoval; // 광고 제거 상품 여부
+  final GameDifficulty? guaranteedDifficulty; // 보장 캐릭터 등급
 
   const IAPProduct({
     required this.id,
@@ -32,6 +35,7 @@ class IAPProduct {
     this.isFeatured = false,
     this.discountPercent = 0,
     this.isAdRemoval = false,
+    this.guaranteedDifficulty,
   });
 
   int get totalCoins => coinAmount + bonusAmount;
@@ -45,6 +49,7 @@ class IAPService {
 
   final InAppPurchase _inAppPurchase = InAppPurchase.instance;
   final TicketManager _ticketManager = TicketManager();
+  final CollectionManager _collectionManager = CollectionManager();
 
   StreamSubscription<List<PurchaseDetails>>? _subscription;
   List<ProductDetails> _products = [];
@@ -59,6 +64,12 @@ class IAPService {
 
   // 광고 제거 구매 여부 확인용 키
   static const String _adsRemovedPurchasedKey = 'ads_removed_purchased';
+  
+  // 처리된 구매 ID 저장 키 (중복 방지용)
+  static const String _processedPurchasesKey = 'processed_purchase_ids';
+  
+  // 처리된 구매 ID 목록 (메모리 캐시)
+  final Set<String> _processedPurchaseIds = {};
 
   // 상품 ID 정의
   static const String coinPack5Id = 'ticket_05';
@@ -72,34 +83,37 @@ class IAPService {
       id: coinPack5Id,
       titleKo: '뽑기권 5개',
       titleEn: '5 Gacha Tickets',
-      descriptionKo: '가챠 이용 횟수 5번 추가',
-      descriptionEn: 'Add 5 gacha attempts',
+      descriptionKo: '어린이바라 캐릭터 1개 보장',
+      descriptionEn: 'Child Level character guaranteed',
       coinAmount: 5,
       priceKo: '₩1,500',
       priceEn: '\$0.99',
+      guaranteedDifficulty: GameDifficulty.level2,
     ),
     IAPProduct(
       id: coinPack20Id,
       titleKo: '뽑기권 25개',
       titleEn: '25 Gacha Tickets',
-      descriptionKo: '가챠 이용 횟수 25번 추가',
-      descriptionEn: 'Add 25 gacha attempts',
+      descriptionKo: '청소년바라 캐릭터 1개 보장',
+      descriptionEn: 'Teen Level character guaranteed',
       coinAmount: 25,
       bonusAmount: 0,
       priceKo: '₩5,500',
       priceEn: '\$4.00',
       isFeatured: true,
       discountPercent: 25,
+      guaranteedDifficulty: GameDifficulty.level3,
     ),
     IAPProduct(
       id: coinPack60Id,
       titleKo: '뽑기권 60개',
       titleEn: '60 Gacha Tickets',
-      descriptionKo: '가챠 이용 횟수 60번 추가',
-      descriptionEn: 'Add 60 gacha attempts',
+      descriptionKo: '어른바라 캐릭터 1개 보장',
+      descriptionEn: 'Adult Level character guaranteed',
       coinAmount: 60,
       priceKo: '₩11,000',
       priceEn: '\$8.00',
+      guaranteedDifficulty: GameDifficulty.level4,
     ),
     IAPProduct(
       id: removeAdsId,
@@ -148,8 +162,14 @@ class IAPService {
       // 티켓 매니저 초기화
       await _ticketManager.initialize();
 
+      // 컬렉션 매니저 초기화
+      await _collectionManager.initializeCollection();
+
       // 기존 구매 상태 확인 (광고 제거 등 비소비성 상품)
       await _checkExistingPurchases();
+      
+      // 처리된 구매 ID 목록 로드
+      await _loadProcessedPurchaseIds();
     } catch (e) {
       // 초기화 중 예외 발생 시 안전하게 처리
       print('[IAP] 초기화 실패: $e');
@@ -174,6 +194,38 @@ class IAPService {
     } catch (e) {
       print('[IAP] 기존 구매 상태 확인 실패: $e');
     }
+  }
+
+  /// 처리된 구매 ID 목록 로드
+  Future<void> _loadProcessedPurchaseIds() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final List<String>? savedIds = prefs.getStringList(_processedPurchasesKey);
+      if (savedIds != null) {
+        _processedPurchaseIds.addAll(savedIds);
+        print('[IAP] 처리된 구매 ID ${_processedPurchaseIds.length}개 로드됨');
+      }
+    } catch (e) {
+      print('[IAP] 처리된 구매 ID 로드 실패: $e');
+    }
+  }
+
+  /// 구매 ID를 SharedPreferences에 저장
+  Future<void> _savePurchaseId(String purchaseId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setStringList(_processedPurchasesKey, _processedPurchaseIds.toList());
+      print('[IAP] ✅ 구매 ID 영구 저장 완료: $purchaseId');
+    } catch (e) {
+      print('[IAP] ❌ 구매 ID 저장 실패: $e');
+      // 메모리에는 이미 추가되어 있으므로 재시작 전까지는 중복 방지 작동
+    }
+  }
+
+  /// 이미 처리된 구매인지 확인
+  bool _isPurchaseAlreadyProcessed(String? purchaseId) {
+    if (purchaseId == null || purchaseId.isEmpty) return false;
+    return _processedPurchaseIds.contains(purchaseId);
   }
 
   /// 상품 정보 로드
@@ -222,10 +274,39 @@ class IAPService {
         case PurchaseStatus.restored:
           // 구매가 성공적으로 완료된 상태
           _isPurchasePending = false;
-          print('[IAP] 구매 완료: ${purchaseDetails.productID}');
+          print('[IAP] 구매 완료: ${purchaseDetails.productID}, purchaseID: ${purchaseDetails.purchaseID}');
+
+          // purchaseID 확인
+          if (purchaseDetails.purchaseID == null || purchaseDetails.purchaseID!.isEmpty) {
+            print('[IAP] ⚠️ purchaseID가 없습니다. 구매 처리 스킵');
+            if (purchaseDetails.pendingCompletePurchase) {
+              await _inAppPurchase.completePurchase(purchaseDetails);
+            }
+            continue;
+          }
+
+          final purchaseId = purchaseDetails.purchaseID!;
+
+          // 중복 구매 체크
+          if (_isPurchaseAlreadyProcessed(purchaseId)) {
+            print('[IAP] ⚠️ 이미 처리된 구매입니다. 중복 방지: $purchaseId');
+            
+            // 구매 완료 처리만 하고 보상은 지급하지 않음
+            if (purchaseDetails.pendingCompletePurchase) {
+              await _inAppPurchase.completePurchase(purchaseDetails);
+            }
+            continue; // 다음 구매로 넘어감
+          }
+
+          // ✅ 즉시 메모리에 추가 (Race Condition 방지)
+          _processedPurchaseIds.add(purchaseId);
+          print('[IAP] 🔒 구매 처리 시작 - 메모리에 잠금: $purchaseId');
 
           // 구매 검증 및 보상 지급
           await _deliverProduct(purchaseDetails);
+          
+          // SharedPreferences에 영구 저장
+          await _savePurchaseId(purchaseId);
 
           // 구매 완료 처리 (스토어에 완료 신호 전송)
           if (purchaseDetails.pendingCompletePurchase) {
@@ -259,16 +340,43 @@ class IAPService {
     final productId = purchaseDetails.productID;
 
     if (productId == coinPack5Id) {
-      // 뽑기권 5개 지급 (소비성 상품)
+      // 뽑기권 5개 지급 + 어린이바라 캐릭터 1개 보장 (소비성 상품)
       await _ticketManager.addTickets(5);
+      
+      // 어린이바라 캐릭터 보장 지급
+      final result = await _collectionManager.addGuaranteedNewCard(GameDifficulty.level2);
+      if (result != null) {
+        print('[IAP] 어린이바라 캐릭터 보장 지급 완료: ${result.card?.imagePath}');
+      } else {
+        print('[IAP] 어린이바라 캐릭터를 모두 보유 중입니다. 뽑기권만 지급됩니다.');
+      }
+      
       print('[IAP] 뽑기권 5개 지급 완료');
     } else if (productId == coinPack20Id) {
-      // 뽑기권 25개 지급 (소비성 상품)
+      // 뽑기권 25개 지급 + 청소년바라 캐릭터 1개 보장 (소비성 상품)
       await _ticketManager.addTickets(25);
+      
+      // 청소년바라 캐릭터 보장 지급
+      final result = await _collectionManager.addGuaranteedNewCard(GameDifficulty.level3);
+      if (result != null) {
+        print('[IAP] 청소년바라 캐릭터 보장 지급 완료: ${result.card?.imagePath}');
+      } else {
+        print('[IAP] 청소년바라 캐릭터를 모두 보유 중입니다. 뽑기권만 지급됩니다.');
+      }
+      
       print('[IAP] 뽑기권 25개 지급 완료');
     } else if (productId == coinPack60Id) {
-      // 뽑기권 60개 지급 (소비성 상품)
+      // 뽑기권 60개 지급 + 어른바라 캐릭터 1개 보장 (소비성 상품)
       await _ticketManager.addTickets(60);
+      
+      // 어른바라 캐릭터 보장 지급
+      final result = await _collectionManager.addGuaranteedNewCard(GameDifficulty.level4);
+      if (result != null) {
+        print('[IAP] 어른바라 캐릭터 보장 지급 완료: ${result.card?.imagePath}');
+      } else {
+        print('[IAP] 어른바라 캐릭터를 모두 보유 중입니다. 뽑기권만 지급됩니다.');
+      }
+      
       print('[IAP] 뽑기권 60개 지급 완료');
     } else if (productId == removeAdsId) {
       // 광고 제거 (비소비성 상품)

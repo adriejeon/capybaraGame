@@ -1769,13 +1769,6 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
           color: Colors.white,
           borderRadius: BorderRadius.circular(20),
           border: Border.all(color: color, width: 2),
-          boxShadow: [
-            BoxShadow(
-              color: color.withOpacity(0.2),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
         ),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
