@@ -1212,7 +1212,7 @@ class _SpotDifferenceScreenState extends State<SpotDifferenceScreen>
     });
   }
 
-  /// 전체 순서 번호 계산 (1-1 = 1, 1-2 = 2, ..., 1-7 = 6, 2-1 = 7, ...)
+  /// 전체 순서 번호 계산 (1-1 = 1, 1-2 = 2, ..., 1-5 = 5, 2-1 = 6, ...)
   int _getStageNumber(int level, int stage) {
     final stageId = '$level-$stage';
     return SpotDifferenceDataManager.getGlobalStageNumber(stageId);

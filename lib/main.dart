@@ -81,6 +81,16 @@ class CapybaraGameApp extends StatelessWidget {
               Locale('ko', 'KR'),
               Locale('en', 'US'),
             ],
+            // 앱 전체에 텍스트 크기 고정 적용
+            builder: (context, child) {
+              final mediaQueryData = MediaQuery.of(context);
+              return MediaQuery(
+                data: mediaQueryData.copyWith(
+                  textScaler: TextScaler.linear(1.0), // 글자 크기 배율을 1.0으로 고정
+                ),
+                child: child!,
+              );
+            },
             home: const HomeScreen(),
             debugShowCheckedModeBanner: false,
           );

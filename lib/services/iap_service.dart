@@ -61,9 +61,9 @@ class IAPService {
   static const String _adsRemovedPurchasedKey = 'ads_removed_purchased';
 
   // 상품 ID 정의
-  static const String coinPack5Id = 'gacha_coin_5';
-  static const String coinPack20Id = 'gacha_coin_20';
-  static const String coinPack60Id = 'gacha_coin_60';
+  static const String coinPack5Id = 'ticket_05';
+  static const String coinPack20Id = 'ticket_25';
+  static const String coinPack60Id = 'ticket_60';
   static const String removeAdsId = 'remove_ads';
 
   // 상품 정보 (UI 표시용)
@@ -86,8 +86,8 @@ class IAPService {
       descriptionEn: 'Add 25 gacha attempts',
       coinAmount: 25,
       bonusAmount: 0,
-      priceKo: '₩4,900',
-      priceEn: '\$3.99',
+      priceKo: '₩5,500',
+      priceEn: '\$4.00',
       isFeatured: true,
       discountPercent: 25,
     ),
@@ -98,8 +98,8 @@ class IAPService {
       descriptionKo: '가챠 이용 횟수 60번 추가',
       descriptionEn: 'Add 60 gacha attempts',
       coinAmount: 60,
-      priceKo: '₩12,000',
-      priceEn: '\$9.99',
+      priceKo: '₩11,000',
+      priceEn: '\$8.00',
     ),
     IAPProduct(
       id: removeAdsId,
@@ -108,8 +108,8 @@ class IAPService {
       descriptionKo: '모든 광고를 영구적으로 제거합니다',
       descriptionEn: 'Remove all ads permanently',
       coinAmount: 0,
-      priceKo: '₩4,900',
-      priceEn: '\$3.99',
+      priceKo: '₩5,500',
+      priceEn: '\$4.00',
       isAdRemoval: true,
     ),
   ];

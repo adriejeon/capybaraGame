@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../services/theme_manager.dart';
 import '../../services/coin_manager.dart';
 import '../../services/iap_service.dart';
 import '../../sound_manager.dart';
 import '../../l10n/app_localizations.dart';
 import '../../data/ticket_manager.dart';
+import '../../ads/admob_handler.dart';
 
 /// 상점 화면
 class ShopScreen extends StatefulWidget {
@@ -32,6 +34,7 @@ class _ShopScreenState extends State<ShopScreen>
   int _currentTickets = 0;
   bool _isLoading = true;
   String _currentThemeId = 'default';
+  bool _adsRemovedPurchased = false; // 광고 제거 구매 여부
 
   // 현재 구매 진행 중인 상품 ID (로딩 다이얼로그 관리용)
   String? _purchasingProductId;
@@ -92,6 +95,10 @@ class _ShopScreenState extends State<ShopScreen>
       );
       await _iapService.initialize();
       await _ticketManager.initialize();
+
+      // 광고 제거 구매 여부 확인
+      final prefs = await SharedPreferences.getInstance();
+      _adsRemovedPurchased = prefs.getBool('ads_removed_purchased') ?? false;
 
       final coins = await CoinManager.getCoins();
       if (mounted) {
@@ -549,86 +556,108 @@ class _ShopScreenState extends State<ShopScreen>
   /// 광고 제거 카드
   ///
   /// 코인 팩 카드와 동일한 디자인으로 구성됩니다.
+  /// 구매 완료 시 비활성화되고 "구매 완료" 칩이 표시됩니다.
   Widget _buildRemoveAdsCard(IAPProduct product) {
     final isKorean = Localizations.localeOf(context).languageCode == 'ko';
     final price = _iapService.getProductPrice(product.id) ??
         (isKorean ? product.priceKo : product.priceEn);
 
     return GestureDetector(
-      onTap: () => _purchaseProduct(product.id),
-      child: Container(
-        padding: const EdgeInsets.all(16),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(16),
-          boxShadow: [
-            BoxShadow(
-              color: Colors.black.withOpacity(0.05),
-              blurRadius: 10,
-              offset: const Offset(0, 4),
-            ),
-          ],
-        ),
-        child: Row(
-          children: [
-            // 아이콘
-            Container(
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: const Color(0xFFFFF8E1),
-                borderRadius: BorderRadius.circular(12),
+      onTap: _adsRemovedPurchased ? null : () => _purchaseProduct(product.id),
+      child: Opacity(
+        opacity: _adsRemovedPurchased ? 0.6 : 1.0,
+        child: Container(
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(16),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.05),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-              child: const Icon(
-                Icons.block,
-                color: Color(0xFFFFB74D),
-                size: 40,
-              ),
-            ),
-            const SizedBox(width: 16),
-
-            // 상품 정보
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    isKorean ? product.titleKo : product.titleEn,
-                    style: const TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF333333),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    isKorean ? product.descriptionKo : product.descriptionEn,
-                    style: TextStyle(
-                      fontSize: 13,
-                      color: Colors.grey[600],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            // 가격 버튼 (간격 넓히기)
-            const SizedBox(width: 24),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 10),
-              decoration: BoxDecoration(
-                color: const Color(0xFFF5F5F5),
-                borderRadius: BorderRadius.circular(12),
-              ),
-              child: Text(
-                price,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  color: Color(0xFF333333),
+            ],
+          ),
+          child: Row(
+            children: [
+              // 아이콘
+              Container(
+                padding: const EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: const Color(0xFFFFF8E1),
+                  borderRadius: BorderRadius.circular(12),
+                ),
+                child: const Icon(
+                  Icons.block,
+                  color: Color(0xFFFFB74D),
+                  size: 40,
                 ),
               ),
-            ),
-          ],
+              const SizedBox(width: 16),
+
+              // 상품 정보
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      isKorean ? product.titleKo : product.titleEn,
+                      style: const TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                        color: Color(0xFF333333),
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      isKorean ? product.descriptionKo : product.descriptionEn,
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: Colors.grey[600],
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+
+              // 가격 버튼 또는 구매 완료 칩
+              const SizedBox(width: 24),
+              _adsRemovedPurchased
+                  ? Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF4CAF50),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        isKorean ? '구매 완료' : 'Purchased',
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.white,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 16, vertical: 10),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFFF5F5F5),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      child: Text(
+                        price,
+                        style: const TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF333333),
+                        ),
+                      ),
+                    ),
+            ],
+          ),
         ),
       ),
     );
@@ -1161,6 +1190,12 @@ class _ShopScreenState extends State<ShopScreen>
     if (_purchasingProductId == productId) {
       Navigator.of(context).pop();
       _purchasingProductId = null;
+    }
+
+    // 광고 제거 상품 구매 완료 시 상태 업데이트
+    if (productId == IAPService.removeAdsId) {
+      final prefs = await SharedPreferences.getInstance();
+      _adsRemovedPurchased = prefs.getBool('ads_removed_purchased') ?? false;
     }
 
     // 데이터 리로드

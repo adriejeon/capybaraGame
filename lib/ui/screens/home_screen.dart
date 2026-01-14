@@ -1703,11 +1703,11 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
             Navigator.of(context).pop();
             await GameCounter.incrementGameCount();
             if (context.mounted) {
-              // 저장된 진행 상황 불러오기
-              final currentStageId = await SpotProgressManager.getCurrentStage();
-              final parts = currentStageId.split('-');
+              // 마지막 완료된 스테이지의 다음 스테이지부터 시작
+              final nextStageId = await SpotProgressManager.getNextStageFromLastCompleted();
+              final parts = nextStageId.split('-');
               
-              // stageId에서 difficulty 계산 (1-6: level1, 7-12: level2, ...)
+              // stageId에서 difficulty 계산
               GameDifficulty difficulty = GameDifficulty.level1;
               if (parts.length == 2) {
                 final level = int.tryParse(parts[0]);
@@ -1732,12 +1732,15 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
                 }
               }
               
+              // 다음 스테이지를 현재 스테이지로 저장
+              await SpotProgressManager.saveCurrentStage(nextStageId);
+              
               await Navigator.push(
                 context,
                 MaterialPageRoute(
                   builder: (context) => SpotDifferenceScreen(
                     difficulty: difficulty,
-                    stageId: currentStageId,
+                    stageId: nextStageId,
                     isSequentialMode: true,
                   ),
                 ),
@@ -1774,23 +1777,47 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
             ),
           ],
         ),
-        child: Row(
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 60,
-              height: 60,
-              decoration: BoxDecoration(
-                color: color.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(15),
-              ),
-              child: Icon(icon, color: color, size: 32),
-            ),
-            const SizedBox(width: 16),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    // 제목 텍스트의 높이를 측정
+                    final textPainter = TextPainter(
+                      text: TextSpan(
+                        text: title,
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          color: color,
+                        ),
+                      ),
+                      maxLines: null,
+                      textDirection: TextDirection.ltr,
+                    );
+                    textPainter.layout();
+                    final titleHeight = textPainter.size.height;
+                    
+                    // 아이콘 컨테이너의 높이를 제목 높이와 동일하게 설정
+                    final iconSize = titleHeight.clamp(20.0, 50.0);
+                    
+                    return Container(
+                      width: iconSize,
+                      height: iconSize,
+                      decoration: BoxDecoration(
+                        color: color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(15),
+                      ),
+                      child: Icon(icon, color: color, size: iconSize * 0.55),
+                    );
+                  },
+                ),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
                     title,
                     style: TextStyle(
                       fontSize: 16,
@@ -1798,20 +1825,20 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
                       color: color,
                     ),
                   ),
-                  if (subtitle.isNotEmpty) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      subtitle,
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: Colors.grey[600],
-                      ),
-                    ),
-                  ],
-                ],
-              ),
+                ),
+                Icon(Icons.arrow_forward_ios, color: color, size: 20),
+              ],
             ),
-            Icon(Icons.arrow_forward_ios, color: color, size: 20),
+            if (subtitle.isNotEmpty) ...[
+              const SizedBox(height: 8),
+              Text(
+                subtitle,
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
           ],
         ),
       ),

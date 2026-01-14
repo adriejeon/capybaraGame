@@ -596,7 +596,7 @@ class _GachaScreenState extends State<GachaScreen>
                             elevation: 2,
                           ),
                           child: Text(
-                            isKorean ? '컬렉션 보러가기' : 'View Collection',
+                            isKorean ? '컬렉션' : 'Collection',
                             style: const TextStyle(
                               fontSize: 16,
                               fontWeight: FontWeight.bold,

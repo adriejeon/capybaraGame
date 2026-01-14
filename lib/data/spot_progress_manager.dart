@@ -64,7 +64,7 @@ class SpotProgressManager {
   }
 
   /// 다음 스테이지 ID 계산
-  /// 실제 스테이지 구조 반영: 1-1 → 1-2 → ... → 1-5 → 1-7 → 2-1 → ... → 5-7 → null
+  /// 실제 스테이지 구조 반영: 1-1 → 1-2 → ... → 1-5 → 2-1 → ... → 5-7 → null
   static String? getNextStageId(String currentStageId) {
     final parts = currentStageId.split('-');
     if (parts.length != 2) return null;
@@ -100,7 +100,7 @@ class SpotProgressManager {
   }
 
   /// 이전 스테이지 ID 계산
-  /// 실제 스테이지 구조 반영: 1-7 → 1-5 → ... → 1-2 → 1-1 → null
+  /// 실제 스테이지 구조 반영: 2-1 → 1-5 → ... → 1-2 → 1-1 → null
   static String? getPreviousStageId(String currentStageId) {
     final parts = currentStageId.split('-');
     if (parts.length != 2) return null;
@@ -136,7 +136,7 @@ class SpotProgressManager {
   }
 
   /// 진행률 계산 (%)
-  /// 레벨별 스테이지 개수: 레벨1=6 (1-1~1-5, 1-7), 레벨2=6, 레벨3=6, 레벨4=6, 레벨5=7 (총 31개)
+  /// 레벨별 스테이지 개수: 레벨1=5, 레벨2=6, 레벨3=6, 레벨4=6, 레벨5=7 (총 29개)
   static Future<double> getProgress() async {
     int completedCount = 0;
     int totalStages = 0;
@@ -155,6 +155,38 @@ class SpotProgressManager {
     }
 
     return totalStages > 0 ? (completedCount / totalStages) * 100 : 0.0;
+  }
+
+  /// 마지막 완료된 스테이지의 다음 스테이지 ID 찾기
+  /// 이어서하기 기능에서 사용: 완료된 스테이지 중 가장 마지막 스테이지의 다음 스테이지 반환
+  /// 완료된 스테이지가 없으면 "1-1" 반환
+  static Future<String> getNextStageFromLastCompleted() async {
+    String? lastCompletedStageId;
+    
+    // 모든 스테이지를 순서대로 확인하여 마지막 완료된 스테이지 찾기
+    for (int level = 1; level <= 5; level++) {
+      final stageNumbers = SpotDifferenceDataManager.stageNumbersByLevel[level] ?? [];
+      for (final stage in stageNumbers) {
+        final stageId = '$level-$stage';
+        final completed = await isStageCompleted(stageId);
+        if (completed) {
+          lastCompletedStageId = stageId;
+        }
+      }
+    }
+    
+    // 마지막 완료된 스테이지가 있으면 그 다음 스테이지 반환
+    if (lastCompletedStageId != null) {
+      final nextStageId = getNextStageId(lastCompletedStageId);
+      if (nextStageId != null) {
+        return nextStageId;
+      }
+      // 마지막 스테이지까지 모두 완료한 경우, 마지막 스테이지 반환
+      return lastCompletedStageId;
+    }
+    
+    // 완료된 스테이지가 없으면 첫 번째 스테이지 반환
+    return '1-1';
   }
 
   /// 모든 진행 상태 초기화

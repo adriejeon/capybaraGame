@@ -1,6 +1,6 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <string name="app_name">Capybara</string>
+    <string name="app_name">Capy Pick</string>
     <!-- Google Play Games APP ID -->
     <!-- Replace with actual APP ID from Google Play Console (12-digit number) -->
     <string name="app_id">286533441770</string>

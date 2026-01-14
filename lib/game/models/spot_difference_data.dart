@@ -175,23 +175,24 @@ class SpotDifferenceDataManager {
 
   /// 레벨별 스테이지 개수
   static const Map<int, int> stageCountByLevel = {
-    1: 6, // 1-1, 1-2, 1-3, 1-4, 1-5, 1-7 (1-6 없음)
-    2: 6, // 2-1 ~ 2-6
-    3: 6, // 3-1 ~ 3-6
-    4: 6, // 4-1 ~ 4-6
-    5: 7, // 5-1 ~ 5-7
+    1: 5, // 1-1 ~ 1-5 (총 5개)
+    2: 6, // 2-1 ~ 2-6 (총 6개)
+    3: 6, // 3-1 ~ 3-6 (총 6개)
+    4: 6, // 4-1 ~ 4-6 (총 6개)
+    5: 7, // 5-1 ~ 5-7 (총 7개)
+    // 총 29개 스테이지
   };
 
   /// 레벨별 실제 스테이지 번호 목록 (순서대로)
   static const Map<int, List<int>> stageNumbersByLevel = {
-    1: [1, 2, 3, 4, 5, 7], // 1-6 없음
+    1: [1, 2, 3, 4, 5], // 1-1 ~ 1-5 (1-6, 1-7 없음)
     2: [1, 2, 3, 4, 5, 6],
     3: [1, 2, 3, 4, 5, 6],
     4: [1, 2, 3, 4, 5, 6],
     5: [1, 2, 3, 4, 5, 6, 7],
   };
 
-  /// 스테이지 ID를 전체 순서 번호로 변환 (1-1 = 1, 1-2 = 2, ..., 1-7 = 6, 2-1 = 7, ...)
+  /// 스테이지 ID를 전체 순서 번호로 변환 (1-1 = 1, 1-2 = 2, ..., 1-5 = 5, 2-1 = 6, ...)
   static int getGlobalStageNumber(String stageId) {
     final parts = stageId.split('-');
     if (parts.length != 2) return 0;
@@ -243,11 +244,11 @@ class SpotDifferenceDataManager {
 
   /// 레벨별 시간 제한
   static const Map<int, int> timeLimitByLevel = {
-    1: 60, // 60초
-    2: 50, // 50초
-    3: 45, // 45초
-    4: 40, // 40초
-    5: 35, // 35초
+    1: 120, // 2분 (120초)
+    2: 120, // 2분 (120초)
+    3: 120, // 2분 (120초)
+    4: 120, // 2분 (120초)
+    5: 120, // 2분 (120초)
   };
 
   /// 레벨별 찾아야 할 틀린그림 개수
@@ -309,16 +310,6 @@ class SpotDifferenceDataManager {
       const DifferenceSpot(x: 0.9673, y: 0.4852, radius: 0.2000),
       const DifferenceSpot(x: 0.4185, y: 0.2205, radius: 0.2000),
       const DifferenceSpot(x: 0.0796, y: 0.0712, radius: 0.2000),
-    ],
-    '1-7': [
-      const DifferenceSpot(x: 0.5527, y: 0.2135, radius: 0.1464),
-      const DifferenceSpot(x: 0.4756, y: 0.4392, radius: 0.1464),
-      const DifferenceSpot(x: 0.5508, y: 0.4340, radius: 0.1464),
-      const DifferenceSpot(x: 0.4766, y: 0.5382, radius: 0.1464),
-      const DifferenceSpot(x: 0.5166, y: 0.4757, radius: 0.1464),
-      const DifferenceSpot(x: 0.9707, y: 0.4392, radius: 0.1464),
-      const DifferenceSpot(x: 0.0898, y: 0.4861, radius: 0.1464),
-      const DifferenceSpot(x: 0.8760, y: 0.5764, radius: 0.1464),
     ],
 
     // ========== 레벨 2 (어린이 단계) ==========
@@ -600,7 +591,7 @@ class SpotDifferenceDataManager {
         originalImage: 'assets/soptTheDifference/$key.webp',
         wrongImage: 'assets/soptTheDifference/$key-wrong.webp',
         spots: jsonSpots,
-        timeLimit: timeLimitByLevel[level] ?? 60,
+        timeLimit: timeLimitByLevel[level] ?? 120,
         spotCount: spotCountByLevel[level] ?? 3,
       );
     }
