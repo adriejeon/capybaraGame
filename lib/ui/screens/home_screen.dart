@@ -12,9 +12,11 @@ import '../../utils/constants.dart';
 import 'game_screen.dart';
 import 'collection_screen.dart';
 import 'spot_difference_screen.dart';
+import 'hidden_picture_screen.dart';
 import 'gacha_screen.dart';
 import '../../data/ticket_manager.dart';
 import '../../data/spot_progress_manager.dart';
+import '../../data/hidden_progress_manager.dart';
 import 'shop_screen.dart';
 import '../widgets/sound_settings_dialog.dart';
 import '../widgets/daily_mission_modal.dart';
@@ -1483,6 +1485,7 @@ enum _ModalStep {
   gameType, // 게임 종류 선택
   cardDifficulty, // 카드 짝 맞추기 난이도 선택
   spotMode, // 틀린그림찾기 모드 선택
+  hiddenMode, // 숨은그림찾기 모드 선택
 }
 
 class _GameSelectionModalState extends State<_GameSelectionModal> {
@@ -1570,6 +1573,8 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
         return isKorean ? '난이도 선택' : 'Select Difficulty';
       case _ModalStep.spotMode:
         return isKorean ? '게임 모드' : 'Game Mode';
+      case _ModalStep.hiddenMode:
+        return isKorean ? '게임 모드' : 'Game Mode';
     }
   }
 
@@ -1581,6 +1586,8 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
         return _buildCardDifficultySelection(context, isKorean);
       case _ModalStep.spotMode:
         return _buildSpotModeSelection(context, isKorean);
+      case _ModalStep.hiddenMode:
+        return _buildHiddenModeSelection(context, isKorean);
     }
   }
 
@@ -1614,6 +1621,21 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
           onTap: () {
             setState(() {
               _currentStep = _ModalStep.spotMode;
+            });
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildGameTypeButton(
+          context: context,
+          icon: Icons.center_focus_weak_rounded,
+          title: isKorean ? '숨은그림 찾기' : 'Hidden Picture',
+          subtitle: isKorean
+              ? '숨어있는 그림들을 찾으세요'
+              : 'Find hidden objects',
+          color: const Color(0xFF9C27B0),
+          onTap: () {
+            setState(() {
+              _currentStep = _ModalStep.hiddenMode;
             });
           },
         ),
@@ -1740,6 +1762,69 @@ class _GameSelectionModalState extends State<_GameSelectionModal> {
                 MaterialPageRoute(
                   builder: (context) => SpotDifferenceScreen(
                     difficulty: difficulty,
+                    stageId: nextStageId,
+                    isSequentialMode: true,
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+      ],
+    );
+  }
+
+  /// 숨은그림찾기 모드 선택
+  Widget _buildHiddenModeSelection(BuildContext context, bool isKorean) {
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        _buildGameTypeButton(
+          context: context,
+          icon: Icons.restart_alt,
+          title: isKorean ? '처음부터 다시하기' : 'Start from Beginning',
+          subtitle:
+              isKorean ? '1 스테이지부터 시작' : 'Start from stage 1',
+          color: const Color(0xFF9C27B0),
+          onTap: () async {
+            Navigator.of(context).pop();
+            await GameCounter.incrementGameCount();
+            if (context.mounted) {
+              // 1 스테이지부터 순차 진행
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const HiddenPictureScreen(
+                    stageId: 1,
+                    isSequentialMode: true,
+                  ),
+                ),
+              );
+            }
+          },
+        ),
+        const SizedBox(height: 16),
+        _buildGameTypeButton(
+          context: context,
+          icon: Icons.play_arrow,
+          title: isKorean ? '이어서 하기' : 'Continue',
+          subtitle:
+              isKorean ? '저장된 진행 상황부터 계속' : 'Continue from saved progress',
+          color: const Color(0xFF4CAF50),
+          onTap: () async {
+            Navigator.of(context).pop();
+            await GameCounter.incrementGameCount();
+            if (context.mounted) {
+              // 마지막 완료된 스테이지의 다음 스테이지부터 시작
+              final nextStageId = await HiddenProgressManager.getNextStageFromLastCompleted();
+              
+              // 다음 스테이지를 현재 스테이지로 저장
+              await HiddenProgressManager.saveCurrentStage(nextStageId);
+              
+              await Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => HiddenPictureScreen(
                     stageId: nextStageId,
                     isSequentialMode: true,
                   ),
