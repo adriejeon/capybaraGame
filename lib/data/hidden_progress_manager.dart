@@ -6,7 +6,7 @@ class HiddenProgressManager {
   static const String _keyPrefix = 'hidden_progress_';
   static const String _keyCurrentStage = 'hidden_current_stage';
 
-  /// 현재 진행 중인 스테이지 저장 (1~3)
+  /// 현재 진행 중인 스테이지 저장 (1~9)
   static Future<void> saveCurrentStage(int stageId) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_keyCurrentStage, stageId);
@@ -49,12 +49,12 @@ class HiddenProgressManager {
     return prefs.getBool('$_keyPrefix$stageId') ?? false;
   }
 
-  /// 다음 스테이지 ID 계산 (1 → 2 → 3 → null)
+  /// 다음 스테이지 ID 계산 (1 → 2 → 3 → ... → 9 → null)
   static int? getNextStageId(int currentStage) {
     return HiddenPictureDataManager.getNextStageId(currentStage);
   }
 
-  /// 이전 스테이지 ID 계산 (3 → 2 → 1 → null)
+  /// 이전 스테이지 ID 계산 (9 → 8 → 7 → ... → 1 → null)
   static int? getPreviousStageId(int currentStage) {
     return HiddenPictureDataManager.getPreviousStageId(currentStage);
   }

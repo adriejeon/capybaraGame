@@ -111,7 +111,7 @@ class HiddenSpot {
 
 /// 숨은그림찾기 스테이지 데이터
 class HiddenPictureStage {
-  final int stage; // 스테이지 (1~5)
+  final int stage; // 스테이지 (1~9)
   final String image; // 이미지 경로
   final List<HiddenSpot> spots; // 숨은 그림 위치들
   final int timeLimit; // 시간 제한 (초)
@@ -135,11 +135,11 @@ class HiddenPictureDataManager {
   factory HiddenPictureDataManager() => _instance;
   HiddenPictureDataManager._internal();
 
-  /// 스테이지 개수 (1~5)
-  static const int totalStages = 5;
+  /// 스테이지 개수 (1~9)
+  static const int totalStages = 9;
 
   /// 시간 제한 (모든 스테이지 동일)
-  static const int timeLimit = 180; // 3분 (180초)
+  static const int timeLimit = 90; // 1분 30초 (90초)
 
   /// 찾아야 할 숨은 그림 개수 (모든 스테이지 동일)
   static const int spotCount = 5; // 5개
@@ -172,6 +172,14 @@ class HiddenPictureDataManager {
         return 'assets/capybara/black2.webp';
       case 5:
         return 'assets/capybara/blue2.webp';
+      case 6:
+        return 'assets/capybara/black3.webp';
+      case 7:
+        return 'assets/capybara/blue1.webp';
+      case 8:
+        return 'assets/capybara/brown1.webp';
+      case 9:
+        return 'assets/capybara/brown2.webp';
       default:
         return 'assets/capybara/blue3.webp'; // 기본값
     }
@@ -216,7 +224,7 @@ class HiddenPictureDataManager {
     return stages;
   }
 
-  /// 다음 스테이지 ID 계산 (1 → 2 → 3 → 4 → 5 → null)
+  /// 다음 스테이지 ID 계산 (1 → 2 → 3 → 4 → 5 → 6 → 7 → 8 → 9 → null)
   static int? getNextStageId(int currentStage) {
     if (currentStage >= 1 && currentStage < totalStages) {
       return currentStage + 1;
@@ -224,7 +232,7 @@ class HiddenPictureDataManager {
     return null; // 마지막 스테이지
   }
 
-  /// 이전 스테이지 ID 계산 (5 → 4 → 3 → 2 → 1 → null)
+  /// 이전 스테이지 ID 계산 (9 → 8 → 7 → 6 → 5 → 4 → 3 → 2 → 1 → null)
   static int? getPreviousStageId(int currentStage) {
     if (currentStage > 1 && currentStage <= totalStages) {
       return currentStage - 1;

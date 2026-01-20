@@ -13,7 +13,7 @@ import '../../l10n/app_localizations.dart';
 
 /// 숨은그림찾기 게임 화면
 class HiddenPictureScreen extends StatefulWidget {
-  final int? stageId; // 특정 스테이지 ID (1~3)
+  final int? stageId; // 특정 스테이지 ID (1~9)
   final bool isSequentialMode; // 순차 진행 모드 여부
 
   const HiddenPictureScreen({
@@ -1399,21 +1399,26 @@ class _HiddenPictureScreenState extends State<HiddenPictureScreen>
           : ClipOval(
               child: Opacity(
                 opacity: 0.2,
-                child: Image.asset(
-                  _currentStage?.characterImage ?? 'assets/capybara/blue3.webp',
-                  fit: BoxFit.cover,
-                  errorBuilder: (context, error, stackTrace) {
-                    return const Center(
-                      child: Text(
-                        '?',
-                        style: TextStyle(
-                          color: Color(0xFFBDBDBD),
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
+                child: Transform.scale(
+                  scale: 1.5,
+                  child: Image.asset(
+                    _currentStage?.characterImage ?? 'assets/capybara/blue3.webp',
+                    fit: BoxFit.cover,
+                    width: 40,
+                    height: 40,
+                    errorBuilder: (context, error, stackTrace) {
+                      return const Center(
+                        child: Text(
+                          '?',
+                          style: TextStyle(
+                            color: Color(0xFFBDBDBD),
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
               ),
             ),
