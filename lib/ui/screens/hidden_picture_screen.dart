@@ -13,7 +13,7 @@ import '../../l10n/app_localizations.dart';
 
 /// 숨은그림찾기 게임 화면
 class HiddenPictureScreen extends StatefulWidget {
-  final int? stageId; // 특정 스테이지 ID (1~9)
+  final int? stageId; // 특정 스테이지 ID (1~10)
   final bool isSequentialMode; // 순차 진행 모드 여부
 
   const HiddenPictureScreen({
